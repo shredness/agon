@@ -1119,9 +1119,9 @@ function editSession(date) {
       <span class="ex-dens" id="exd-${id}"></span>
     `;
     document.getElementById('ex-container').appendChild(div);
-    onExChange(id);
 
-    // Populate sets
+    // Populate sets BEFORE calling onExChange so DOM is fully ready
+    const tbody = document.getElementById('sets-'+id);
     (ex.sets || []).forEach(set => {
       const sid = setCounts[id]++;
       const def = getExDef(ex.name);
@@ -1136,11 +1136,15 @@ function editSession(date) {
         <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${id}-${sid}">—</td>
         <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${id},${sid})">✕</button></td>
       `;
-      document.getElementById('sets-'+id).appendChild(tr);
+      if (tbody) tbody.appendChild(tr);
     });
+
+    // Call onExChange after sets are in DOM
+    onExChange(id);
   });
 
-  calcRD();
+  // Defer calcRD until all DOM is settled
+  setTimeout(calcRD, 100);
   window.scrollTo({ top: 0, behavior: 'smooth' });
   showToast(`Editing session — ${date}`);
 }
