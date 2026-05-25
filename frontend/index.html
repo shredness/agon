@@ -895,11 +895,11 @@ function effBW(id, bw) {
 
 function calcRD() {
   const bw = parseFloat(document.getElementById('sess-bw')?.value)||0;
-  let totalDensity = 0; const lines = [];
+  let sessionTotalVol = 0; let sessionTotalTime = 0; const lines = [];
   document.querySelectorAll('.exercise-block').forEach(block => {
     const id = block.id.replace('ex-','');
     const def = getExDef(document.getElementById('exn-'+id)?.value||'');
-    let exVol = 0; let exDensity = 0;
+    let exVol = 0; let exTime = 0; let exDensity = 0;
     block.querySelectorAll('tbody tr').forEach(tr => {
       const [,exId,sid] = tr.id.split('-');
       const reps = parseFloat(document.getElementById(`r-${exId}-${sid}`)?.value)||0;
@@ -911,6 +911,7 @@ function calcRD() {
       else { const l=parseFloat(document.getElementById(`l-${exId}-${sid}`)?.value)||0; if(!l){if(vEl)vEl.textContent='—';return;} const vtm=def.tool==='Bar'?(document.querySelector(`input[name="vtm-${id}"]:checked`)?.value||'vitruvian'):''; if(def.tool==='Bar'&&vtm==='standard'){const bwt2=parseFloat(document.getElementById(`barwt-val-${id}`)?.value)||0;trueLbs=l*2+bwt2;}else{trueLbs=l*(def.tool==='Bar'?2.0:def.mult);} }
       const vol = trueLbs*reps;
       exVol += vol;
+      exTime += setTime;
       exDensity += vol / setTime;
       if(vEl) vEl.textContent=vol.toFixed(0)+' lbs';
     });
@@ -921,8 +922,8 @@ function calcRD() {
     } else { const de=document.getElementById('exd-'+id); if(de) de.textContent=''; }
   });
   const rb=document.getElementById('result-bar');
-  if (totalDensity>0&&bw>0) {
-    const rd=totalDensity/bw;
+  if (sessionTotalVol>0&&sessionTotalTime>0&&bw>0) {
+    const rd=sessionTotalVol/(sessionTotalTime*bw);
     rb.style.display='flex';
     document.getElementById('result-rd').textContent=rd.toFixed(2);
     document.getElementById('result-detail').innerHTML=lines.map(l=>`<span style="display:inline-block;margin-right:10px;margin-bottom:3px;">${l} lbs/min</span>`).join('');
@@ -956,7 +957,9 @@ async function saveSession() {
     if(exDensity>0){totalDensity+=exDensity;exData.push({name,sets,totalVol:exVol,density:exDensity,tool:def.tool,mult:def.mult,isBW:def.isBW});}
   });
   if(!exData.length){showToast('Add at least one exercise with reps.');return;}
-  const rd=totalDensity/bw;
+  const totalVol=exData.reduce((a,e)=>a+e.totalVol,0);
+  const totalTime=exData.reduce((a,e)=>a+e.sets.reduce((b,s)=>b+(s.time||2),0),0);
+  const rd=totalTime>0&&bw>0?totalVol/(totalTime*bw):0;
   const btn=document.getElementById('save-btn');
   btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
   try {

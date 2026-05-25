@@ -297,21 +297,24 @@ def save_session(session: SessionIn, user=Depends(current_user)):
         raise HTTPException(status_code=403, detail="Demo account is read-only")
     uid = user["id"]
 
-    # Recalculate density and RD server-side from per-set time
+    # Recalculate RD server-side using correct formula:
+    # RD = total_session_vol / (total_session_time * bodyweight)
     exercises_out = []
-    total_density = 0.0
+    total_vol  = 0.0
+    total_time = 0.0
     for ex in session.exercises:
-        set_density = sum(
-            (s.vol / s.time) for s in ex.sets if s.time > 0
-        )
-        total_density += set_density
+        ex_vol  = sum(s.vol  for s in ex.sets)
+        ex_time = sum(s.time for s in ex.sets if s.time > 0)
+        total_vol  += ex_vol
+        total_time += ex_time
         exercises_out.append({
             **ex.dict(),
-            "density": round(set_density, 2),
-            "totalVol": round(sum(s.vol for s in ex.sets), 1),
+            "totalVol": round(ex_vol, 1),
+            "density":  round(ex_vol / ex_time, 2) if ex_time > 0 else 0,
         })
 
-    rd = round(total_density / session.bw, 2) if session.bw else 0
+    total_density = round(total_vol / total_time, 2) if total_time > 0 else 0
+    rd = round(total_vol / (total_time * session.bw), 2) if (total_time > 0 and session.bw) else 0
 
     conn = get_db()
     try:
