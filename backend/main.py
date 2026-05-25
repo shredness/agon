@@ -3,9 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3, json, os
-from datetime import datetime
+from datetime import datetime, timedelta
 
-app = FastAPI(title="RD Tracker API")
+app = FastAPI(title="Prometheus API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,34 +15,6 @@ app.add_middleware(
 )
 
 DB_PATH = os.environ.get("DB_PATH", "/data/sessions.db")
-
-SEED_WEEKLY = [
-    {"week": "12/4/2025",  "rd": 1.70, "wt": 219},
-    {"week": "12/11/2025", "rd": 2.04, "wt": 215},
-    {"week": "12/18/2025", "rd": 2.17, "wt": 215},
-    {"week": "12/25/2025", "rd": 1.97, "wt": 214},
-    {"week": "1/8/2026",   "rd": 1.81, "wt": 212},
-    {"week": "1/15/2026",  "rd": 2.25, "wt": 211},
-    {"week": "1/22/2026",  "rd": 2.30, "wt": 210},
-    {"week": "1/29/2026",  "rd": 2.35, "wt": 210},
-    {"week": "2/5/2026",   "rd": 2.37, "wt": 209},
-    {"week": "2/12/2026",  "rd": 2.57, "wt": 207},
-    {"week": "2/19/2026",  "rd": 2.62, "wt": 206},
-    {"week": "2/26/2026",  "rd": 2.69, "wt": 205},
-    {"week": "3/5/2026",   "rd": 2.77, "wt": 203},
-    {"week": "3/12/2026",  "rd": 2.73, "wt": 203},
-    {"week": "3/19/2026",  "rd": 2.39, "wt": 202},
-    {"week": "3/26/2026",  "rd": 2.59, "wt": 201},
-    {"week": "4/2/2026",   "rd": 2.77, "wt": 201},
-    {"week": "4/9/2026",   "rd": 2.82, "wt": 202},
-    {"week": "4/16/2026",  "rd": 2.91, "wt": 202},
-    {"week": "4/23/2026",  "rd": 2.37, "wt": 200},
-    {"week": "4/30/2026",  "rd": 2.63, "wt": 200},
-    {"week": "5/7/2026",   "rd": 2.69, "wt": 199},
-    {"week": "5/14/2026",  "rd": 2.95, "wt": 199},
-    {"week": "5/21/2026",  "rd": 2.89, "wt": 199},
-    {"week": "5/28/2026",  "rd": 2.79, "wt": 200},
-]
 
 
 def get_db():
@@ -173,32 +145,73 @@ def get_trend():
         except ValueError:
             continue
         days_to_sunday = (6 - d.weekday()) % 7
-        from datetime import timedelta
         sun = d + timedelta(days=days_to_sunday)
         key = f"{sun.month}/{sun.day}/{sun.year}"
         if key not in by_week:
             by_week[key] = []
         by_week[key].append({"rd": r["rd"], "wt": r["bw"]})
 
-    merged = list(SEED_WEEKLY)
+    result = []
     for week, entries in by_week.items():
         avg_rd = sum(e["rd"] for e in entries) / len(entries)
         avg_wt = sum(e["wt"] for e in entries) / len(entries)
-        existing = next((i for i, w in enumerate(merged) if w["week"] == week), None)
-        if existing is not None:
-            merged[existing] = {
-                "week": week,
-                "rd": round((merged[existing]["rd"] + avg_rd) / 2, 2),
-                "wt": round((merged[existing]["wt"] + avg_wt) / 2, 1),
-            }
-        else:
-            merged.append({"week": week, "rd": round(avg_rd, 2), "wt": round(avg_wt, 1)})
+        result.append({
+            "week": week,
+            "rd": round(avg_rd, 2),
+            "wt": round(avg_wt, 1),
+        })
 
-    def sort_key(w):
-        try:
-            return datetime.strptime(w["week"], "%m/%d/%Y")
-        except ValueError:
-            return datetime.min
+    result.sort(key=lambda w: datetime.strptime(w["week"], "%m/%d/%Y"))
+    return result
 
-    merged.sort(key=sort_key)
-    return merged
+
+@app.get("/progress/{exercise_name}")
+def get_progress(exercise_name: str):
+    """
+    Returns per-session data for a specific exercise:
+    date, top set load (trueLbs), total vol, density, session RD, bodyweight.
+    Useful for graphing strength progression on a single lift over time.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT date, bw, rd, exercises FROM sessions ORDER BY date ASC"
+    ).fetchall()
+    conn.close()
+
+    result = []
+    for r in rows:
+        exercises = json.loads(r["exercises"])
+        match = next((e for e in exercises if e.get("name","").lower() == exercise_name.lower()), None)
+        if not match:
+            continue
+        sets = match.get("sets", [])
+        if not sets:
+            continue
+        top_set = max(sets, key=lambda s: s.get("trueLbs", 0))
+        total_vol = sum(s.get("vol", 0) for s in sets)
+        result.append({
+            "date":      r["date"],
+            "bw":        r["bw"],
+            "rd":        r["rd"],
+            "topLoad":   round(top_set.get("trueLbs", 0), 1),
+            "topReps":   int(top_set.get("reps", 0)),
+            "totalVol":  round(total_vol, 1),
+            "density":   round(match.get("density", 0), 2),
+            "sets":      len(sets),
+        })
+
+    return result
+
+
+@app.get("/exercises/logged")
+def get_logged_exercises():
+    """Returns a sorted list of all exercise names that have at least one logged session."""
+    conn = get_db()
+    rows = conn.execute("SELECT exercises FROM sessions").fetchall()
+    conn.close()
+    names = set()
+    for r in rows:
+        for ex in json.loads(r["exercises"]):
+            if ex.get("name"):
+                names.add(ex["name"])
+    return sorted(names)
