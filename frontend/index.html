@@ -490,7 +490,7 @@ const EXERCISE_BANK = [
   {name:'Hanging Leg Raise', alias:'Hanging Leg Raises', tool:'Bodyweight', mult:0.50, muscle:'Core', day:'—', loadHint:'bodyweight', isBW:true, isAssist:false},
 ];
 
-let sessions = [];
+let sessions = []; // always an array
 let exCount = 0, setCounts = {};
 let tC = null, wC = null;
 
@@ -706,7 +706,8 @@ function applyRoleUI() {
 async function init() {
   document.getElementById('sess-date').value = new Date().toISOString().slice(0,10);
   try {
-    sessions = await apiFetch('/sessions');
+    const fetched = await apiFetch('/sessions');
+    sessions = Array.isArray(fetched) ? fetched : [];
     document.getElementById('api-banner').style.display = 'none';
   } catch(e) { sessions = []; }
   // Load saved bank from localStorage if it exists
@@ -978,7 +979,7 @@ async function saveSession() {
 }
 
 function updateStats() {
-  if(!sessions.length){return;}
+  if(!sessions||!sessions.length){return;}
   const rds=sessions.map(s=>s.rd);
   document.getElementById('s-avg').textContent=(rds.reduce((a,v)=>a+v,0)/rds.length).toFixed(2);
   const last=sessions[sessions.length-1];
