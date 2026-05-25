@@ -571,6 +571,11 @@ let currentUser = null;
 function logout() {
   try { localStorage.removeItem('prometheus-token'); } catch(e) {}
   currentUser = null;
+  // Remove user badge and demo banner so they rebuild fresh on next login
+  const badge = document.getElementById('user-badge');
+  if (badge) badge.remove();
+  const banner = document.getElementById('demo-banner');
+  if (banner) banner.remove();
   document.getElementById('main-app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-username').value = '';
