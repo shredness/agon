@@ -354,27 +354,18 @@ def get_trend(user=Depends(current_user)):
     ).fetchall()
     conn.close()
 
-    by_week: dict = {}
+    # Return per-session data — matches original spreadsheet which plots each session individually
+    result = []
     for r in rows:
         try:
             d = datetime.strptime(r["date"], "%Y-%m-%d")
         except ValueError:
             continue
-        days_to_sunday = (6 - d.weekday()) % 7
-        sun = d + timedelta(days=days_to_sunday)
-        key = f"{sun.month}/{sun.day}/{sun.year}"
-        if key not in by_week:
-            by_week[key] = []
-        by_week[key].append({"rd": r["rd"], "wt": r["bw"]})
-
-    result = []
-    for week, entries in by_week.items():
         result.append({
-            "week": week,
-            "rd":   round(sum(e["rd"] for e in entries) / len(entries), 2),
-            "wt":   round(sum(e["wt"] for e in entries) / len(entries), 1),
+            "week": f"{d.month}/{d.day}/{d.year}",  # field kept as 'week' for frontend compat
+            "rd":   r["rd"],
+            "wt":   r["bw"],
         })
-    result.sort(key=lambda w: datetime.strptime(w["week"], "%m/%d/%Y"))
     return result
 
 

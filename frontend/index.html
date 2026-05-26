@@ -277,7 +277,7 @@
       <div style="position:relative;width:100%;height:320px;">
         <canvas id="trendChart" role="img" aria-label="RD and bodyweight trend overlaid"></canvas>
       </div>
-      <p style="font-size:11px;color:var(--text3);margin-top:8px;">Weekly averages. RD higher = stronger relative to bodyweight.</p>
+      <p style="font-size:11px;color:var(--text3);margin-top:8px;">Per-session RD. Higher = stronger relative to bodyweight.</p>
     </div>
   </div>
 
@@ -1213,7 +1213,7 @@ function editSession(date) {
 async function renderTrend() {
   let trendData=[];
   try { trendData=await apiFetch('/trend'); } catch(e){return;}
-  const labels=trendData.map(d=>d.week.replace('/2025','').replace('/2026',''));
+  const labels=trendData.map(d=>{ const p=d.week.split('/'); return p[0]+'/'+p[1]; });
   const rdV=trendData.map(d=>+d.rd.toFixed(2));
   const wtV=trendData.map(d=>+d.wt.toFixed(1));
   // 60-day average RD — use weeks within last 60 days
@@ -1234,7 +1234,7 @@ async function renderTrend() {
     ? recent60.reduce((a,d)=>a+d.rd,0)/recent60.length
     : rdV.reduce((a,v)=>a+v,0)/rdV.length;
   document.getElementById('t-avg').textContent=avg.toFixed(2);
-  document.getElementById('t-avg-sub').textContent=recent60.length ? `last ${recent60.length} weeks` : 'all time';
+  document.getElementById('t-avg-sub').textContent=recent60.length ? `last ${recent60.length} sessions` : 'all time';
   const pk=trendData.reduce((b,d)=>d.rd>b.rd?d:b);
   document.getElementById('t-peak').textContent=pk.rd.toFixed(2);
   document.getElementById('t-peak-d').textContent=pk.week;
