@@ -258,7 +258,7 @@
   <div id="tab-trend" class="tab-panel">
     <div class="metric-grid">
       <div class="metric"><div class="metric-label">Avg bodyweight</div><div class="metric-value" id="t-wt">—</div><div class="metric-sub">lbs, last 4 weeks</div></div>
-      <div class="metric"><div class="metric-label">60-day avg RD</div><div class="metric-value" id="t-avg">—</div><div class="metric-sub" id="t-avg-sub">last 60 days</div></div>
+      <div class="metric"><div class="metric-label">60-day average RD</div><div class="metric-value" id="t-avg">—</div><div class="metric-sub" id="t-avg-sub">last 60 days</div></div>
       <div class="metric"><div class="metric-label">4-week trend</div><div class="metric-value" id="t-dir">—</div><div class="metric-sub" id="t-dir-s">vs prior 4wk</div></div>
       <div class="metric"><div class="metric-label">Peak week</div><div class="metric-value" id="t-peak">—</div><div class="metric-sub" id="t-peak-d">—</div></div>
     </div>
@@ -1216,7 +1216,7 @@ async function renderTrend() {
   const labels=trendData.map(d=>d.week.replace('/2025','').replace('/2026',''));
   const rdV=trendData.map(d=>+d.rd.toFixed(2));
   const wtV=trendData.map(d=>+d.wt.toFixed(1));
-  // 60-day avg RD — use weeks within last 60 days
+  // 60-day average RD — use weeks within last 60 days
   const now = new Date();
   const cutoff60 = new Date(now - 60*24*60*60*1000);
   const cutoff28 = new Date(now - 28*24*60*60*1000);
