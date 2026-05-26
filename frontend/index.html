@@ -792,9 +792,9 @@ function switchTab(name) {
   names.forEach(n => document.getElementById('tab-'+n).classList.toggle('active', n===name));
   if (name==='log') {
     const sg=document.getElementById('workout-stats'); if(sg) sg.style.display='';
-    // If cancel button is visible, user clicked Workout tab during an edit — cancel it
+    // If cancel button is visible AND this isn't called from editSession, cancel the edit
     const cb=document.getElementById('cancel-edit-btn');
-    if (cb && cb.style.display !== 'none') { cancelEdit(); return; }
+    if (cb && cb.style.display !== 'none' && !window._editSessionActive) { cancelEdit(); return; }
   }
   if (name==='history') populateHistoryExerciseFilter();
   if (name==='trend') renderTrend();
@@ -1238,8 +1238,10 @@ function editSession(date) {
   const cancelBtn = document.getElementById('cancel-edit-btn');
   if (cancelBtn) cancelBtn.style.display = '';
 
-  // Switch to Workout tab and populate the form
+  // Switch to Workout tab — flag prevents switchTab from cancelling the edit
+  window._editSessionActive = true;
   switchTab('log');
+  window._editSessionActive = false;
 
   // Set date and bodyweight
   document.getElementById('sess-date').value = session.date;
