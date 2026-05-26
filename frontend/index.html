@@ -135,6 +135,8 @@
     .sets-table td input { font-size: 16px; }
     .col-vol { display: none; }
     .sets-table th.col-vol { display: none; }
+    .col-notes { display: none; }
+    .sets-table th.col-notes { display: none; }
   }
 
   /* ── Result bar ── */
@@ -797,6 +799,7 @@ function addExercise() {
         <th style="width:64px;">Reps</th>
         <th style="width:64px;">Time (min)</th>
         <th class="col-vol" style="width:84px;">Vol (lbs)</th>
+        <th class="col-notes" style="min-width:100px;">Notes</th>
         <th style="width:30px;"></th>
       </tr></thead>
       <tbody id="sets-${id}"></tbody>
@@ -923,6 +926,7 @@ function addSet(exId) {
     <td><input type="number" id="r-${exId}-${sid}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
     <td><input type="number" id="t-${exId}-${sid}" step="0.5" min="0.5" value="2" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
     <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${exId}-${sid}">—</td>
+    <td class="col-notes"><input type="text" id="n-${exId}-${sid}" placeholder="notes…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;"></td>
     <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${exId},${sid})">✕</button></td>
   `;
   document.getElementById('sets-'+exId).appendChild(tr);
@@ -998,7 +1002,8 @@ async function saveSession() {
       const vol=trueLbs*reps;
       exVol+=vol;
       exDensity+=vol/setTime;
-      sets.push({reps,rawLoad,trueLbs,vol,time:setTime});
+      const notes=document.getElementById(`n-${id}-${sid}`)?.value||'';
+      sets.push({reps,rawLoad,trueLbs,vol,time:setTime,notes});
     });
     if(exDensity>0){totalDensity+=exDensity;exData.push({name,sets,totalVol:exVol,density:exDensity,tool:def.tool,mult:def.mult,isBW:def.isBW});}
   });
@@ -1157,6 +1162,7 @@ function editSession(date) {
           <th style="width:64px;">Reps</th>
           <th style="width:64px;">Time (min)</th>
           <th class="col-vol" style="width:84px;">Vol (lbs)</th>
+          <th class="col-notes" style="min-width:100px;">Notes</th>
           <th style="width:30px;"></th>
         </tr></thead>
         <tbody id="sets-${id}"></tbody>
@@ -1180,6 +1186,7 @@ function editSession(date) {
         <td><input type="number" id="r-${id}-${sid}" value="${set.reps}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
         <td><input type="number" id="t-${id}-${sid}" value="${set.time||2}" step="0.5" min="0.5" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
         <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${id}-${sid}">—</td>
+        <td class="col-notes"><input type="text" id="n-${id}-${sid}" value="${set.notes||''}" placeholder="notes…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;"></td>
         <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${id},${sid})">✕</button></td>
       `;
       if (tbody) tbody.appendChild(tr);
@@ -1435,7 +1442,7 @@ function buildLogRows() {
   sessions.forEach(s=>{
     (s.exercises||[]).forEach(ex=>{
       (ex.sets||[]).forEach(set=>{
-        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'True (lbs)':+set.trueLbs.toFixed(1),'Reps':set.reps,'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||2,'Density':+((set.vol/(set.time||ex.time||2))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':''});
+        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||2,'Density':+((set.vol/(set.time||ex.time||2))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':set.notes||''});
       });
     });
   });
@@ -1457,7 +1464,7 @@ async function updateExportSummary() {
   const lr=buildLogRows();
   document.getElementById('exp-log-ct').textContent=lr.length+' rows';
   try { const tr=await buildTrendRows(); document.getElementById('exp-trend-ct').textContent=tr.length+' rows'; } catch(e){}
-  const cols=['Date','Weight (lbs)','Exercise','Load (lbs)','True (lbs)','Reps','Vol (lbs)','Time (min)','Density','Rel Density'];
+  const cols=['Date','Weight (lbs)','Exercise','Load (lbs)','Reps','True (lbs)','Vol (lbs)','Time (min)','Density','Rel Density','Notes'];
   const table=document.getElementById('log-preview');
   const preview=lr.slice(-5);
   if(!preview.length){table.innerHTML='<tr><td colspan="10" style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Log sessions to see preview</td></tr>';return;}
@@ -1473,7 +1480,7 @@ async function doExport() {
     const XLSX=window.XLSX;
     const wb=XLSX.utils.book_new();
     const lr=buildLogRows();
-    const wsL=XLSX.utils.json_to_sheet(lr.length?lr:[{'Date':'','Weight (lbs)':'','Exercise':'','Load (lbs)':'','True (lbs)':'','Reps':'','Vol (lbs)':'','Time (min)':'','Density':'','Rel Density':'','Notes':''}]);
+    const wsL=XLSX.utils.json_to_sheet(lr.length?lr:[{'Date':'','Weight (lbs)':'','Exercise':'','Load (lbs)':'','Reps':'','True (lbs)':'','Vol (lbs)':'','Time (min)':'','Density':'','Rel Density':'','Notes':''}]);
     wsL['!cols']=[12,13,24,12,12,8,12,11,10,12,18].map(w=>({wch:w}));
     const tr=await buildTrendRows();
     const wsT=XLSX.utils.json_to_sheet(tr);
