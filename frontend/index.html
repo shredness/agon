@@ -1168,7 +1168,7 @@ function renderHistory() {
       <div style="font-size:18px;font-weight:700;width:54px;flex-shrink:0;color:var(--accent);">${s.rd.toFixed(2)}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(s.exercises||[]).map(e=>e.name).join(', ')}</div>
-        <div style="font-size:11px;color:var(--text3);">${s.bw} lbs</div>
+        <div style="font-size:11px;color:var(--text3);">${s.bw} lbs${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+s.notes+'</span>' : ''}</div>
       </div>
       ${badge}
       <div class="history-actions">
