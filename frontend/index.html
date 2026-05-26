@@ -1448,8 +1448,7 @@ let _musclePickerIdx = null;
 function openMusclePicker(idx) {
   _musclePickerIdx = idx;
   const ex = EXERCISE_BANK[idx];
-  const selected = Array.isArray(ex.muscles) ? ex.muscles
-    : (ex.muscle||'').split('/').map(m=>m.trim()).filter(Boolean);
+  const selected = getMusclesArray(ex);
   const container = document.getElementById('muscle-chip-container');
   container.innerHTML = MUSCLE_GROUPS.map(m =>
     `<div class="muscle-chip${selected.includes(m)?' selected':''}" onclick="toggleMuscleChip(this,'${m}')">${m}</div>`
@@ -1473,6 +1472,8 @@ async function confirmMusclePicker() {
   const ex = EXERCISE_BANK[_musclePickerIdx];
   ex.muscles = selected;
   ex.muscle = selected.join(' / ');
+  // If bank not yet in DB, just update local and re-render
+
   await saveBankRowToAPI(ex);
   closeMusclePicker();
   renderBankTable();
@@ -1650,6 +1651,18 @@ async function deleteBankExerciseFromAPI(name) {
   try { await apiFetch('/exercises/bank/'+encodeURIComponent(name), {method:'DELETE'}); } catch(e) {}
 }
 
+function getMusclesArray(e) {
+  if (Array.isArray(e.muscles) && e.muscles.length) return e.muscles;
+  if (e.muscle && e.muscle.trim()) return e.muscle.split('/').map(m=>m.trim()).filter(Boolean);
+  return [];
+}
+
+function getMuscleTagsHtml(e) {
+  const arr = getMusclesArray(e);
+  if (!arr.length) return '<span style="font-size:11px;color:var(--text3);">+ add</span>';
+  return arr.map(m => `<span class="muscle-tag">${m}</span>`).join('');
+}
+
 function renderBankTable() {
   const inp = (val, idx, field, extra='') =>
     `<input type="text" value="${String(val).replace(/"/g,'&quot;')}" data-field="${field}"
@@ -1676,7 +1689,7 @@ function renderBankTable() {
       <td style="padding:6px 8px;">${inp(e.mult, idx, 'mult', 'style="width:60px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;" type="number" step="0.05" min="0.1"')}</td>
       <td style="padding:6px 8px;">
         <div class="muscle-tags" onclick="openMusclePicker(${idx})" style="cursor:pointer;display:flex;flex-wrap:wrap;gap:3px;min-width:100px;padding:3px;border-radius:5px;border:1px solid var(--border);">
-          ${(Array.isArray(e.muscles)&&e.muscles.length?e.muscles:(e.muscle||'').split('/').map(m=>m.trim()).filter(Boolean)).map(m=>'<span class=\"muscle-tag\">'+m+'</span>').join('')||'<span style=\"font-size:11px;color:var(--text3);\">+ add</span>'}
+          ${getMuscleTagsHtml(e)}
         </div>
       </td>
       <td style="padding:6px 8px;">${selBW(e.isBW, idx)}</td>
