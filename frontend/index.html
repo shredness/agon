@@ -135,8 +135,7 @@
     .sets-table td input { font-size: 16px; }
     .col-vol { display: none; }
     .sets-table th.col-vol { display: none; }
-    .col-notes { display: none; }
-    .sets-table th.col-notes { display: none; }
+
   }
 
   /* ── Result bar ── */
@@ -241,6 +240,7 @@
       <div class="form-row">
         <div class="form-group"><label>Date</label><input type="date" id="sess-date" style="width:155px;"></div>
         <div class="form-group"><label>Bodyweight (lbs)</label><input type="number" id="sess-bw" step="0.1" placeholder="199.0" style="width:115px;" oninput="calcRD();document.querySelectorAll('.exercise-block').forEach(b=>updateBWLoadFields(b.id.replace('ex-','')))"></div>
+        <div class="form-group" style="flex:1;min-width:180px;"><label>Notes</label><input type="text" id="sess-notes" placeholder="Optional session notes…" style="width:100%;"></div>
       </div>
       <div class="section-label">Exercises</div>
       <div id="ex-container"></div>
@@ -848,7 +848,6 @@ function addExercise() {
         <th style="width:64px;">Reps</th>
         <th style="width:64px;">Time (min)</th>
         <th class="col-vol" style="width:84px;">Vol (lbs)</th>
-        <th class="col-notes" style="min-width:100px;">Notes</th>
         <th style="width:30px;"></th>
       </tr></thead>
       <tbody id="sets-${id}"></tbody>
@@ -977,7 +976,6 @@ function addSet(exId) {
     <td><input type="number" id="r-${exId}-${sid}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
     <td><input type="number" id="t-${exId}-${sid}" step="0.5" min="0.5" value="2" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
     <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${exId}-${sid}">—</td>
-    <td class="col-notes"><input type="text" id="n-${exId}-${sid}" placeholder="notes…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;"></td>
     <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${exId},${sid})">✕</button></td>
   `;
   document.getElementById('sets-'+exId).appendChild(tr);
@@ -1043,6 +1041,7 @@ function calcRD() {
 
 async function saveSession() {
   const date = document.getElementById('sess-date').value;
+  const sessionNotes = document.getElementById('sess-notes')?.value||'';
   const bw = parseFloat(document.getElementById('sess-bw').value)||0;
   if (!date||!bw) { showToast('Enter date and bodyweight.'); return; }
   const blocks = document.querySelectorAll('.exercise-block');
@@ -1063,8 +1062,7 @@ async function saveSession() {
       const vol=trueLbs*reps;
       exVol+=vol;
       exDensity+=vol/setTime;
-      const notes=document.getElementById(`n-${id}-${sid}`)?.value||'';
-      sets.push({reps,rawLoad,trueLbs,vol,time:setTime,notes});
+      sets.push({reps,rawLoad,trueLbs,vol,time:setTime});
     });
     if(exDensity>0){totalDensity+=exDensity;exData.push({name,sets,totalVol:exVol,density:exDensity,tool:def.tool,mult:def.mult,isBW:def.isBW});}
   });
@@ -1075,13 +1073,14 @@ async function saveSession() {
   const btn=document.getElementById('save-btn');
   btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
   try {
-    await apiFetch('/sessions',{method:'POST',body:JSON.stringify({date,bw,rd,total_density:totalDensity,exercises:exData})});
+    await apiFetch('/sessions',{method:'POST',body:JSON.stringify({date,bw,rd,total_density:totalDensity,exercises:exData,notes:sessionNotes})});
     sessions=await apiFetch('/sessions');
     updateStats(); renderHistory(); updateExportSummary();
     document.getElementById('ex-container').innerHTML='';
     exCount=0; setCounts={};
     addExercise(); document.getElementById('result-bar').style.display='none';
     document.getElementById('sess-bw').value = '';
+    document.getElementById('sess-notes').value = '';
     const sg=document.getElementById('workout-stats'); if(sg) sg.style.display='';
     const cb=document.getElementById('cancel-edit-btn'); if(cb) cb.style.display='none';
     prefillBodyweight();
@@ -1219,6 +1218,7 @@ function cancelEdit() {
   exCount = 0; setCounts = {};
   document.getElementById('sess-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('sess-bw').value = '';
+  document.getElementById('sess-notes').value = '';
   document.getElementById('result-bar').style.display = 'none';
   document.getElementById('cancel-edit-btn').style.display = 'none';
   const sg = document.getElementById('workout-stats');
@@ -1246,6 +1246,7 @@ function editSession(date) {
 
   // Set date and bodyweight
   document.getElementById('sess-date').value = session.date;
+  document.getElementById('sess-notes').value = session.notes||'';
   const bwEl = document.getElementById('sess-bw');
   bwEl.value = session.bw;
   bwEl.style.color = '';
@@ -1297,7 +1298,6 @@ function editSession(date) {
           <th style="width:64px;">Reps</th>
           <th style="width:64px;">Time (min)</th>
           <th class="col-vol" style="width:84px;">Vol (lbs)</th>
-          <th class="col-notes" style="min-width:100px;">Notes</th>
           <th style="width:30px;"></th>
         </tr></thead>
         <tbody id="sets-${id}"></tbody>
@@ -1321,7 +1321,6 @@ function editSession(date) {
         <td><input type="number" id="r-${id}-${sid}" value="${set.reps}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
         <td><input type="number" id="t-${id}-${sid}" value="${set.time||2}" step="0.5" min="0.5" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
         <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${id}-${sid}">—</td>
-        <td class="col-notes"><input type="text" id="n-${id}-${sid}" value="${set.notes||''}" placeholder="notes…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;"></td>
         <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${id},${sid})">✕</button></td>
       `;
       if (tbody) tbody.appendChild(tr);

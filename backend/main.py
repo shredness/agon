@@ -111,6 +111,8 @@ def init_db():
     cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
     if "user_id" not in cols:
         conn.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1")
+    if "notes" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
 
     conn.commit()
 
@@ -234,6 +236,7 @@ class SessionIn(BaseModel):
     rd: float
     total_density: float
     exercises: list[ExerciseData]
+    notes: Optional[str] = ''
 
 class UserCreate(BaseModel):
     username: str
@@ -315,7 +318,7 @@ def get_sessions(user=Depends(current_user)):
     ).fetchall()
     conn.close()
     return [{"id": r["id"], "date": r["date"], "bw": r["bw"], "rd": r["rd"],
-             "total_density": r["total_density"],
+             "total_density": r["total_density"], "notes": r["notes"] or "",
              "exercises": json.loads(r["exercises"])} for r in rows]
 
 @app.post("/sessions")
@@ -346,13 +349,14 @@ def save_session(session: SessionIn, user=Depends(current_user)):
     conn = get_db()
     try:
         conn.execute("""
-            INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises)
-            VALUES (?,?,?,?,?,?)
+            INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises, notes)
+            VALUES (?,?,?,?,?,?,?)
             ON CONFLICT(user_id, date) DO UPDATE SET
                 bw=excluded.bw, rd=excluded.rd,
-                total_density=excluded.total_density, exercises=excluded.exercises
+                total_density=excluded.total_density, exercises=excluded.exercises,
+                notes=excluded.notes
         """, (uid, session.date, session.bw, rd, round(total_density, 2),
-              json.dumps(exercises_out)))
+              json.dumps(exercises_out), session.notes or ""))
         conn.commit()
     except Exception as e:
         conn.close()
