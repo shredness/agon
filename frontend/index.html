@@ -1435,7 +1435,7 @@ function buildLogRows() {
   sessions.forEach(s=>{
     (s.exercises||[]).forEach(ex=>{
       (ex.sets||[]).forEach(set=>{
-        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'True (lbs)':+set.trueLbs.toFixed(1),'Reps':set.reps,'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':ex.time,'Density':+(set.vol/ex.time).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':''});
+        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'True (lbs)':+set.trueLbs.toFixed(1),'Reps':set.reps,'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||2,'Density':+((set.vol/(set.time||ex.time||2))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':''});
       });
     });
   });
