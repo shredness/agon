@@ -1617,7 +1617,7 @@ function updateBankField(idx, field, val) {
     else e.loadHint = 'lbs per side';
   }
 
-  saveBank();
+  saveBankRowToAPI(EXERCISE_BANK[idx]);
   rebuildExerciseDropdowns();
   // Re-render the whole table so mult/isBW fields and formula preview update
   renderBankTable();
@@ -1674,7 +1674,11 @@ function renderBankTable() {
       <td style="padding:6px 10px;">${inp(e.name, idx, 'name')}</td>
       <td style="padding:6px 8px;">${selTool(e.tool, idx)}</td>
       <td style="padding:6px 8px;">${inp(e.mult, idx, 'mult', 'style="width:60px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;" type="number" step="0.05" min="0.1"')}</td>
-      <td style="padding:6px 8px;">${inp(e.muscle, idx, 'muscle')}</td>
+      <td style="padding:6px 8px;">
+        <div class="muscle-tags" onclick="openMusclePicker(${idx})" style="cursor:pointer;display:flex;flex-wrap:wrap;gap:3px;min-width:100px;padding:3px;border-radius:5px;border:1px solid var(--border);">
+          ${(Array.isArray(e.muscles)&&e.muscles.length?e.muscles:(e.muscle||'').split('/').map(m=>m.trim()).filter(Boolean)).map(m=>'<span class=\"muscle-tag\">'+m+'</span>').join('')||'<span style=\"font-size:11px;color:var(--text3);\">+ add</span>'}
+        </div>
+      </td>
       <td style="padding:6px 8px;">${selBW(e.isBW, idx)}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--text3);font-style:italic;">${bankFormulaHint(e)}</td>
       <td style="padding:6px 8px;">
