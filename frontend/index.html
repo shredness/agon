@@ -255,10 +255,10 @@
   <!-- TREND -->
   <div id="tab-trend" class="tab-panel">
     <div class="metric-grid">
-      <div class="metric"><div class="metric-label">Running avg RD</div><div class="metric-value" id="t-avg">—</div><div class="metric-sub">Dec 2025 – present</div></div>
-      <div class="metric"><div class="metric-label">Peak week</div><div class="metric-value" id="t-peak">—</div><div class="metric-sub" id="t-peak-d">—</div></div>
-      <div class="metric"><div class="metric-label">Avg bodyweight</div><div class="metric-value" id="t-wt">—</div><div class="metric-sub">lbs, all time</div></div>
+      <div class="metric"><div class="metric-label">Avg bodyweight</div><div class="metric-value" id="t-wt">—</div><div class="metric-sub">lbs, last 4 weeks</div></div>
+      <div class="metric"><div class="metric-label">60-day avg RD</div><div class="metric-value" id="t-avg">—</div><div class="metric-sub" id="t-avg-sub">last 60 days</div></div>
       <div class="metric"><div class="metric-label">4-week trend</div><div class="metric-value" id="t-dir">—</div><div class="metric-sub" id="t-dir-s">vs prior 4wk</div></div>
+      <div class="metric"><div class="metric-label">Peak week</div><div class="metric-value" id="t-peak">—</div><div class="metric-sub" id="t-peak-d">—</div></div>
     </div>
     <div class="card" style="padding:16px;">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
@@ -1175,12 +1175,31 @@ async function renderTrend() {
   const labels=trendData.map(d=>d.week.replace('/2025','').replace('/2026',''));
   const rdV=trendData.map(d=>+d.rd.toFixed(2));
   const wtV=trendData.map(d=>+d.wt.toFixed(1));
-  const avg=rdV.reduce((a,v)=>a+v,0)/rdV.length;
+  // 60-day avg RD — use weeks within last 60 days
+  const now = new Date();
+  const cutoff60 = new Date(now - 60*24*60*60*1000);
+  const cutoff28 = new Date(now - 28*24*60*60*1000);
+  const recent60 = trendData.filter(d => {
+    const parts = d.week.split('/');
+    const dt = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
+    return dt >= cutoff60;
+  });
+  const recent4wk = trendData.filter(d => {
+    const parts = d.week.split('/');
+    const dt = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
+    return dt >= cutoff28;
+  });
+  const avg = recent60.length
+    ? recent60.reduce((a,d)=>a+d.rd,0)/recent60.length
+    : rdV.reduce((a,v)=>a+v,0)/rdV.length;
   document.getElementById('t-avg').textContent=avg.toFixed(2);
+  document.getElementById('t-avg-sub').textContent=recent60.length ? `last ${recent60.length} weeks` : 'all time';
   const pk=trendData.reduce((b,d)=>d.rd>b.rd?d:b);
   document.getElementById('t-peak').textContent=pk.rd.toFixed(2);
   document.getElementById('t-peak-d').textContent=pk.week;
-  document.getElementById('t-wt').textContent=(wtV.reduce((a,v)=>a+v,0)/wtV.length).toFixed(1);
+  // Avg bodyweight — last 4 weeks
+  const wtRecent = recent4wk.length ? recent4wk.map(d=>d.wt) : wtV;
+  document.getElementById('t-wt').textContent=(wtRecent.reduce((a,v)=>a+v,0)/wtRecent.length).toFixed(1);
   if(rdV.length>=8){const r=rdV.slice(-4).reduce((a,v)=>a+v,0)/4,p=rdV.slice(-8,-4).reduce((a,v)=>a+v,0)/4,dir=r-p;document.getElementById('t-dir').textContent=(dir>=0?'+':'')+dir.toFixed(2);document.getElementById('t-dir-s').textContent=dir>=0?'▲ improving':'▼ declining';}
   if(tC)tC.destroy();
   tC=new Chart(document.getElementById('trendChart'),{
