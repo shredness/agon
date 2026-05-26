@@ -1222,8 +1222,34 @@ function editSession(date) {
 
     // Call onExChange after sets are in DOM
     onExChange(id);
-    // Populate BW load fields after exercise change is processed
-    if (getExDef(ex.name).isBW) setTimeout(() => updateBWLoadFields(id), 60);
+    // For BW exercises, restore vest/assist state from saved trueLbs
+    if (getExDef(ex.name).isBW && ex.sets && ex.sets.length > 0) {
+      setTimeout(() => {
+        const bw = parseFloat(document.getElementById('sess-bw')?.value)||0;
+        const def2 = getExDef(ex.name);
+        const savedTrueLbs = ex.sets[0].trueLbs || 0;
+        const bareBW = bw * def2.mult;
+        if (savedTrueLbs > 0 && Math.abs(savedTrueLbs - bareBW) > 0.5) {
+          // There's a vest or assist — figure out which
+          if (savedTrueLbs > bareBW) {
+            // Vest: vestWeight = savedTrueLbs/mult - bw
+            const vestWt = (savedTrueLbs / def2.mult) - bw;
+            const vestRadio = document.querySelector(`input[name="bwm-${id}"][value="vest"]`);
+            if (vestRadio) { vestRadio.checked = true; onBWMode(id); }
+            const vestInput = document.getElementById('bwextra-val-'+id);
+            if (vestInput) { vestInput.value = vestWt.toFixed(1); }
+          } else {
+            // Assist: pct = (1 - savedTrueLbs/(bw*mult)) * 100
+            const pct = Math.round((1 - savedTrueLbs / bareBW) * 100);
+            const assistRadio = document.querySelector(`input[name="bwm-${id}"][value="assist"]`);
+            if (assistRadio) { assistRadio.checked = true; onBWMode(id); }
+            const assistInput = document.getElementById('bwextra-val-'+id);
+            if (assistInput) { assistInput.value = pct; }
+          }
+        }
+        updateBWLoadFields(id);
+      }, 80);
+    }
   });
 
   // Defer calcRD until all DOM is settled
