@@ -153,7 +153,7 @@
   /* ── History ── */
   .history-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
   .history-item:last-child { border-bottom: none; }
-  .history-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .15s; flex-shrink: 0; }
+  .history-actions { display: flex; gap: 6px; opacity: 1; transition: opacity .15s; flex-shrink: 0; }
   .history-item:hover .history-actions { opacity: 1; }
   @media (max-width: 600px) { .history-actions { opacity: 1; } }
   .confirm-bar { background: var(--red-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-top: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--red-text); }
@@ -1188,8 +1188,8 @@ function renderHistory() {
         <div style="font-size:11px;color:var(--text3);">${s.bw} lbs${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+s.notes+'</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:80px;justify-content:flex-end;">
-        ${badge}
         ${crownHtml}
+        ${badge}
       </div>
       <div class="history-actions">
         <button class="btn btn-sm" onclick="editSession('${s.date}')" title="Edit session">✏️</button>
