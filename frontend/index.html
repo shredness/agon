@@ -153,9 +153,7 @@
   /* ── History ── */
   .history-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
   .history-item:last-child { border-bottom: none; }
-  .history-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .15s; flex-shrink: 0; }
-  .history-item:hover .history-actions { opacity: 1; }
-  @media (max-width: 600px) { .history-actions { opacity: 1; } }
+  .history-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .confirm-bar { background: var(--red-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; margin-top: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--red-text); }
   .confirm-bar .btn-sm { font-size: 12px; }
   .muscle-tag { display:inline-block; background:var(--bg2); border:1px solid var(--border); border-radius:20px; padding:2px 8px; font-size:11px; color:var(--text2); font-weight:500; }
