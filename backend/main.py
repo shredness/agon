@@ -10,9 +10,15 @@ import bcrypt as _bcrypt
 
 app = FastAPI(title="Agon API")
 
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "https://agon.savo.us,http://localhost,http://localhost:3800"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -149,8 +155,20 @@ def init_db():
 
     conn.commit()
 
-    # Run per-set time migration
-    migrate_sessions_to_per_set_time(conn)
+    # Run per-set time migration (only once, gated by a flag in meta table)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS meta (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    flag = conn.execute("SELECT value FROM meta WHERE key='per_set_time_migration_done'").fetchone()
+    if not flag:
+        migrate_sessions_to_per_set_time(conn)
+        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                     ('per_set_time_migration_done', '1'))
+        conn.commit()
     conn.close()
 
 

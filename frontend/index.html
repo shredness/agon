@@ -546,6 +546,13 @@
 <script>
 const API = '/api';
 
+// HTML escape helper for safely interpolating user data into innerHTML
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+
 
 
 let sessions = []; // always an array
@@ -631,10 +638,7 @@ function prefillBodyweight() {
     const last = sessions[sessions.length - 1];
     bwEl.value = last.bw;
     bwEl.style.color = 'var(--text3)'; // subtle tint to signal it's a pre-fill
-    bwEl.addEventListener('input', function clearTint() {
-      bwEl.style.color = '';
-      bwEl.removeEventListener('input', clearTint);
-    }, { once: true });
+    bwEl.addEventListener('input', () => { bwEl.style.color = ''; }, { once: true });
   }
 }
 
@@ -749,7 +753,7 @@ function applyRoleUI() {
     badge.id = 'user-badge';
     badge.style.cssText = 'display:flex;align-items:center;gap:8px;';
     badge.innerHTML = `
-      <span style="font-size:12px;color:var(--text2);">${currentUser.username}</span>
+      <span style="font-size:12px;color:var(--text2);">${escapeHtml(currentUser.username)}</span>
       ${isDemo ? '<span style="font-size:10px;background:var(--accent-bg);color:var(--accent-text);padding:2px 7px;border-radius:20px;font-weight:600;">DEMO</span>' : ''}
       <button class="theme-toggle" onclick="logout()" title="Sign out" style="font-size:13px;">↩</button>
     `;
@@ -1115,7 +1119,7 @@ function populateHistoryExerciseFilter() {
   const current = sel.value;
   const names = [...new Set(sessions.flatMap(s => (s.exercises||[]).map(e => e.name)))].sort();
   sel.innerHTML = '<option value="">All exercises</option>' +
-    names.map(n => `<option value="${n}"${n===current?' selected':''}>${n}</option>`).join('');
+    names.map(n => `<option value="${escapeHtml(n)}"${n===current?' selected':''}>${escapeHtml(n)}</option>`).join('');
 }
 
 function clearHistoryFilters() {
@@ -1173,15 +1177,15 @@ function renderHistory() {
         <span class="trigger-crown" onmouseenter="toggleTriggerPopover(event,'pop-${s.date}',true)" onmouseleave="toggleTriggerPopover(event,'pop-${s.date}',false)" title="Bump the weight" style="cursor:default;font-size:16px;user-select:none;">👑</span>
         <div id="pop-${s.date}" style="display:none;position:absolute;right:0;top:24px;z-index:100;background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.5);">
           <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Bump the weight</div>
-          ${triggers.map(t=>`<div style="font-size:12px;color:var(--text);padding:3px 0;border-bottom:1px solid var(--border);">${t.name}<br><span style="color:var(--text3);">${t.reps} reps · ${t.load} lbs${t.isBW?' (BW)':''}</span></div>`).join('')}
+          ${triggers.map(t=>`<div style="font-size:12px;color:var(--text);padding:3px 0;border-bottom:1px solid var(--border);">${escapeHtml(t.name)}<br><span style="color:var(--text3);">${t.reps} reps · ${t.load} lbs${t.isBW?' (BW)':''}</span></div>`).join('')}
         </div>
       </div>` : '';
     return `<div class="history-item" id="hi-${s.date}">
       <div style="font-size:12px;color:var(--text2);width:88px;flex-shrink:0;">${formatDate(s.date)}</div>
       <div style="font-size:18px;font-weight:700;width:54px;flex-shrink:0;color:var(--accent);">${s.rd.toFixed(2)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(s.exercises||[]).map(e=>e.name).join(', ')}</div>
-        <div style="font-size:11px;color:var(--text3);">${s.bw} lbs${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+s.notes+'</span>' : ''}</div>
+        <div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml((s.exercises||[]).map(e=>e.name).join(', '))}</div>
+        <div style="font-size:11px;color:var(--text3);">${s.bw} lbs${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+escapeHtml(s.notes)+'</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:80px;justify-content:flex-end;">
         ${crownHtml}
@@ -1281,7 +1285,7 @@ function editSession(date) {
     const id = exCount++;
     setCounts[id] = 0;
     const opts = '<option value="">— Select exercise —</option>' +
-      EXERCISE_BANK.map(e => `<option value="${e.name}"${e.name===ex.name?' selected':''}>${e.name}</option>`).join('') +
+      EXERCISE_BANK.map(e => `<option value="${e.name}"${e.name===ex.name?' selected':''}>${escapeHtml(e.name)}</option>`).join('') +
       '<option value="__add_new__" style="color:var(--accent);font-weight:500;">+ Add new exercise…</option>';
     const div = document.createElement('div');
     div.className = 'exercise-block'; div.id = 'ex-'+id;
@@ -1457,7 +1461,6 @@ async function renderTrend() {
       }
     }
   });
-  wC=null; // no longer used separately
 }
 
 let EXERCISE_BANK = []; // populated by loadBankFromAPI()
@@ -1475,13 +1478,9 @@ function openMusclePicker(idx) {
     const sel = selected.includes(m);
     const c = MUSCLE_COLORS[m] || {};
     const style = sel ? `background:${c.border||'var(--accent)'};border-color:${c.border||'var(--accent)'};color:#fff;` : `background:${c.bg||'var(--bg2)'};border-color:${c.border||'var(--border)'};color:${c.text||'var(--text2)'};`;
-    return `<div class="muscle-chip${sel?' selected':''}" style="${style}" onclick="toggleMuscleChipColored(this,'${m}')">${m}</div>`;
+    return `<div class="muscle-chip${sel?' selected':''}" style="${style}" onclick="toggleMuscleChipColored(this,'${escapeHtml(m)}')">${escapeHtml(m)}</div>`;
   }).join('');
   document.getElementById('muscle-picker-modal').style.display = 'flex';
-}
-
-function toggleMuscleChip(el, name) {
-  el.classList.toggle('selected');
 }
 
 function toggleMuscleChipColored(el, name) {
@@ -1551,8 +1550,6 @@ async function seedBankToAPI() {
   await loadBankFromAPI();
 }
 
-function loadBank() { return null; } // legacy stub — bank now in DB
-function saveBank() {} // legacy stub
 
 async function resetBank() {
   if (!confirm('Reset exercise bank to defaults? Any custom exercises will be lost.')) return;
@@ -1678,7 +1675,7 @@ function updateBankField(idx, field, val) {
 function rebuildExerciseDropdowns() {
   document.querySelectorAll('select[id^="exn-"]').forEach(sel => {
     const cur = sel.value;
-    sel.innerHTML = EXERCISE_BANK.map(e=>`<option value="${e.name}"${e.name===cur?' selected':''}>${e.name}</option>`).join('');
+    sel.innerHTML = EXERCISE_BANK.map(e=>`<option value="${e.name}"${e.name===cur?' selected':''}>${escapeHtml(e.name)}</option>`).join('');
   });
 }
 
@@ -1923,7 +1920,7 @@ function toggleNewExMusclePicker() {
       const sel = existing.includes(m);
       const c = MUSCLE_COLORS[m] || {};
       const style = sel ? `background:${c.border||'var(--accent)'};border-color:${c.border||'var(--accent)'};color:#fff;` : `background:${c.bg||'var(--bg2)'};border-color:${c.border||'var(--border)'};color:${c.text||'var(--text2)'};`;
-      return `<div class="muscle-chip${sel?' selected':''}" style="${style}" onclick="event.stopPropagation();toggleMuscleChipColored(this,'${m}');updateNewExMusclePlaceholder()">${m}</div>`;
+      return `<div class="muscle-chip${sel?' selected':''}" style="${style}" onclick="event.stopPropagation();toggleMuscleChipColored(this,'${escapeHtml(m)}');updateNewExMusclePlaceholder()">${escapeHtml(m)}</div>`;
     }).join('');
     picker.style.display = 'flex';
   } else {
@@ -2009,7 +2006,7 @@ async function initProgress() {
   try {
     const names = await apiFetch('/exercises/logged');
     sel.innerHTML = '<option value="">— Select exercise —</option>' +
-      names.map(n => `<option value="${n}"${n===current?' selected':''}>${n}</option>`).join('');
+      names.map(n => `<option value="${escapeHtml(n)}"${n===current?' selected':''}>${escapeHtml(n)}</option>`).join('');
   } catch(e) {}
   if (sel.value) loadProgress();
 }
@@ -2046,18 +2043,30 @@ function renderStrengthMaintenance() {
   const body = document.getElementById('strength-maintenance-body');
   if (!body) return;
   
-  const exerciseNames = [...new Set(sessions.flatMap(s => (s.exercises||[]).map(e => e.name)))].sort();
+  // Single pass: build {name: {peak, current, lastDate}} map
+  const stats = new Map();
+  for (const session of sessions) {
+    for (const ex of (session.exercises || [])) {
+      const maxSet = (ex.sets || []).reduce((m, s) => Math.max(m, s.trueLbs || s.rawLoad || 0), 0);
+      if (maxSet <= 0) continue;
+      const cur = stats.get(ex.name) || { peak: 0, current: 0, lastDate: '' };
+      cur.peak = Math.max(cur.peak, maxSet);
+      if (session.date >= cur.lastDate) {
+        cur.current = maxSet;
+        cur.lastDate = session.date;
+      }
+      stats.set(ex.name, cur);
+    }
+  }
   
-  body.innerHTML = exerciseNames.map(exName => {
-    const peak = getPeakLoad(exName);
-    const current = getCurrentLoad(exName);
-    const ratio = peak > 0 ? ((current / peak) * 100).toFixed(1) : 0;
+  const sorted = [...stats.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  body.innerHTML = sorted.map(([exName, s]) => {
+    const ratio = s.peak > 0 ? ((s.current / s.peak) * 100).toFixed(1) : 0;
     const ratioColor = ratio >= 95 ? '#10B981' : ratio >= 85 ? '#F59E0B' : '#EF4444';
-    
     return `<tr style="border-bottom:0.5px solid var(--border);">
-      <td style="padding:8px 0;color:var(--text);">${exName}</td>
-      <td style="padding:8px 0;text-align:right;color:var(--text);">${current > 0 ? current.toFixed(1) : '—'}</td>
-      <td style="padding:8px 0;text-align:right;color:var(--text);">${peak > 0 ? peak.toFixed(1) : '—'}</td>
+      <td style="padding:8px 0;color:var(--text);">${escapeHtml(exName)}</td>
+      <td style="padding:8px 0;text-align:right;color:var(--text);">${s.current > 0 ? s.current.toFixed(1) : '—'}</td>
+      <td style="padding:8px 0;text-align:right;color:var(--text);">${s.peak > 0 ? s.peak.toFixed(1) : '—'}</td>
       <td style="padding:8px 0;text-align:right;font-weight:600;color:${ratioColor};">${ratio}%</td>
     </tr>`;
   }).join('');
@@ -2266,14 +2275,14 @@ async function loadUsers() {
     const roleColors = { admin:'var(--accent)', demo:'var(--text2)', guest:'var(--green)' };
     tbody.innerHTML = users.map(u => `
       <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:9px 14px; font-weight:500;">${u.username}</td>
+        <td style="padding:9px 14px; font-weight:500;">${escapeHtml(u.username)}</td>
         <td style="padding:9px 8px;">
           <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg2);color:${roleColors[u.role]||'var(--text2)'};font-weight:600;text-transform:uppercase;">${u.role}</span>
         </td>
         <td style="padding:9px 8px; font-size:12px; color:var(--text2);">${u.created_at?.slice(0,10)||'—'}</td>
         <td style="padding:9px 8px;">
-            <button class="btn btn-sm" onclick="openChpwModal('${u.username}')" title="Change password" style="margin-right:4px;">🔑</button>
-          ${u.username !== 'manny' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.username}')">✕</button>` : ''}
+            <button class="btn btn-sm" onclick="openChpwModal('${escapeHtml(u.username)}')" title="Change password" style="margin-right:4px;">🔑</button>
+          ${u.username !== 'manny' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">✕</button>` : ''}
         </td>
       </tr>`).join('');
   } catch(e) {}
