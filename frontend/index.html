@@ -1163,6 +1163,15 @@ function renderHistory() {
         ? `<span class="badge badge-up">▲ ${Math.abs(d).toFixed(2)}</span>`
         : `<span class="badge badge-dn">▼ ${Math.abs(d).toFixed(2)}</span>`;
     }
+    const triggers = getSessionTriggers(s);
+    const crownHtml = triggers.length ? `
+      <div style="position:relative;display:inline-block;">
+        <span class="trigger-crown" onclick="toggleTriggerPopover(event,'pop-${s.date}')" title="Progression trigger hit" style="cursor:pointer;font-size:16px;user-select:none;">👑</span>
+        <div id="pop-${s.date}" style="display:none;position:absolute;right:0;top:24px;z-index:100;background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.5);">
+          <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Bump the weight</div>
+          ${triggers.map(t=>`<div style="font-size:12px;color:var(--text);padding:3px 0;border-bottom:1px solid var(--border);">${t.name}<br><span style="color:var(--text3);">${t.reps} reps · ${t.load} lbs${t.isBW?' (BW)':''}</span></div>`).join('')}
+        </div>
+      </div>` : '';
     return `<div class="history-item" id="hi-${s.date}">
       <div style="font-size:12px;color:var(--text2);width:88px;flex-shrink:0;">${formatDate(s.date)}</div>
       <div style="font-size:18px;font-weight:700;width:54px;flex-shrink:0;color:var(--accent);">${s.rd.toFixed(2)}</div>
@@ -1171,6 +1180,7 @@ function renderHistory() {
         <div style="font-size:11px;color:var(--text3);">${s.bw} lbs${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+s.notes+'</span>' : ''}</div>
       </div>
       ${badge}
+      ${crownHtml}
       <div class="history-actions">
         <button class="btn btn-sm" onclick="editSession('${s.date}')" title="Edit session">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="confirmDelete('${s.date}')" title="Delete session">🗑</button>
@@ -1190,6 +1200,21 @@ function confirmDelete(date) {
   const bar = document.getElementById('confirm-'+date);
   if (bar) bar.style.display = 'flex';
 }
+
+function toggleTriggerPopover(e, id) {
+  e.stopPropagation();
+  // Close any other open popovers
+  document.querySelectorAll('[id^="pop-"]').forEach(el => {
+    if (el.id !== id) el.style.display = 'none';
+  });
+  const pop = document.getElementById(id);
+  if (pop) pop.style.display = pop.style.display === 'none' ? 'block' : 'none';
+}
+
+// Close popovers on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('[id^="pop-"]').forEach(el => el.style.display = 'none');
+});
 
 function cancelDelete(date) {
   const bar = document.getElementById('confirm-'+date);
@@ -1700,6 +1725,38 @@ const MUSCLE_COLORS = {
 function muscleTagStyle(m) {
   const c = MUSCLE_COLORS[m] || {bg:'var(--bg2)', border:'var(--border)', text:'var(--text2)'};
   return `background:${c.bg};border:1px solid ${c.border};color:${c.text};`;
+}
+
+function getSessionTriggers(session) {
+  // Returns array of {name, reps, load, isBW} for exercises that hit their trigger
+  const triggered = [];
+  for (const ex of (session.exercises || [])) {
+    const def = EXERCISE_BANK.find(e => e.name === ex.name) || {};
+    const tool = ex.tool || def.tool || 'Bar';
+    const isBW = ex.isBW || def.isBW || false;
+    const sets = ex.sets || [];
+
+    // Kettlebells exempt
+    if (tool === 'Kettlebell') continue;
+
+    // 10+ sets = wave/varied protocol — exempt
+    if (sets.length >= 10) continue;
+
+    if (!sets.length) continue;
+
+    // Check all sets share the same load (density block)
+    const loads = sets.map(s => s.trueLbs || s.rawLoad || 0);
+    const allSameLoad = loads.every(l => Math.abs(l - loads[0]) < 0.5);
+    if (!allSameLoad) continue;
+
+    const totalReps = sets.reduce((sum, s) => sum + (s.reps || 0), 0);
+    const threshold = isBW ? 100 : 50;
+
+    if (totalReps >= threshold) {
+      triggered.push({ name: ex.name, reps: totalReps, load: loads[0], isBW });
+    }
+  }
+  return triggered;
 }
 
 function getMuscleTagsHtml(e) {
