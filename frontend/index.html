@@ -11,6 +11,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Agon</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -73,9 +74,12 @@
   /* ── Tabs ── */
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
-  .tab { font-size: 14px; padding: 8px 14px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text2); cursor: pointer; transition: all .15s; white-space: nowrap; flex-shrink: 0; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; padding: 7px 12px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text2); cursor: pointer; transition: all .15s; white-space: nowrap; flex-shrink: 0; }
+  .tab i { font-size: 17px; line-height: 1; }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
   .tab:hover:not(.active) { color: var(--text); }
+  .tab-label { font-size: 11px; }
+  @media (max-width: 520px) { .tab-label { display: none; } .tab { padding: 7px 10px; } }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
 
@@ -220,13 +224,13 @@
   <div class="api-banner" id="api-banner">⚠ Cannot reach the API. Check that the backend container is running.</div>
 
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('log')">Workout</button>
-    <button class="tab" onclick="switchTab('history')">History</button>
-    <button class="tab" onclick="switchTab('trend')">Trend</button>
-    <button class="tab" onclick="switchTab('bank')">Exercises</button>
-    <button class="tab" onclick="switchTab('progress')">Progress</button>
-    <button class="tab" onclick="switchTab('export')">↓ Export</button>
-    <button class="tab" id="tab-btn-users" onclick="switchTab('users')" style="display:none;">Users</button>
+    <button class="tab active" onclick="switchTab('log')"><i class="ti ti-barbell" aria-hidden="true"></i><span class="tab-label">Workout</span></button>
+    <button class="tab" onclick="switchTab('history')"><i class="ti ti-history" aria-hidden="true"></i><span class="tab-label">History</span></button>
+    <button class="tab" onclick="switchTab('trend')"><i class="ti ti-trending-up" aria-hidden="true"></i><span class="tab-label">Trend</span></button>
+    <button class="tab" onclick="switchTab('bank')"><i class="ti ti-list-details" aria-hidden="true"></i><span class="tab-label">Exercises</span></button>
+    <button class="tab" onclick="switchTab('progress')"><i class="ti ti-target" aria-hidden="true"></i><span class="tab-label">Progress</span></button>
+    <button class="tab" onclick="switchTab('export')"><i class="ti ti-file-download" aria-hidden="true"></i><span class="tab-label">Export</span></button>
+    <button class="tab" id="tab-btn-users" onclick="switchTab('users')" style="display:none;"><i class="ti ti-users" aria-hidden="true"></i><span class="tab-label">Users</span></button>
   </div>
 
   <!-- LOG -->
