@@ -153,6 +153,29 @@ def init_db():
         )
     """)
 
+    # Per-user AI settings: encrypted Gemini key + model choice
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id      INTEGER PRIMARY KEY,
+            ai_key_enc   TEXT,
+            ai_model     TEXT DEFAULT 'gemini-1.5-flash',
+            updated_at   TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Persisted Insights conversation history (one row per message)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS insights_messages (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            role       TEXT NOT NULL,
+            content    TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
     conn.commit()
 
     # Run per-set time migration (only once, gated by a flag in meta table)
@@ -181,6 +204,25 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def hash_password(plain: str) -> str:
     return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt()).decode()
+
+
+# ── AI key encryption (Fernet, derived from SECRET_KEY) ───────
+import base64 as _b64, hashlib as _hashlib
+from cryptography.fernet import Fernet, InvalidToken
+
+def _fernet():
+    # Derive a stable 32-byte urlsafe key from SECRET_KEY
+    digest = _hashlib.sha256(SECRET_KEY.encode()).digest()
+    return Fernet(_b64.urlsafe_b64encode(digest))
+
+def encrypt_secret(plain: str) -> str:
+    return _fernet().encrypt(plain.encode()).decode()
+
+def decrypt_secret(token: str) -> str:
+    try:
+        return _fernet().decrypt(token.encode()).decode()
+    except (InvalidToken, Exception):
+        return ""
 
 def create_token(data: dict):
     payload = data.copy()
@@ -262,6 +304,14 @@ class UserCreate(BaseModel):
     username: str
     password: str
     role: str = "guest"
+
+
+class AISettingsIn(BaseModel):
+    ai_key: Optional[str] = None      # plaintext key from user; None = don't change
+    ai_model: Optional[str] = None
+
+class InsightsQuery(BaseModel):
+    question: str
 
 
 # ── Auth endpoints ────────────────────────────────────────────
@@ -543,3 +593,234 @@ def get_logged_exercises(user=Depends(current_user)):
             if ex.get("name"):
                 names.add(ex["name"])
     return sorted(names)
+
+# ── AI Settings endpoints ─────────────────────────────────────
+@app.get("/ai/settings")
+def get_ai_settings(user=Depends(current_user)):
+    """Return whether a key is set + masked preview + model. Never returns the raw key."""
+    conn = get_db()
+    row = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
+                       (user["id"],)).fetchone()
+    conn.close()
+    if not row or not row["ai_key_enc"]:
+        return {"has_key": False, "masked": "", "model": (row["ai_model"] if row else "gemini-1.5-flash")}
+    plain = decrypt_secret(row["ai_key_enc"])
+    masked = ("•" * max(0, len(plain) - 4) + plain[-4:]) if plain else ""
+    return {"has_key": bool(plain), "masked": masked, "model": row["ai_model"] or "gemini-1.5-flash"}
+
+@app.post("/ai/settings")
+def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot store API keys")
+    conn = get_db()
+    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?",
+                            (user["id"],)).fetchone()
+    # Build the update
+    key_enc = None
+    if body.ai_key is not None and body.ai_key.strip():
+        key_enc = encrypt_secret(body.ai_key.strip())
+    if existing:
+        if key_enc is not None:
+            conn.execute("UPDATE user_settings SET ai_key_enc=?, updated_at=datetime('now') WHERE user_id=?",
+                         (key_enc, user["id"]))
+        if body.ai_model:
+            conn.execute("UPDATE user_settings SET ai_model=?, updated_at=datetime('now') WHERE user_id=?",
+                         (body.ai_model, user["id"]))
+    else:
+        conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model) VALUES (?,?,?)",
+                     (user["id"], key_enc, body.ai_model or "gemini-1.5-flash"))
+    conn.commit()
+    conn.close()
+    return {"status": "saved"}
+
+@app.delete("/ai/settings")
+def delete_ai_settings(user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts have no stored key")
+    conn = get_db()
+    conn.execute("UPDATE user_settings SET ai_key_enc=NULL, updated_at=datetime('now') WHERE user_id=?",
+                 (user["id"],))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+# ── Insights: build a compact data context for the LLM ────────
+def build_training_context(uid: int) -> str:
+    """Produce a compact text summary of the user's training data for the LLM."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=? ORDER BY date",
+        (uid,)
+    ).fetchall()
+    conn.close()
+    if not rows:
+        return "No training sessions logged yet."
+
+    lines = []
+    lines.append(f"Total sessions: {len(rows)}")
+    lines.append(f"Date range: {rows[0]['date']} to {rows[-1]['date']}")
+    lines.append("")
+    lines.append("RD = Relative Density = total session volume / (total time x bodyweight).")
+    lines.append("Higher RD means more work done per unit time per pound of bodyweight.")
+    lines.append("")
+    lines.append("SESSION LOG (date | bodyweight | RD | exercises[load x reps]):")
+
+    for r in rows:
+        try:
+            exs = json.loads(r["exercises"])
+        except Exception:
+            exs = []
+        ex_parts = []
+        for ex in exs:
+            sets = ex.get("sets", [])
+            if not sets:
+                continue
+            # Compact: name maxload xtotalreps
+            max_load = max((s.get("trueLbs") or s.get("rawLoad") or 0) for s in sets)
+            total_reps = sum(s.get("reps", 0) for s in sets)
+            ex_parts.append(f"{ex.get('name','?')} {max_load:g}x{total_reps:g}")
+        note = f" | note: {r['notes']}" if r["notes"] else ""
+        lines.append(f"{r['date']} | {r['bw']:g}lb | RD {r['rd']:.2f} | {'; '.join(ex_parts)}{note}")
+
+    return "\n".join(lines)
+
+
+SYSTEM_PROMPT = """You are an analytical strength-training assistant inside an app called Agon.
+The user tracks workouts using a metric called RD (Relative Density). You have access to their
+full session history below. Answer their questions directly and concisely, grounding every claim
+in the actual data. Use specific dates, loads, and numbers. If the data doesn't support an answer,
+say so plainly. Do not invent data. Keep answers tight and useful — this is a knowledgeable user
+who wants signal, not filler. When discussing trends, cite the specific sessions that show them."""
+
+
+async def call_gemini(api_key: str, model: str, context: str, history: list, question: str) -> str:
+    """Call the Gemini API with the training context + conversation history."""
+    import httpx
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    # Build the conversation: system context as first user turn, then history, then new question
+    contents = []
+    contents.append({
+        "role": "user",
+        "parts": [{"text": f"{SYSTEM_PROMPT}\n\n=== TRAINING DATA ===\n{context}\n\n=== END DATA ===\n\nAcknowledge you have the data and are ready."}]
+    })
+    contents.append({
+        "role": "model",
+        "parts": [{"text": "I have your full training history loaded and I'm ready to analyze it. What would you like to know?"}]
+    })
+    for msg in history:
+        contents.append({
+            "role": "user" if msg["role"] == "user" else "model",
+            "parts": [{"text": msg["content"]}]
+        })
+    contents.append({"role": "user", "parts": [{"text": question}]})
+
+    payload = {"contents": contents}
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(url, params={"key": api_key}, json=payload)
+        if resp.status_code != 200:
+            detail = resp.text[:300]
+            raise HTTPException(status_code=502, detail=f"Gemini API error ({resp.status_code}): {detail}")
+        data = resp.json()
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except (KeyError, IndexError):
+            raise HTTPException(status_code=502, detail="Gemini returned an unexpected response shape")
+
+
+@app.get("/insights/history")
+def get_insights_history(user=Depends(current_user)):
+    """Return persisted conversation. Demo gets nothing (shared identity)."""
+    if user["role"] == "demo":
+        return {"messages": []}
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT role, content, created_at FROM insights_messages WHERE user_id=? ORDER BY id",
+        (user["id"],)
+    ).fetchall()
+    conn.close()
+    return {"messages": [dict(r) for r in rows]}
+
+@app.delete("/insights/history")
+def clear_insights_history(user=Depends(current_user)):
+    if user["role"] == "demo":
+        return {"status": "noop"}
+    conn = get_db()
+    conn.execute("DELETE FROM insights_messages WHERE user_id=?", (user["id"],))
+    conn.commit()
+    conn.close()
+    return {"status": "cleared"}
+
+@app.post("/insights/ask")
+async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
+    q = (body.question or "").strip()
+    if not q:
+        raise HTTPException(status_code=400, detail="Empty question")
+
+    # Get the user's key + model
+    conn = get_db()
+    settings = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
+                            (user["id"],)).fetchone()
+    conn.close()
+    if not settings or not settings["ai_key_enc"]:
+        raise HTTPException(status_code=400, detail="No API key configured. Add one in Settings.")
+    api_key = decrypt_secret(settings["ai_key_enc"])
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Stored key could not be decrypted. Re-enter it in Settings.")
+    model = settings["ai_model"] or "gemini-1.5-flash"
+
+    # Build context from the data the user is allowed to see
+    uid = data_user_id(user)
+    context = build_training_context(uid)
+
+    # Load prior conversation (demo has none)
+    history = []
+    if user["role"] != "demo":
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT role, content FROM insights_messages WHERE user_id=? ORDER BY id",
+            (user["id"],)
+        ).fetchall()
+        conn.close()
+        history = [dict(r) for r in rows]
+
+    answer = await call_gemini(api_key, model, context, history, q)
+
+    # Persist both turns (not for demo)
+    if user["role"] != "demo":
+        conn = get_db()
+        conn.execute("INSERT INTO insights_messages (user_id, role, content) VALUES (?,?,?)",
+                     (user["id"], "user", q))
+        conn.execute("INSERT INTO insights_messages (user_id, role, content) VALUES (?,?,?)",
+                     (user["id"], "model", answer))
+        conn.commit()
+        conn.close()
+
+    return {"answer": answer}
+
+@app.post("/ai/test")
+async def test_ai_key(body: AISettingsIn, user=Depends(current_user)):
+    """Test a Gemini key with a trivial call. Uses provided key, or stored key if none given."""
+    import httpx
+    key = (body.ai_key or "").strip()
+    model = body.ai_model or "gemini-1.5-flash"
+    if not key:
+        conn = get_db()
+        row = conn.execute("SELECT ai_key_enc FROM user_settings WHERE user_id=?",
+                           (user["id"],)).fetchone()
+        conn.close()
+        if row and row["ai_key_enc"]:
+            key = decrypt_secret(row["ai_key_enc"])
+    if not key:
+        raise HTTPException(status_code=400, detail="No key to test")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    payload = {"contents": [{"role": "user", "parts": [{"text": "Reply with just: OK"}]}]}
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(url, params={"key": key}, json=payload)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Connection failed: {str(e)[:200]}")
+    if resp.status_code == 200:
+        return {"ok": True, "model": model}
+    raise HTTPException(status_code=400, detail=f"Key test failed ({resp.status_code}): {resp.text[:200]}")
