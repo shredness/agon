@@ -184,6 +184,14 @@
   .modal .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
   .modal .form-group input, .modal .form-group select { width: 100%; }
   .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .insights-messages { display: flex; flex-direction: column; gap: 14px; min-height: 280px; max-height: 56vh; overflow-y: auto; padding: 8px 2px 16px; }
+  .insights-msg { max-width: 88%; padding: 11px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .insights-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .insights-msg.model { align-self: flex-start; background: var(--bg2); border: 0.5px solid var(--border); color: var(--text); border-bottom-left-radius: 4px; }
+  .insights-msg.thinking { align-self: flex-start; color: var(--text3); font-style: italic; }
+  .insights-input-bar { display: flex; gap: 8px; align-items: flex-end; }
+  .insights-input-bar textarea { flex: 1; resize: none; max-height: 140px; font-family: inherit; font-size: 14px; line-height: 1.4; padding: 10px 12px; overflow-y: auto; }
+  .insights-empty { text-align: center; color: var(--text3); font-size: 13px; padding: 40px 20px; }
 </style>
 </head>
 <body>
@@ -216,6 +224,7 @@
   <div class="app-header">
     <h1>Agon</h1>
     <div id="header-right" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+      <button class="theme-toggle" id="settings-btn" onclick="openSettings()" title="Settings" aria-label="Settings" style="display:none;"><i class="ti ti-settings"></i></button>
       <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle light/dark theme">🌙</button>
     </div>
   </div>
@@ -228,6 +237,7 @@
     <button class="tab" onclick="switchTab('trend')"><i class="ti ti-trending-up" aria-hidden="true"></i><span class="tab-label">Trend</span></button>
     <button class="tab" onclick="switchTab('bank')"><i class="ti ti-list-details" aria-hidden="true"></i><span class="tab-label">Exercises</span></button>
     <button class="tab" onclick="switchTab('progress')"><i class="ti ti-target" aria-hidden="true"></i><span class="tab-label">Progress</span></button>
+    <button class="tab" onclick="switchTab('insights')"><i class="ti ti-sparkles" aria-hidden="true"></i><span class="tab-label">Insights</span></button>
     <button class="tab" onclick="switchTab('export')"><i class="ti ti-file-download" aria-hidden="true"></i><span class="tab-label">Export</span></button>
     <button class="tab" id="tab-btn-users" onclick="switchTab('users')" style="display:none;"><i class="ti ti-users" aria-hidden="true"></i><span class="tab-label">Users</span></button>
   </div>
@@ -430,6 +440,26 @@
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;" id="log-preview"></table></div>
     </div>
   </div>
+
+  <!-- INSIGHTS -->
+  <div id="tab-insights" class="tab-panel">
+    <div id="insights-no-key" class="card" style="display:none;text-align:center;padding:32px 20px;">
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Connect an AI model to unlock Insights</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px;max-width:440px;margin-left:auto;margin-right:auto;">Ask plain-English questions about your training history and get answers grounded in your actual data. Add a free Google Gemini API key to get started.</div>
+      <button class="btn btn-primary" onclick="openSettings()">Open Settings</button>
+    </div>
+    <div id="insights-chat-wrap" style="display:none;">
+      <div id="insights-messages" class="insights-messages"></div>
+      <div class="insights-input-bar">
+        <textarea id="insights-input" rows="1" placeholder="Ask about your training… e.g. Am I losing strength on my pulls?" onkeydown="insightsKeydown(event)" oninput="autoGrow(this)"></textarea>
+        <button class="btn btn-primary" id="insights-send" onclick="askInsights()">Ask</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+        <div style="font-size:11px;color:var(--text3);" id="insights-model-label"></div>
+        <button class="btn btn-sm" onclick="clearInsights()" style="font-size:11px;" id="insights-clear-btn">Clear conversation</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -489,6 +519,35 @@
     <div class="modal-footer">
       <button class="btn btn-sm" onclick="closeChpwModal()">Cancel</button>
       <button class="btn btn-primary btn-sm" onclick="confirmChpw()">Update password</button>
+  </div>
+</div>
+
+<!-- AI Settings modal -->
+<div class="modal-overlay" id="settings-modal" style="display:none;" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <h3>AI Insights settings</h3>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">Connect a Google Gemini API key to ask questions about your training data. Your key is encrypted and stored only on your server — never shared.</div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Model</label>
+      <select id="ai-model" style="width:100%;">
+        <option value="gemini-1.5-flash">Gemini 1.5 Flash (fast, free tier)</option>
+        <option value="gemini-1.5-pro">Gemini 1.5 Pro (deeper analysis)</option>
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>API key</label>
+      <input type="password" id="ai-key" style="width:100%;" placeholder="Paste your Gemini API key" autocomplete="off">
+      <div id="ai-key-status" style="font-size:11px;color:var(--text3);margin-top:4px;"></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">Get a free key at <span style="color:var(--accent);">aistudio.google.com</span> → Get API key</div>
+    <div id="settings-msg" style="display:none;font-size:13px;margin-bottom:10px;"></div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-sm btn-danger" onclick="removeAiKey()" id="settings-remove-btn" style="display:none;">Remove key</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-sm" onclick="testAiKey()">Test</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save</button>
+      </div>
     </div>
   </div>
 </div>
@@ -762,6 +821,9 @@ function applyRoleUI() {
     const themeBtn = document.getElementById('theme-btn');
     if (themeBtn) headerRight.insertBefore(badge, themeBtn);
   }
+  // Show settings gear (all roles can open it; demo just can't save)
+  const sb = document.getElementById('settings-btn');
+  if (sb) sb.style.display = '';
 
   // If demo, start on history tab
   if (isDemo) switchTab('history');
@@ -794,7 +856,7 @@ async function init() {
 }
 
 function switchTab(name) {
-  const names = ['log','history','trend','bank','progress','export','users'];
+  const names = ['log','history','trend','bank','progress','insights','export','users'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   names.forEach(n => document.getElementById('tab-'+n).classList.toggle('active', n===name));
   if (name==='log') {
@@ -808,6 +870,7 @@ function switchTab(name) {
   if (name==='trend') renderTrend();
   if (name==='progress') initProgress();
   if (name==='export') updateExportSummary();
+  if (name==='insights') openInsights();
   if (name==='users') loadUsers();
 }
 
@@ -2360,6 +2423,210 @@ async function confirmChpw() {
   } catch(e) {
     errEl.textContent = e.message;
     errEl.style.display = 'block';
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════
+// AI SETTINGS + INSIGHTS
+// ════════════════════════════════════════════════════════════
+let _aiHasKey = false;
+let _aiModel = 'gemini-1.5-flash';
+
+// Dedicated fetch that surfaces backend error detail without tripping the API banner
+async function aiFetch(path, opts={}) {
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const r = await fetch(API + path, { headers, ...opts });
+  if (r.status === 401) { logout(); throw new Error('Session expired'); }
+  let body;
+  try { body = await r.json(); } catch(e) { body = {}; }
+  if (!r.ok) {
+    throw new Error(body.detail || ('Request failed (' + r.status + ')'));
+  }
+  return body;
+}
+
+async function openSettings() {
+  document.getElementById('settings-modal').style.display = 'flex';
+  document.getElementById('settings-msg').style.display = 'none';
+  document.getElementById('ai-key').value = '';
+  try {
+    const s = await aiFetch('/ai/settings');
+    _aiHasKey = s.has_key;
+    _aiModel = s.model || 'gemini-1.5-flash';
+    document.getElementById('ai-model').value = _aiModel;
+    const status = document.getElementById('ai-key-status');
+    const removeBtn = document.getElementById('settings-remove-btn');
+    if (s.has_key) {
+      status.textContent = 'Key on file: ' + s.masked;
+      document.getElementById('ai-key').placeholder = 'Enter a new key to replace the existing one';
+      if (removeBtn) removeBtn.style.display = currentUser?.role === 'demo' ? 'none' : '';
+    } else {
+      status.textContent = 'No key configured yet.';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+    if (currentUser?.role === 'demo') {
+      status.textContent = 'Demo accounts cannot store a key. Ask in read-only mode only if the owner has one set.';
+      document.getElementById('ai-key').disabled = true;
+    } else {
+      document.getElementById('ai-key').disabled = false;
+    }
+  } catch(e) {
+    settingsMsg(e.message, true);
+  }
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').style.display = 'none';
+}
+
+function settingsMsg(text, isError) {
+  const el = document.getElementById('settings-msg');
+  el.textContent = text;
+  el.style.display = 'block';
+  el.style.color = isError ? 'var(--red-text)' : 'var(--green-text, #10B981)';
+}
+
+async function testAiKey() {
+  const key = document.getElementById('ai-key').value.trim();
+  const model = document.getElementById('ai-model').value;
+  settingsMsg('Testing…', false);
+  try {
+    await aiFetch('/ai/test', { method:'POST', body: JSON.stringify({ ai_key: key || null, ai_model: model }) });
+    settingsMsg('✓ Connection works.', false);
+  } catch(e) {
+    settingsMsg(e.message, true);
+  }
+}
+
+async function saveSettings() {
+  const key = document.getElementById('ai-key').value.trim();
+  const model = document.getElementById('ai-model').value;
+  try {
+    await aiFetch('/ai/settings', { method:'POST', body: JSON.stringify({ ai_key: key || null, ai_model: model }) });
+    settingsMsg('✓ Saved.', false);
+    _aiModel = model;
+    setTimeout(() => { closeSettings(); openInsights(); }, 600);
+  } catch(e) {
+    settingsMsg(e.message, true);
+  }
+}
+
+async function removeAiKey() {
+  if (!confirm('Remove your stored API key?')) return;
+  try {
+    await aiFetch('/ai/settings', { method:'DELETE' });
+    _aiHasKey = false;
+    settingsMsg('Key removed.', false);
+    document.getElementById('ai-key-status').textContent = 'No key configured yet.';
+    document.getElementById('settings-remove-btn').style.display = 'none';
+  } catch(e) {
+    settingsMsg(e.message, true);
+  }
+}
+
+// ── Insights tab ──────────────────────────────────────────────
+async function openInsights() {
+  // Determine if a key is available
+  try {
+    const s = await aiFetch('/ai/settings');
+    _aiHasKey = s.has_key;
+    _aiModel = s.model || 'gemini-1.5-flash';
+  } catch(e) { _aiHasKey = false; }
+
+  const noKey = document.getElementById('insights-no-key');
+  const chatWrap = document.getElementById('insights-chat-wrap');
+
+  // Demo can use insights only if the owner (admin) has a key — but settings reads demo's own row.
+  // For simplicity: if no key on this account, show the connect prompt (except we let demo see prompt too).
+  if (!_aiHasKey) {
+    noKey.style.display = 'block';
+    chatWrap.style.display = 'none';
+    return;
+  }
+  noKey.style.display = 'none';
+  chatWrap.style.display = 'block';
+  document.getElementById('insights-model-label').textContent = 'Model: ' + _aiModel;
+
+  // Demo can't persist — hide clear button
+  const clearBtn = document.getElementById('insights-clear-btn');
+  if (clearBtn) clearBtn.style.display = currentUser?.role === 'demo' ? 'none' : '';
+
+  await loadInsightsHistory();
+}
+
+async function loadInsightsHistory() {
+  const box = document.getElementById('insights-messages');
+  try {
+    const data = await aiFetch('/insights/history');
+    const msgs = data.messages || [];
+    if (!msgs.length) {
+      box.innerHTML = '<div class="insights-empty">No questions yet. Ask anything about your training — trends, comparisons, plateaus, recovery patterns.</div>';
+      return;
+    }
+    box.innerHTML = msgs.map(m =>
+      `<div class="insights-msg ${m.role === 'user' ? 'user' : 'model'}">${escapeHtml(m.content)}</div>`
+    ).join('');
+    box.scrollTop = box.scrollHeight;
+  } catch(e) {
+    box.innerHTML = '<div class="insights-empty">Could not load conversation: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+function insightsKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    askInsights();
+  }
+}
+
+async function askInsights() {
+  const input = document.getElementById('insights-input');
+  const q = input.value.trim();
+  if (!q) return;
+  const box = document.getElementById('insights-messages');
+  const sendBtn = document.getElementById('insights-send');
+
+  // Clear empty-state if present
+  if (box.querySelector('.insights-empty')) box.innerHTML = '';
+
+  // Append user message
+  box.insertAdjacentHTML('beforeend', `<div class="insights-msg user">${escapeHtml(q)}</div>`);
+  input.value = '';
+  autoGrow(input);
+
+  // Thinking indicator
+  box.insertAdjacentHTML('beforeend', `<div class="insights-msg thinking" id="insights-thinking">Thinking…</div>`);
+  box.scrollTop = box.scrollHeight;
+  sendBtn.disabled = true;
+
+  try {
+    const data = await aiFetch('/insights/ask', { method:'POST', body: JSON.stringify({ question: q }) });
+    document.getElementById('insights-thinking')?.remove();
+    box.insertAdjacentHTML('beforeend', `<div class="insights-msg model">${escapeHtml(data.answer)}</div>`);
+  } catch(e) {
+    document.getElementById('insights-thinking')?.remove();
+    box.insertAdjacentHTML('beforeend', `<div class="insights-msg model" style="color:var(--red-text);">${escapeHtml(e.message)}</div>`);
+  } finally {
+    sendBtn.disabled = false;
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+async function clearInsights() {
+  if (!confirm('Clear this conversation? This cannot be undone.')) return;
+  try {
+    await aiFetch('/insights/history', { method:'DELETE' });
+    await loadInsightsHistory();
+  } catch(e) {
+    showToast('Could not clear: ' + e.message);
   }
 }
 
