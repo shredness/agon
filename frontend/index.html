@@ -224,7 +224,7 @@
   <div class="app-header">
     <h1>Agon</h1>
     <div id="header-right" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
-      <button class="theme-toggle" id="settings-btn" onclick="openSettings()" title="Settings" aria-label="Settings" style="display:none;"><i class="ti ti-settings"></i></button>
+      <button class="theme-toggle" id="settings-btn" onclick="openSettings()" title="Settings" aria-label="Settings" style="display:none;font-size:16px;">⚙</button>
       <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle light/dark theme">🌙</button>
     </div>
   </div>
@@ -748,7 +748,7 @@ async function doLogin() {
 function applyRoleUI() {
   const isDemo  = currentUser?.role === 'demo';
   const isAdmin = currentUser?.role === 'admin';
-  const names   = ['log','history','trend','bank','progress','export'];
+  const names   = ['log','history','trend','bank','progress','insights','export'];
 
   // Show all tabs for everyone (demo sees everything, just can't write)
   names.forEach(n => {
