@@ -615,20 +615,22 @@ def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
     conn = get_db()
     existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?",
                             (user["id"],)).fetchone()
-    # Build the update
+    # Build the update — always write both fields atomically
     key_enc = None
     if body.ai_key is not None and body.ai_key.strip():
         key_enc = encrypt_secret(body.ai_key.strip())
     if existing:
-        if key_enc is not None:
-            conn.execute("UPDATE user_settings SET ai_key_enc=?, updated_at=datetime('now') WHERE user_id=?",
-                         (key_enc, user["id"]))
-        if body.ai_model:
-            conn.execute("UPDATE user_settings SET ai_model=?, updated_at=datetime('now') WHERE user_id=?",
-                         (body.ai_model, user["id"]))
+        cur = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
+                           (user["id"],)).fetchone()
+        final_key   = key_enc if key_enc is not None else cur["ai_key_enc"]
+        final_model = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.0-flash")
+        conn.execute(
+            "UPDATE user_settings SET ai_key_enc=?, ai_model=?, updated_at=datetime('now') WHERE user_id=?",
+            (final_key, final_model, user["id"])
+        )
     else:
         conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model) VALUES (?,?,?)",
-                     (user["id"], key_enc, body.ai_model or "gemini-1.5-flash"))
+                     (user["id"], key_enc, body.ai_model or "gemini-2.0-flash"))
     conn.commit()
     conn.close()
     return {"status": "saved"}
@@ -693,12 +695,20 @@ say so plainly. Do not invent data. Keep answers tight and useful — this is a 
 who wants signal, not filler. When discussing trends, cite the specific sessions that show them."""
 
 
-async def call_gemini(api_key: str, model: str, context: str, history: list, question: str) -> str:
-    """Call the Gemini API with the training context + conversation history."""
+def _is_claude_model(model: str) -> bool:
+    return model.startswith("claude-")
+
+async def call_llm(api_key: str, model: str, context: str, history: list, question: str) -> str:
+    """Route to Gemini or Anthropic depending on the model name."""
+    import httpx
+    if _is_claude_model(model):
+        return await _call_anthropic(api_key, model, context, history, question)
+    return await _call_gemini(api_key, model, context, history, question)
+
+async def _call_gemini(api_key: str, model: str, context: str, history: list, question: str) -> str:
+    """Call the Gemini API with training context + conversation history."""
     import httpx
     url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
-
-    # Build the conversation: system context as first user turn, then history, then new question
     contents = []
     contents.append({
         "role": "user",
@@ -714,18 +724,49 @@ async def call_gemini(api_key: str, model: str, context: str, history: list, que
             "parts": [{"text": msg["content"]}]
         })
     contents.append({"role": "user", "parts": [{"text": question}]})
-
     payload = {"contents": contents}
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(url, params={"key": api_key}, json=payload)
         if resp.status_code != 200:
-            detail = resp.text[:300]
-            raise HTTPException(status_code=502, detail=f"Gemini API error ({resp.status_code}): {detail}")
+            raise HTTPException(status_code=502, detail=f"Gemini API error ({resp.status_code}): {resp.text[:300]}")
         data = resp.json()
         try:
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except (KeyError, IndexError):
             raise HTTPException(status_code=502, detail="Gemini returned an unexpected response shape")
+
+async def _call_anthropic(api_key: str, model: str, context: str, history: list, question: str) -> str:
+    """Call the Anthropic Messages API with training context + conversation history."""
+    import httpx
+    url = "https://api.anthropic.com/v1/messages"
+    messages = []
+    # Prior conversation turns
+    for msg in history:
+        messages.append({
+            "role": "user" if msg["role"] == "user" else "assistant",
+            "content": msg["content"]
+        })
+    messages.append({"role": "user", "content": question})
+    payload = {
+        "model": model,
+        "max_tokens": 1024,
+        "system": f"{SYSTEM_PROMPT}\n\n=== TRAINING DATA ===\n{context}\n\n=== END DATA ===",
+        "messages": messages
+    }
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Anthropic API error ({resp.status_code}): {resp.text[:300]}")
+        data = resp.json()
+        try:
+            return data["content"][0]["text"]
+        except (KeyError, IndexError):
+            raise HTTPException(status_code=502, detail="Anthropic returned an unexpected response shape")
 
 
 @app.get("/insights/history")
@@ -814,11 +855,19 @@ async def test_ai_key(body: AISettingsIn, user=Depends(current_user)):
     if not key:
         raise HTTPException(status_code=400, detail="No key to test")
 
-    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
-    payload = {"contents": [{"role": "user", "parts": [{"text": "Reply with just: OK"}]}]}
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
-            resp = await client.post(url, params={"key": key}, json=payload)
+        import httpx
+        if _is_claude_model(model):
+            url = "https://api.anthropic.com/v1/messages"
+            headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
+            payload = {"model": model, "max_tokens": 10, "messages": [{"role": "user", "content": "Reply OK"}]}
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+        else:
+            url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
+            payload = {"contents": [{"role": "user", "parts": [{"text": "Reply with just: OK"}]}]}
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(url, params={"key": key}, json=payload)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Connection failed: {str(e)[:200]}")
     if resp.status_code == 200:
