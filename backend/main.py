@@ -158,7 +158,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id      INTEGER PRIMARY KEY,
             ai_key_enc   TEXT,
-            ai_model     TEXT DEFAULT 'gemini-1.5-flash',
+            ai_model     TEXT DEFAULT 'gemini-2.0-flash',
             updated_at   TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
@@ -696,7 +696,7 @@ who wants signal, not filler. When discussing trends, cite the specific sessions
 async def call_gemini(api_key: str, model: str, context: str, history: list, question: str) -> str:
     """Call the Gemini API with the training context + conversation history."""
     import httpx
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
 
     # Build the conversation: system context as first user turn, then history, then new question
     contents = []
@@ -767,7 +767,7 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
     api_key = decrypt_secret(settings["ai_key_enc"])
     if not api_key:
         raise HTTPException(status_code=400, detail="Stored key could not be decrypted. Re-enter it in Settings.")
-    model = settings["ai_model"] or "gemini-1.5-flash"
+    model = settings["ai_model"] or "gemini-2.0-flash"
 
     # Build context from the data the user is allowed to see
     uid = data_user_id(user)
@@ -814,7 +814,7 @@ async def test_ai_key(body: AISettingsIn, user=Depends(current_user)):
     if not key:
         raise HTTPException(status_code=400, detail="No key to test")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent"
     payload = {"contents": [{"role": "user", "parts": [{"text": "Reply with just: OK"}]}]}
     try:
         async with httpx.AsyncClient(timeout=20) as client:
