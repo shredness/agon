@@ -245,10 +245,10 @@
   <!-- LOG -->
   <div id="tab-log" class="tab-panel active">
     <div class="metric-grid" id="workout-stats">
-      <div class="metric"><div class="metric-label">Last session</div><div class="metric-value" id="s-last">—</div><div class="metric-sub" id="s-last-d">—</div></div>
-      <div class="metric"><div class="metric-label">Average RD</div><div class="metric-value" id="s-avg">—</div><div class="metric-sub" id="s-avg-sub">last 4 weeks</div></div>
-      <div class="metric"><div class="metric-label">Best session</div><div class="metric-value" id="s-best">—</div><div class="metric-sub" id="s-best-d">—</div></div>
-      <div class="metric"><div class="metric-label">Sessions</div><div class="metric-value" id="s-count">—</div><div class="metric-sub">total logged</div></div>
+      <div class="metric"><div class="metric-label">Last session</div><div class="metric-value" id="s-last">-</div><div class="metric-sub" id="s-last-d">-</div></div>
+      <div class="metric"><div class="metric-label">Average RD</div><div class="metric-value" id="s-avg">-</div><div class="metric-sub" id="s-avg-sub">last 4 weeks</div></div>
+      <div class="metric"><div class="metric-label">Best session</div><div class="metric-value" id="s-best">-</div><div class="metric-sub" id="s-best-d">-</div></div>
+      <div class="metric"><div class="metric-label">Sessions</div><div class="metric-value" id="s-count">-</div><div class="metric-sub">total logged</div></div>
     </div>
     <div class="card">
       <div class="section-label" style="margin-bottom:14px;">Session details</div>
@@ -297,10 +297,10 @@
   <!-- TREND -->
   <div id="tab-trend" class="tab-panel">
     <div class="metric-grid">
-      <div class="metric"><div class="metric-label">Avg bodyweight</div><div class="metric-value" id="t-wt">—</div><div class="metric-sub">lbs, last 4 weeks</div></div>
-      <div class="metric"><div class="metric-label">60-day average RD</div><div class="metric-value" id="t-avg">—</div><div class="metric-sub" id="t-avg-sub">last 60 days</div></div>
-      <div class="metric"><div class="metric-label">4-week trend</div><div class="metric-value" id="t-dir">—</div><div class="metric-sub" id="t-dir-s">vs prior 4wk</div></div>
-      <div class="metric"><div class="metric-label">Peak week</div><div class="metric-value" id="t-peak">—</div><div class="metric-sub" id="t-peak-d">—</div></div>
+      <div class="metric"><div class="metric-label">Avg bodyweight</div><div class="metric-value" id="t-wt">-</div><div class="metric-sub">lbs, last 4 weeks</div></div>
+      <div class="metric"><div class="metric-label">60-day average RD</div><div class="metric-value" id="t-avg">-</div><div class="metric-sub" id="t-avg-sub">last 60 days</div></div>
+      <div class="metric"><div class="metric-label">4-week trend</div><div class="metric-value" id="t-dir">-</div><div class="metric-sub" id="t-dir-s">vs prior 4wk</div></div>
+      <div class="metric"><div class="metric-label">Peak week</div><div class="metric-value" id="t-peak">-</div><div class="metric-sub" id="t-peak-d">-</div></div>
     </div>
     <div class="card" style="padding:16px;">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
@@ -357,7 +357,7 @@
         <div class="form-group" style="flex:1;min-width:200px;">
           <label>Exercise</label>
           <select id="progress-exercise" onchange="loadProgress()" style="width:100%;">
-            <option value="">— Select exercise —</option>
+            <option value="">- Select exercise -</option>
           </select>
         </div>
         <div id="progress-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;"></div>
@@ -414,7 +414,7 @@
   <div id="tab-export" class="tab-panel">
     <div class="card">
       <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Import from Excel</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Upload a filled template to import historical sessions. Download the template first — it includes a Legend sheet explaining every field and modifier.</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Upload a filled template to import historical sessions. Download the template first - it includes a Legend sheet explaining every field and modifier.</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-export" onclick="downloadImportTemplate()">↓ Download template</button>
         <input type="file" id="import-file" accept=".xlsx" style="font-size:12px;color:var(--text2);" onchange="previewImport(this)">
@@ -425,7 +425,7 @@
     <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <div style="flex:1;">
         <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Export to Excel</div>
-        <div style="font-size:13px;color:var(--text2);">Log, Trend, and ExerciseBank sheets — matching your 2026 Workouts.xlsx structure</div>
+        <div style="font-size:13px;color:var(--text2);">Log, Trend, and ExerciseBank sheets with relevant information on your progress.</div>
         <div id="export-status" style="font-size:12px;margin-top:4px;"></div>
       </div>
       <button class="btn btn-export" id="export-btn" onclick="doExport()">↓ Download .xlsx</button>
@@ -439,9 +439,9 @@
           <th style="padding:7px 0;text-align:left;font-size:11px;font-weight:600;color:var(--text2);width:80px;">Rows</th>
         </tr></thead>
         <tbody>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:500;">Log</td><td style="padding:8px 0;font-size:12px;color:var(--text2);">Date, Weight, Exercise, Load, True, Reps, Vol, Time, Density, Rel Density, Notes</td><td style="padding:8px 0;font-size:12px;color:var(--text2);" id="exp-log-ct">—</td></tr>
-          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:500;">Trend</td><td style="padding:8px 0;font-size:12px;color:var(--text2);">Week Ending, Relative Density Avg, Weekly Weight Avg (lbs)</td><td style="padding:8px 0;font-size:12px;color:var(--text2);" id="exp-trend-ct">—</td></tr>
-          <tr><td style="padding:8px 0;font-weight:500;">ExerciseBank</td><td style="padding:8px 0;font-size:12px;color:var(--text2);">Name, Alias, Tool, Multiplier, Muscle Group, Day, Load Input, Is Bodyweight</td><td style="padding:8px 0;font-size:12px;color:var(--text2);" id="exp-bank-ct">— rows</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:500;">Log</td><td style="padding:8px 0;font-size:12px;color:var(--text2);">Date, Weight, Exercise, Load, True, Reps, Vol, Time, Density, Rel Density, Notes</td><td style="padding:8px 0;font-size:12px;color:var(--text2);" id="exp-log-ct">-</td></tr>
+          <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;font-weight:500;">Trend</td><td style="padding:8px 0;font-size:12px;color:var(--text2);">Week Ending, Relative Density Avg, Weekly Weight Avg (lbs)</td><td style="padding:8px 0;font-size:12px;color:var(--text2);" id="exp-trend-ct">-</td></tr>
+          <tr><td style="padding:8px 0;font-weight:500;">ExerciseBank</td><td style="padding:8px 0;font-size:12px;color:var(--text2);">Name, Alias, Tool, Multiplier, Muscle Group, Load Input, Is Bodyweight</td><td style="padding:8px 0;font-size:12px;color:var(--text2);" id="exp-bank-ct">- rows</td></tr>
         </tbody>
       </table>
     </div>
@@ -505,8 +505,8 @@
     <div class="form-group" style="margin-bottom:12px;">
       <label>Role</label>
       <select id="nu-role" style="width:100%;">
-        <option value="guest">Guest — own data, full access</option>
-        <option value="demo">Demo — read-only, sees admin data</option>
+        <option value="guest">Guest - own data, full access</option>
+        <option value="demo">Demo - read-only, sees admin data</option>
         <option value="admin">Admin</option>
       </select>
     </div>
@@ -559,11 +559,11 @@
 
     <!-- ── AI Insights ── -->
     <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">AI Insights</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Your key is encrypted and stored only on your server — never shared.</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Your key is encrypted and stored only on your server - never shared.</div>
     <div class="form-group" style="margin-bottom:10px;">
       <label>Model</label>
       <select id="ai-model" style="width:100%;" onchange="updateKeyPlaceholder()">
-        <optgroup label="Google Gemini — Stable">
+        <optgroup label="Google Gemini - Stable">
           <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
           <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
           <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite (lightest)</option>
@@ -571,7 +571,7 @@
           <option value="gemini-2.0-flash">Gemini 2.0 Flash (free tier)</option>
           <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
         </optgroup>
-        <optgroup label="Google Gemini — Preview">
+        <optgroup label="Google Gemini - Preview">
           <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
           <option value="gemini-flash-latest">Gemini Flash Latest</option>
           <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest</option>
@@ -814,7 +814,7 @@ function applyRoleUI() {
         const banner = document.createElement('div');
         banner.id = 'demo-banner';
         banner.style.cssText = 'background:var(--accent-bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:12px;color:var(--accent-text);margin-bottom:16px;text-align:center;';
-        banner.textContent = 'You are viewing in read-only demo mode — data belongs to Manny.';
+        banner.textContent = 'You are viewing in read-only demo mode - data belongs to Manny.';
         const app = document.querySelector('.app');
         const tabs = document.querySelector('.tabs');
         if (app && tabs) app.insertBefore(banner, tabs.nextSibling);
@@ -930,7 +930,7 @@ function getExDef(name) {
 function addExercise() {
   const id = exCount++;
   setCounts[id] = 0;
-  const opts = '<option value="">— Select exercise —</option>' + EXERCISE_BANK.map(e=>`<option value="${e.name}">${e.name}</option>`).join('') + '<option value="__add_new__" style="color:var(--blue);font-weight:500;">+ Add new exercise…</option>';
+  const opts = '<option value="">- Select exercise -</option>' + EXERCISE_BANK.map(e=>`<option value="${e.name}">${e.name}</option>`).join('') + '<option value="__add_new__" style="color:var(--blue);font-weight:500;">+ Add new exercise…</option>';
   const div = document.createElement('div');
   div.className = 'exercise-block'; div.id = 'ex-'+id;
   div.innerHTML = `
@@ -1094,7 +1094,7 @@ function addSet(exId) {
     <td><input type="number" id="l-${exId}-${sid}" step="0.5" placeholder="${def.isBW?'auto':'0'}" style="width:${def.isBW?62:78}px;" oninput="calcRD()" ${def.isBW?'disabled':''}></td>
     <td><input type="number" id="r-${exId}-${sid}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
     <td><input type="number" id="t-${exId}-${sid}" step="0.5" min="0.5" value="2" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
-    <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${exId}-${sid}">—</td>
+    <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${exId}-${sid}">-</td>
     <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${exId},${sid})">✕</button></td>
   `;
   document.getElementById('sets-'+exId).appendChild(tr);
@@ -1133,10 +1133,10 @@ function calcRD() {
       const reps = parseFloat(document.getElementById(`r-${exId}-${sid}`)?.value)||0;
       const setTime = parseFloat(document.getElementById(`t-${exId}-${sid}`)?.value)||2;
       const vEl = document.getElementById(`v-${exId}-${sid}`);
-      if (!reps) { if(vEl) vEl.textContent='—'; return; }
+      if (!reps) { if(vEl) vEl.textContent='-'; return; }
       let trueLbs;
       if (def.isBW && bw>0) { trueLbs = effBW(id,bw)*def.mult; }
-      else { const l=parseFloat(document.getElementById(`l-${exId}-${sid}`)?.value)||0; if(!l){if(vEl)vEl.textContent='—';return;} const vtm=def.tool==='Bar'?(document.querySelector(`input[name="vtm-${id}"]:checked`)?.value||'vitruvian'):''; if(def.tool==='Bar'&&vtm==='standard'){const bwt2=parseFloat(document.getElementById(`barwt-val-${id}`)?.value)||0;trueLbs=l+bwt2;}else{trueLbs=l*(def.tool==='Bar'?2.0:def.mult);} }
+      else { const l=parseFloat(document.getElementById(`l-${exId}-${sid}`)?.value)||0; if(!l){if(vEl)vEl.textContent='-';return;} const vtm=def.tool==='Bar'?(document.querySelector(`input[name="vtm-${id}"]:checked`)?.value||'vitruvian'):''; if(def.tool==='Bar'&&vtm==='standard'){const bwt2=parseFloat(document.getElementById(`barwt-val-${id}`)?.value)||0;trueLbs=l+bwt2;}else{trueLbs=l*(def.tool==='Bar'?2.0:def.mult);} }
       const vol = trueLbs*reps;
       exVol += vol;
       exTime += setTime;
@@ -1204,7 +1204,7 @@ async function saveSession() {
     const sg=document.getElementById('workout-stats'); if(sg) sg.style.display='';
     const cb=document.getElementById('cancel-edit-btn'); if(cb) cb.style.display='none';
     prefillBodyweight();
-    showToast(`Session saved — RD ${rd.toFixed(2)}`);
+    showToast(`Session saved - RD ${rd.toFixed(2)}`);
     switchTab('history');
   } catch(e) { showToast('Save failed: '+e.message); }
   btn.innerHTML='Save session'; btn.disabled=false;
@@ -1252,7 +1252,7 @@ function renderHistory() {
   const exFilter = document.getElementById('hist-exercise')?.value || '';
 
   let filtered = [...sessions].reverse();
-  // Date strings are YYYY-MM-DD — lexicographic comparison is correct
+  // Date strings are YYYY-MM-DD - lexicographic comparison is correct
   if (from) filtered = filtered.filter(s => s.date >= from);
   if (to)   filtered = filtered.filter(s => s.date <= to);
   if (exFilter) filtered = filtered.filter(s => (s.exercises||[]).some(e => e.name === exFilter));
@@ -1377,7 +1377,7 @@ function editSession(date) {
   const cancelBtn = document.getElementById('cancel-edit-btn');
   if (cancelBtn) cancelBtn.style.display = '';
 
-  // Switch to Workout tab — flag prevents switchTab from cancelling the edit
+  // Switch to Workout tab - flag prevents switchTab from cancelling the edit
   window._editSessionActive = true;
   switchTab('log');
   window._editSessionActive = false;
@@ -1397,7 +1397,7 @@ function editSession(date) {
   (session.exercises || []).forEach(ex => {
     const id = exCount++;
     setCounts[id] = 0;
-    const opts = '<option value="">— Select exercise —</option>' +
+    const opts = '<option value="">- Select exercise -</option>' +
       EXERCISE_BANK.map(e => `<option value="${e.name}"${e.name===ex.name?' selected':''}>${escapeHtml(e.name)}</option>`).join('') +
       '<option value="__add_new__" style="color:var(--accent);font-weight:500;">+ Add new exercise…</option>';
     const div = document.createElement('div');
@@ -1458,7 +1458,7 @@ function editSession(date) {
         <td><input type="number" id="l-${id}-${sid}" value="${loadVal}" step="0.5" placeholder="${def.isBW?'auto':'0'}" style="width:${def.isBW?62:78}px;" oninput="calcRD()" ${def.isBW?'disabled':''}></td>
         <td><input type="number" id="r-${id}-${sid}" value="${set.reps}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
         <td><input type="number" id="t-${id}-${sid}" value="${set.time||2}" step="0.5" min="0.5" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
-        <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${id}-${sid}">—</td>
+        <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${id}-${sid}">-</td>
         <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${id},${sid})">✕</button></td>
       `;
       if (tbody) tbody.appendChild(tr);
@@ -1474,7 +1474,7 @@ function editSession(date) {
         const savedTrueLbs = ex.sets[0].trueLbs || 0;
         const bareBW = bw * def2.mult;
         if (savedTrueLbs > 0 && Math.abs(savedTrueLbs - bareBW) > 0.5) {
-          // There's a vest or assist — figure out which
+          // There's a vest or assist - figure out which
           if (savedTrueLbs > bareBW) {
             // Vest: vestWeight = savedTrueLbs/mult - bw
             const vestWt = (savedTrueLbs / def2.mult) - bw;
@@ -1499,7 +1499,7 @@ function editSession(date) {
   // Defer calcRD until all DOM is settled
   setTimeout(calcRD, 100);
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  showToast(`Editing session — ${date}`);
+  showToast(`Editing session - ${date}`);
 }
 
 async function renderTrend() {
@@ -1508,7 +1508,7 @@ async function renderTrend() {
   const labels=trendData.map(d=>{ const p=d.week.split('/'); return p[0]+'/'+p[1]; });
   const rdV=trendData.map(d=>+d.rd.toFixed(2));
   const wtV=trendData.map(d=>+d.wt.toFixed(1));
-  // 60-day average RD — use weeks within last 60 days
+  // 60-day average RD - use weeks within last 60 days
   const now = new Date();
   const cutoff60 = new Date(now - 60*24*60*60*1000);
   const cutoff28 = new Date(now - 28*24*60*60*1000);
@@ -1530,7 +1530,7 @@ async function renderTrend() {
   const pk=trendData.reduce((b,d)=>d.rd>b.rd?d:b);
   document.getElementById('t-peak').textContent=pk.rd.toFixed(2);
   document.getElementById('t-peak-d').textContent=pk.week;
-  // Avg bodyweight — last 4 weeks
+  // Avg bodyweight - last 4 weeks
   const wtRecent = recent4wk.length ? recent4wk.map(d=>d.wt) : wtV;
   document.getElementById('t-wt').textContent=(wtRecent.reduce((a,v)=>a+v,0)/wtRecent.length).toFixed(1);
   if(rdV.length>=8){const r=rdV.slice(-4).reduce((a,v)=>a+v,0)/4,p=rdV.slice(-8,-4).reduce((a,v)=>a+v,0)/4,dir=r-p;document.getElementById('t-dir').textContent=(dir>=0?'+':'')+dir.toFixed(2);document.getElementById('t-dir-s').textContent=dir>=0?'▲ improving':'▼ declining';}
@@ -1687,15 +1687,15 @@ async function resetBank() {
     {name:'Low Bar Squat',alias:'Back Squat',tool:'Bar',mult:2.0,muscle:'Legs',day:'Thursday',loadHint:'lbs per side',isBW:false,isAssist:false},
     {name:'KB Swings',alias:'KB Swings',tool:'Kettlebell',mult:1.0,muscle:'Legs / Back',day:'Thursday',loadHint:'total lbs',isBW:false,isAssist:false},
     {name:'Hanging Knee Tuck',alias:'Hanging Knee Tuck',tool:'Bodyweight',mult:0.35,muscle:'Core',day:'Mon/Fri',loadHint:'bodyweight',isBW:true,isAssist:false},
-    {name:'Assisted Pull Ups',alias:'Assisted Pull Ups',tool:'Bodyweight',mult:0.75,muscle:'Back / Biceps',day:'—',loadHint:'bodyweight',isBW:true,isAssist:true},
-    {name:'Crossover Rear Delt Fly',alias:'Incline Reverse Fly',tool:'Cable',mult:2.0,muscle:'Shoulders / Back',day:'—',loadHint:'lbs per side',isBW:false,isAssist:false},
-    {name:'Upright Row',alias:'Upright Row',tool:'Bar',mult:2.0,muscle:'Shoulders / Back',day:'—',loadHint:'lbs per side',isBW:false,isAssist:false},
-    {name:'Goblet Squat',alias:'Goblet Squat',tool:'Kettlebell',mult:1.0,muscle:'Legs',day:'—',loadHint:'total lbs',isBW:false,isAssist:false},
-    {name:'KB Front Squat',alias:'KB Front Squat',tool:'Kettlebell',mult:1.0,muscle:'Legs',day:'—',loadHint:'total lbs',isBW:false,isAssist:false},
-    {name:'KB Step-up',alias:'KB Step Ups',tool:'Kettlebell',mult:1.0,muscle:'Legs / Core',day:'—',loadHint:'total lbs',isBW:false,isAssist:false},
-    {name:"Farmer's Walk",alias:"Farmer's Walk",tool:'Kettlebell',mult:1.0,muscle:'Core',day:'—',loadHint:'total lbs',isBW:false,isAssist:false},
-    {name:'Pullover to sit-up',alias:'Core',tool:'Kettlebell',mult:1.0,muscle:'Core',day:'—',loadHint:'total lbs',isBW:false,isAssist:false},
-    {name:'Hanging Leg Raise',alias:'Hanging Leg Raises',tool:'Bodyweight',mult:0.5,muscle:'Core',day:'—',loadHint:'bodyweight',isBW:true,isAssist:false},
+    {name:'Assisted Pull Ups',alias:'Assisted Pull Ups',tool:'Bodyweight',mult:0.75,muscle:'Back / Biceps',day:'-',loadHint:'bodyweight',isBW:true,isAssist:true},
+    {name:'Crossover Rear Delt Fly',alias:'Incline Reverse Fly',tool:'Cable',mult:2.0,muscle:'Shoulders / Back',day:'-',loadHint:'lbs per side',isBW:false,isAssist:false},
+    {name:'Upright Row',alias:'Upright Row',tool:'Bar',mult:2.0,muscle:'Shoulders / Back',day:'-',loadHint:'lbs per side',isBW:false,isAssist:false},
+    {name:'Goblet Squat',alias:'Goblet Squat',tool:'Kettlebell',mult:1.0,muscle:'Legs',day:'-',loadHint:'total lbs',isBW:false,isAssist:false},
+    {name:'KB Front Squat',alias:'KB Front Squat',tool:'Kettlebell',mult:1.0,muscle:'Legs',day:'-',loadHint:'total lbs',isBW:false,isAssist:false},
+    {name:'KB Step-up',alias:'KB Step Ups',tool:'Kettlebell',mult:1.0,muscle:'Legs / Core',day:'-',loadHint:'total lbs',isBW:false,isAssist:false},
+    {name:"Farmer's Walk",alias:"Farmer's Walk",tool:'Kettlebell',mult:1.0,muscle:'Core',day:'-',loadHint:'total lbs',isBW:false,isAssist:false},
+    {name:'Pullover to sit-up',alias:'Core',tool:'Kettlebell',mult:1.0,muscle:'Core',day:'-',loadHint:'total lbs',isBW:false,isAssist:false},
+    {name:'Hanging Leg Raise',alias:'Hanging Leg Raises',tool:'Bodyweight',mult:0.5,muscle:'Core',day:'-',loadHint:'bodyweight',isBW:true,isAssist:false},
   ];
   DEFAULT_BANK.forEach(e => EXERCISE_BANK.push(e));
   await seedBankToAPI();
@@ -1705,9 +1705,9 @@ async function resetBank() {
 }
 
 async function addBankRow() {
-  const newEx = {name:'New Exercise',alias:'',tool:'Bar',mult:2.0,muscles:[],muscle:'',day:'—',loadHint:'lbs per side',isBW:false,_isNew:true};
+  const newEx = {name:'New Exercise',alias:'',tool:'Bar',mult:2.0,muscles:[],muscle:'',day:'-',loadHint:'lbs per side',isBW:false,_isNew:true};
   EXERCISE_BANK.push(newEx);
-  // Don't save placeholder — wait until user sets a real name
+  // Don't save placeholder - wait until user sets a real name
   renderBankTable();
   rebuildExerciseDropdowns();
   // Scroll to and focus the new name cell
@@ -1846,7 +1846,7 @@ function getSessionTriggers(session) {
     // Kettlebells exempt
     if (tool === 'Kettlebell') continue;
 
-    // 10+ sets = wave/varied protocol — exempt
+    // 10+ sets = wave/varied protocol - exempt
     if (sets.length >= 10) continue;
 
     if (!sets.length) continue;
@@ -1929,7 +1929,7 @@ async function buildTrendRows() {
 }
 
 function buildBankRows() {
-  return EXERCISE_BANK.map(e=>({'Name':e.name,'Alias':e.alias,'Tool':e.tool,'Multiplier':e.mult,'Muscle Group':e.muscle,'Day':e.day,'Load Input':e.loadHint,'Is Bodyweight':e.isBW?'Yes':'No'}));
+  return EXERCISE_BANK.map(e=>({'Name':e.name,'Alias':e.alias,'Tool':e.tool,'Multiplier':e.mult,'Muscle Group':e.muscle,'Load Input':e.loadHint,'Is Bodyweight':e.isBW?'Yes':'No'}));
 }
 
 async function updateExportSummary() {
@@ -1960,7 +1960,7 @@ async function doExport() {
     wsT['!cols']=[14,22,24].map(w=>({wch:w}));
     const br=buildBankRows();
     const wsB=XLSX.utils.json_to_sheet(br);
-    wsB['!cols']=[26,26,12,12,20,14,18,14].map(w=>({wch:w}));
+    wsB['!cols']=[26,26,12,12,20,18,14].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,wsL,'Log');
     XLSX.utils.book_append_sheet(wb,wsT,'Trend');
     XLSX.utils.book_append_sheet(wb,wsB,'ExerciseBank');
@@ -2056,7 +2056,7 @@ async function confirmAddEx() {
   const muscle = muscles.join(' / ');
   const isBW = document.getElementById('new-ex-isbw').value === 'true';
   const loadHint = isBW ? 'bodyweight' : (tool === 'Kettlebell' || mult === 1.0) ? 'total lbs' : 'lbs per side';
-  const newEx = { name, alias: name, tool, mult, muscles, muscle, day: '—', loadHint, isBW };
+  const newEx = { name, alias: name, tool, mult, muscles, muscle, day: '-', loadHint, isBW };
   EXERCISE_BANK.push(newEx);
   await saveBankRowToAPI(newEx);
   rebuildExerciseDropdowns();
@@ -2118,7 +2118,7 @@ async function initProgress() {
   const current = sel.value;
   try {
     const names = await apiFetch('/exercises/logged');
-    sel.innerHTML = '<option value="">— Select exercise —</option>' +
+    sel.innerHTML = '<option value="">- Select exercise -</option>' +
       names.map(n => `<option value="${escapeHtml(n)}"${n===current?' selected':''}>${escapeHtml(n)}</option>`).join('');
   } catch(e) {}
   if (sel.value) loadProgress();
@@ -2178,8 +2178,8 @@ function renderStrengthMaintenance() {
     const ratioColor = ratio >= 95 ? '#10B981' : ratio >= 85 ? '#F59E0B' : '#EF4444';
     return `<tr style="border-bottom:0.5px solid var(--border);">
       <td style="padding:8px 0;color:var(--text);">${escapeHtml(exName)}</td>
-      <td style="padding:8px 0;text-align:right;color:var(--text);">${s.current > 0 ? s.current.toFixed(1) : '—'}</td>
-      <td style="padding:8px 0;text-align:right;color:var(--text);">${s.peak > 0 ? s.peak.toFixed(1) : '—'}</td>
+      <td style="padding:8px 0;text-align:right;color:var(--text);">${s.current > 0 ? s.current.toFixed(1) : '-'}</td>
+      <td style="padding:8px 0;text-align:right;color:var(--text);">${s.peak > 0 ? s.peak.toFixed(1) : '-'}</td>
       <td style="padding:8px 0;text-align:right;font-weight:600;color:${ratioColor};">${ratio}%</td>
     </tr>`;
   }).join('');
@@ -2219,7 +2219,7 @@ async function loadProgress() {
   const avgLoad     = loads.reduce((a,v)=>a+v,0)/loads.length;
   const sessionCount = data.length;
   const recent4 = loads.slice(-4), prior4 = loads.slice(-8,-4);
-  let trend = '—';
+  let trend = '-';
   if (recent4.length >= 2 && prior4.length >= 2) {
     const r = recent4.reduce((a,v)=>a+v,0)/recent4.length;
     const p = prior4.reduce((a,v)=>a+v,0)/prior4.length;
@@ -2392,7 +2392,7 @@ async function loadUsers() {
         <td style="padding:9px 8px;">
           <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg2);color:${roleColors[u.role]||'var(--text2)'};font-weight:600;text-transform:uppercase;">${u.role}</span>
         </td>
-        <td style="padding:9px 8px; font-size:12px; color:var(--text2);">${u.created_at?.slice(0,10)||'—'}</td>
+        <td style="padding:9px 8px; font-size:12px; color:var(--text2);">${u.created_at?.slice(0,10)||'-'}</td>
         <td style="padding:9px 8px;">
             <button class="btn btn-sm" onclick="openChpwModal('${escapeHtml(u.username)}')" title="Change password" style="margin-right:4px;">🔑</button>
           ${u.username !== 'manny' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">✕</button>` : ''}
@@ -2600,7 +2600,7 @@ async function openInsights() {
   const noKey = document.getElementById('insights-no-key');
   const chatWrap = document.getElementById('insights-chat-wrap');
 
-  // Demo can use insights only if the owner (admin) has a key — but settings reads demo's own row.
+  // Demo can use insights only if the owner (admin) has a key - but settings reads demo's own row.
   // For simplicity: if no key on this account, show the connect prompt (except we let demo see prompt too).
   if (!_aiHasKey) {
     noKey.style.display = 'block';
@@ -2611,7 +2611,7 @@ async function openInsights() {
   chatWrap.style.display = 'block';
   document.getElementById('insights-model-label').textContent = 'Model: ' + _aiModel;
 
-  // Demo can't persist — hide clear button
+  // Demo can't persist - hide clear button
   const clearBtn = document.getElementById('insights-clear-btn');
   if (clearBtn) clearBtn.style.display = currentUser?.role === 'demo' ? 'none' : '';
 
@@ -2624,7 +2624,7 @@ async function loadInsightsHistory() {
     const data = await aiFetch('/insights/history');
     const msgs = data.messages || [];
     if (!msgs.length) {
-      box.innerHTML = '<div class="insights-empty">No questions yet. Ask anything about your training — trends, comparisons, plateaus, recovery patterns.</div>';
+      box.innerHTML = '<div class="insights-empty">No questions yet. Ask anything about your training - trends, comparisons, plateaus, recovery patterns.</div>';
       return;
     }
     box.innerHTML = msgs.map(m =>
@@ -2752,7 +2752,7 @@ function previewImport(input) {
   const btn = document.getElementById('import-confirm-btn');
   _importFile = input.files[0] || null;
   if (!_importFile) { preview.innerHTML = ''; btn.style.display = 'none'; return; }
-  preview.innerHTML = `<span style="color:var(--text);">File ready: </span><strong>${escapeHtml(_importFile.name)}</strong> (${(_importFile.size/1024).toFixed(1)} KB) — click Import to proceed.`;
+  preview.innerHTML = `<span style="color:var(--text);">File ready: </span><strong>${escapeHtml(_importFile.name)}</strong> (${(_importFile.size/1024).toFixed(1)} KB) - click Import to proceed.`;
   btn.style.display = '';
 }
 
