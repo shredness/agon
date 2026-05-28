@@ -158,7 +158,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id      INTEGER PRIMARY KEY,
             ai_key_enc   TEXT,
-            ai_model     TEXT DEFAULT 'gemini-2.0-flash',
+            ai_model     TEXT DEFAULT 'gemini-2.5-flash',
             updated_at   TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
@@ -623,14 +623,14 @@ def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
         cur = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
                            (user["id"],)).fetchone()
         final_key   = key_enc if key_enc is not None else cur["ai_key_enc"]
-        final_model = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.0-flash")
+        final_model = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.5-flash")
         conn.execute(
             "UPDATE user_settings SET ai_key_enc=?, ai_model=?, updated_at=datetime('now') WHERE user_id=?",
             (final_key, final_model, user["id"])
         )
     else:
         conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model) VALUES (?,?,?)",
-                     (user["id"], key_enc, body.ai_model or "gemini-2.0-flash"))
+                     (user["id"], key_enc, body.ai_model or "gemini-2.5-flash"))
     conn.commit()
     conn.close()
     return {"status": "saved"}
@@ -808,7 +808,7 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
     api_key = decrypt_secret(settings["ai_key_enc"])
     if not api_key:
         raise HTTPException(status_code=400, detail="Stored key could not be decrypted. Re-enter it in Settings.")
-    model = settings["ai_model"] or "gemini-2.0-flash"
+    model = settings["ai_model"] or "gemini-2.5-flash"
 
     # Build context from the data the user is allowed to see
     uid = data_user_id(user)
