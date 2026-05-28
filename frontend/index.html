@@ -412,6 +412,16 @@
 
   <!-- EXPORT -->
   <div id="tab-export" class="tab-panel">
+    <div class="card">
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Import from Excel</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Upload a filled template to import historical sessions. Download the template first — it includes a Legend sheet explaining every field and modifier.</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-export" onclick="downloadImportTemplate()">↓ Download template</button>
+        <input type="file" id="import-file" accept=".xlsx" style="font-size:12px;color:var(--text2);" onchange="previewImport(this)">
+      </div>
+      <div id="import-preview" style="margin-top:8px;font-size:13px;color:var(--text2);"></div>
+      <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()" style="display:none;margin-top:12px;">Import sessions</button>
+    </div>
     <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <div style="flex:1;">
         <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Export to Excel</div>
@@ -438,20 +448,6 @@
     <div class="card">
       <div class="section-label" style="margin-bottom:10px;">Log preview (last 5 rows)</div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;" id="log-preview"></table></div>
-    </div>
-    <div class="card">
-      <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Import from Excel</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Upload a filled template to import historical sessions. Download the template first — it includes a Legend sheet explaining every field and modifier.</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
-        <button class="btn btn-sm" onclick="downloadImportTemplate()">↓ Download template</button>
-        <span style="font-size:12px;color:var(--text3);">Fill it out, then upload below</span>
-      </div>
-      <div style="margin-bottom:10px;">
-        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px;">Select filled template:</label>
-        <input type="file" id="import-file" accept=".xlsx" style="font-size:12px;color:var(--text2);" onchange="previewImport(this)">
-      </div>
-      <div id="import-preview" style="margin-top:8px;font-size:13px;color:var(--text2);"></div>
-      <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()" style="display:none;margin-top:12px;">Import sessions</button>
     </div>
   </div>
 
