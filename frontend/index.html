@@ -3079,17 +3079,15 @@ let _macroPhase    = null;
 async function loadMacroData() {
   const out = document.getElementById('macro-output');
   if (out) out.innerHTML = '<span style="color:var(--text3);">Loading...</span>';
+
+  // Fetch independently so a recomp/phases failure doesn't block profile
+  try { _macroProfile = await aiFetch('/profile'); } catch(e) { _macroProfile = null; }
+  try { _macroRecomp  = await aiFetch('/recomp');  } catch(e) { _macroRecomp  = null; }
   try {
-    [_macroProfile, _macroRecomp] = await Promise.all([
-      aiFetch('/profile'),
-      aiFetch('/recomp')
-    ]);
     const phases = await aiFetch('/phases');
     _macroPhase = phases.find(p => !p.end_date) || null;
-  } catch(e) {
-    if (out) out.innerHTML = '<span style="color:var(--red-text);">Could not load profile data: ' + escapeHtml(e.message) + '</span>';
-    return;
-  }
+  } catch(e) { _macroPhase = null; }
+
   calcMacros();
 }
 
