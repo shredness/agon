@@ -176,6 +176,7 @@ def init_db():
                          ('height_in','NULL'),('target_bw','NULL')]:
         try:
             conn.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT {default}")
+            conn.commit()
         except Exception:
             pass
 
@@ -674,10 +675,20 @@ def get_logged_exercises(user=Depends(current_user)):
 @app.get("/profile")
 def get_profile(user=Depends(current_user)):
     conn = get_db()
-    row = conn.execute(
-        "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw FROM user_settings WHERE user_id=?",
-        (user["id"],)
-    ).fetchone()
+    try:
+        row = conn.execute(
+            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw FROM user_settings WHERE user_id=?",
+            (user["id"],)
+        ).fetchone()
+    except Exception:
+        # Columns may not exist yet — fall back to partial query
+        try:
+            row = conn.execute(
+                "SELECT first_name, last_name, dob, gender, week_start FROM user_settings WHERE user_id=?",
+                (user["id"],)
+            ).fetchone()
+        except Exception:
+            row = None
     conn.close()
     if not row:
         return {"first_name":"","last_name":"","dob":"","gender":"","week_start":"Saturday","height_in":None,"target_bw":None}
@@ -687,8 +698,8 @@ def get_profile(user=Depends(current_user)):
         "dob":        row["dob"]        or "",
         "gender":     row["gender"]     or "",
         "week_start": row["week_start"] or "Saturday",
-        "height_in":  row["height_in"],
-        "target_bw":  row["target_bw"],
+        "height_in":  row["height_in"]  if "height_in" in row.keys() else None,
+        "target_bw":  row["target_bw"]  if "target_bw" in row.keys() else None,
     }
 
 @app.post("/profile")
@@ -1405,8 +1416,11 @@ def get_recomp(user=Depends(current_user)):
         "SELECT date, bw, rd FROM sessions WHERE user_id=? ORDER BY date DESC LIMIT 60",
         (uid,)
     ).fetchall()
-    # Also get target_bw
-    settings = conn.execute("SELECT target_bw FROM user_settings WHERE user_id=?", (uid,)).fetchone()
+    # Get target_bw — defensive in case column not yet migrated
+    try:
+        settings = conn.execute("SELECT target_bw FROM user_settings WHERE user_id=?", (uid,)).fetchone()
+    except Exception:
+        settings = None
     conn.close()
 
     if len(rows) < 4:

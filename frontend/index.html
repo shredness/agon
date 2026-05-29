@@ -619,11 +619,11 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div class="form-group">
         <label>First name</label>
-        <input type="text" id="s-first" style="width:100%;" placeholder="First name">
+        <input type="text" id="p-first" style="width:100%;" placeholder="First name">
       </div>
       <div class="form-group">
         <label>Last name</label>
-        <input type="text" id="s-last" style="width:100%;" placeholder="Last name">
+        <input type="text" id="p-last" style="width:100%;" placeholder="Last name">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -2850,8 +2850,8 @@ async function clearInsights() {
 async function loadSettingsProfile() {
   try {
     const p = await aiFetch('/profile');
-    document.getElementById('s-first').value       = p.first_name  || '';
-    document.getElementById('s-last').value        = p.last_name   || '';
+    document.getElementById('p-first').value       = p.first_name  || '';
+    document.getElementById('p-last').value        = p.last_name   || '';
     document.getElementById('s-dob').value         = p.dob         || '';
     document.getElementById('s-gender').value      = p.gender      || '';
     document.getElementById('s-week-start').value  = p.week_start  || 'Saturday';
@@ -2878,8 +2878,8 @@ async function saveSettingsProfile() {
     await aiFetch('/profile', {
       method: 'POST',
       body: JSON.stringify({
-        first_name: document.getElementById('s-first').value.trim() || null,
-        last_name:  document.getElementById('s-last').value.trim()  || null,
+        first_name: document.getElementById('p-first').value.trim() || null,
+        last_name:  document.getElementById('p-last').value.trim()  || null,
         dob:        document.getElementById('s-dob').value          || null,
         gender:     document.getElementById('s-gender').value       || null,
         week_start: document.getElementById('s-week-start').value   || 'Saturday',
