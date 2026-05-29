@@ -1081,6 +1081,7 @@ function switchTab(name) {
       fromEl.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
     }
     populateHistoryExerciseFilter();
+    renderHistory();
   }
   if (name==='bank') renderBankTable();
   if (name==='trend') renderTrend();
