@@ -173,7 +173,8 @@ def init_db():
     # Migrate existing rows to add new profile columns if they don't exist
     for col, default in [('first_name','NULL'),('last_name','NULL'),('dob','NULL'),
                          ('gender','NULL'),('week_start',"'Saturday'"),
-                         ('height_in','NULL'),('target_bw','NULL')]:
+                         ('height_in','NULL'),('target_bw','NULL'),
+                         ('activity_level',"'1.55'")]:
         try:
             conn.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT {default}")
             conn.commit()
@@ -358,8 +359,9 @@ class ProfileIn(BaseModel):
     dob:        Optional[str] = None        # YYYY-MM-DD
     gender:     Optional[str] = None
     week_start: Optional[str] = None        # Monday-Sunday
-    height_in:  Optional[float] = None      # inches
-    target_bw:  Optional[float] = None      # lbs
+    height_in:      Optional[float] = None      # inches
+    target_bw:      Optional[float] = None      # lbs
+    activity_level: Optional[str]   = None      # TDEE multiplier string
 
 class ProtocolIn(BaseModel):
     name:      str
@@ -697,9 +699,10 @@ def get_profile(user=Depends(current_user)):
         "last_name":  row["last_name"]  or "",
         "dob":        row["dob"]        or "",
         "gender":     row["gender"]     or "",
-        "week_start": row["week_start"] or "Saturday",
-        "height_in":  row["height_in"]  if "height_in" in row.keys() else None,
-        "target_bw":  row["target_bw"]  if "target_bw" in row.keys() else None,
+        "week_start":       row["week_start"] or "Saturday",
+        "height_in":        row["height_in"]        if "height_in"        in row.keys() else None,
+        "target_bw":        row["target_bw"]        if "target_bw"        in row.keys() else None,
+        "activity_level":   row["activity_level"]   if "activity_level"   in row.keys() else "1.55",
     }
 
 @app.post("/profile")
@@ -718,16 +721,17 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
                 week_start=COALESCE(?,week_start),
                 height_in=COALESCE(?,height_in),
                 target_bw=COALESCE(?,target_bw),
+                activity_level=COALESCE(?,activity_level),
                 updated_at=datetime('now')
             WHERE user_id=?
         """, (body.first_name, body.last_name, body.dob, body.gender, body.week_start,
-                body.height_in, body.target_bw, user["id"]))
+                body.height_in, body.target_bw, body.activity_level, user["id"]))
     else:
         conn.execute("""
             INSERT INTO user_settings (user_id, first_name, last_name, dob, gender, week_start, height_in, target_bw)
             VALUES (?,?,?,?,?,?,?,?)
         """, (user["id"], body.first_name, body.last_name, body.dob, body.gender,
-                body.week_start or "Saturday", body.height_in, body.target_bw))
+                body.week_start or "Saturday", body.height_in, body.target_bw, body.activity_level or "1.55"))
     conn.commit()
     conn.close()
     return {"status": "saved"}
@@ -1068,7 +1072,7 @@ def download_import_template(user=Depends(current_user)):
     ws = wb.active
     ws.title = "Log"
 
-    headers = ["Date", "Bodyweight (lbs)", "Exercise", "Tool", "Modifier", "Load", "Reps", "Time (min)"]
+    headers = ["Date", "Bodyweight (lbs)", "Exercise", "Tool", "Modifier", "Load", "Reps", "Time (min)", "Phase"]
     header_fill = PatternFill("solid", fgColor="1A1A18")
     header_font = Font(bold=True, color="E05A20")
     thin = Side(style="thin", color="444444")
@@ -1082,7 +1086,7 @@ def download_import_template(user=Depends(current_user)):
         cell.border = border
 
     # Column widths
-    widths = [14, 18, 28, 14, 20, 10, 8, 12]
+    widths = [14, 18, 28, 14, 20, 10, 8, 12, 16]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -1096,7 +1100,7 @@ def download_import_template(user=Depends(current_user)):
         ["01/15/2026", 200.0, "Pull-up",         "Bodyweight", "Vest",      25,  8,  1.5],
         ["01/15/2026", 200.0, "Pull-up",         "Bodyweight", "Vest",      25,  8,  1.5],
         ["01/17/2026", 199.5, "Low Bar Squat",   "Bar",        "Standard",  225, 3,  2.0],
-        ["01/17/2026", 199.5, "KB Swings",       "Kettlebell", "",          53,  15, 1.5],
+        ["01/17/2026", 199.5, "KB Swings",       "Kettlebell", "",          53,  15, 1.5, "Recomp"],
     ]
     example_font = Font(color="888888", italic=True)
     for r, row in enumerate(examples, 2):
@@ -1129,6 +1133,7 @@ def download_import_template(user=Depends(current_user)):
         ("Load", "Weight entered (see modifier rules)", "Numeric. See below for what to enter per modifier."),
         ("Reps", "Reps performed in this set", "Integer"),
         ("Time (min)", "Duration of this set in minutes", "Decimal. e.g. 1.5 for 90 seconds. Defaults to 1.5 if left blank."),
+        ("Phase", "Training phase active on this date (optional)", "Weight Loss | Cut | Recomp | Bulk | Maintain | Peak | Deload. Leave blank to skip. Consecutive rows with the same phase are grouped into one phase record."),
         ("", "", ""),
         ("MODIFIER GUIDE", "", ""),
         ("Tool: Bar", "", ""),
@@ -1180,12 +1185,14 @@ def download_import_template(user=Depends(current_user)):
 
 
 def _parse_import_row(row, bw: float) -> dict:
-    """Convert a single spreadsheet row into a set dict."""
+    """Convert a single spreadsheet row into a set dict with optional phase."""
     tool      = (str(row[3] or "Bar")).strip()
     modifier  = (str(row[4] or "")).strip().lower()
     raw_load  = float(row[5] or 0)
     reps      = int(float(row[6] or 0))
     time_min  = float(row[7]) if len(row) > 7 and row[7] not in (None, "", " ") else 1.5
+    phase_raw = row[8] if len(row) > 8 else None
+    phase     = str(phase_raw).strip() if phase_raw not in (None, "", " ", "None") else None
 
     # Determine trueLbs based on tool + modifier
     if tool == "Bar":
@@ -1229,7 +1236,8 @@ def _parse_import_row(row, bw: float) -> dict:
         "trueLbs": round(true_lbs, 2),
         "reps": reps,
         "vol": vol,
-        "time": time_min
+        "time":  time_min,
+        "phase": phase
     }
 
 
@@ -1335,13 +1343,54 @@ async def import_sessions(user=Depends(current_user), file: UploadFile = File(..
         )
         inserted += 1
 
+    # Synthesize phases from Phase column — group consecutive same-phase dates
+    date_phase_map = {}  # date -> phase_type
+    for (d_str, bw_val), ex_map in sessions_map.items():
+        for ex_name, ex_data in ex_map.items():
+            for s in ex_data["sets"]:
+                if s.get("phase"):
+                    date_phase_map[d_str] = s["phase"]
+                    break
+            break
+
+    phases_created = 0
+    if date_phase_map:
+        sorted_dates = sorted(date_phase_map.keys())
+        runs = []  # [(phase_type, start, end)]
+        cur_type  = date_phase_map[sorted_dates[0]]
+        cur_start = sorted_dates[0]
+        prev_date = sorted_dates[0]
+        for d in sorted_dates[1:]:
+            ptype = date_phase_map[d]
+            if ptype != cur_type:
+                runs.append((cur_type, cur_start, prev_date))
+                cur_type  = ptype
+                cur_start = d
+            prev_date = d
+        runs.append((cur_type, cur_start, None))  # last run stays open
+
+        for phase_type, start_date, end_date in runs:
+            if not phase_type:
+                continue
+            existing = conn.execute(
+                "SELECT id FROM phases WHERE user_id=? AND phase_type=? AND start_date=?",
+                (user["id"], phase_type, start_date)
+            ).fetchone()
+            if not existing:
+                conn.execute(
+                    "INSERT INTO phases (user_id, phase_type, start_date, end_date) VALUES (?,?,?,?)",
+                    (user["id"], phase_type, start_date, end_date)
+                )
+                phases_created += 1
+
     conn.commit()
     conn.close()
 
     return {
-        "inserted": inserted,
-        "skipped":  skipped_dates,
-        "errors":   errors
+        "inserted":       inserted,
+        "skipped":        skipped_dates,
+        "errors":         errors,
+        "phases_created": phases_created,
     }
 
 # ── Phase endpoints ───────────────────────────────────────────

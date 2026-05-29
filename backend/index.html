@@ -2125,22 +2125,11 @@ function renderBankTable() {
 }
 
 function buildLogRows() {
-  // Build date->phase map
-  const phaseMap = {};
-  if (typeof _allPhases !== 'undefined' && _allPhases && _allPhases.length) {
-    for (const ph of _allPhases) {
-      const end = ph.end_date || '9999-12-31';
-      for (const s of sessions) {
-        if (s.date >= ph.start_date && s.date <= end) phaseMap[s.date] = ph.phase_type;
-      }
-    }
-  }
   const rows=[];
   sessions.forEach(s=>{
-    const phase = phaseMap[s.date] || '';
     (s.exercises||[]).forEach(ex=>{
       (ex.sets||[]).forEach(set=>{
-        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||2,'Density':+((set.vol/(set.time||ex.time||2))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':set.notes||'','Phase':phase});
+        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||2,'Density':+((set.vol/(set.time||ex.time||2))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':set.notes||''});
       });
     });
   });
@@ -2163,8 +2152,8 @@ async function updateExportSummary() {
   document.getElementById('exp-log-ct').textContent=lr.length+' rows';
   try { const tr=await buildTrendRows(); document.getElementById('exp-trend-ct').textContent=tr.length+' rows'; } catch(e){}
   const bankCt=document.getElementById('exp-bank-ct'); if(bankCt) bankCt.textContent=EXERCISE_BANK.length+' rows';
-  const cols=['Date','Weight (lbs)','Exercise','Load (lbs)','Reps','True (lbs)','Vol (lbs)','Time (min)','Density','Rel Density','Notes','Phase'];
-  const previewCols=cols.filter(c=>c!=='Notes' && c!=='Phase');
+  const cols=['Date','Weight (lbs)','Exercise','Load (lbs)','Reps','True (lbs)','Vol (lbs)','Time (min)','Density','Rel Density','Notes'];
+  const previewCols=cols.filter(c=>c!=='Notes');
   const table=document.getElementById('log-preview');
   const preview=lr.slice(-5);
   if(!preview.length){table.innerHTML='<tr><td colspan="10" style="padding:12px;font-size:12px;color:var(--text3);text-align:center;">Log sessions to see preview</td></tr>';return;}
@@ -2176,15 +2165,11 @@ async function doExport() {
   const st=document.getElementById('export-status');
   btn.innerHTML='<span class="spinner"></span>Building…'; btn.disabled=true;
   try {
-    // Ensure phases are loaded for Phase column
-    if (!_allPhases || !_allPhases.length) {
-      try { const ph = await apiFetch('/phases'); _allPhases = ph || []; } catch(e) {}
-    }
     const XLSX=window.XLSX;
     const wb=XLSX.utils.book_new();
     const lr=buildLogRows();
-    const wsL=XLSX.utils.json_to_sheet(lr.length?lr:[{'Date':'','Weight (lbs)':'','Exercise':'','Load (lbs)':'','Reps':'','True (lbs)':'','Vol (lbs)':'','Time (min)':'','Density':'','Rel Density':'','Notes':'','Phase':''}]);
-    wsL['!cols']=[12,13,24,12,12,8,12,11,10,12,18,14].map(w=>({wch:w}));
+    const wsL=XLSX.utils.json_to_sheet(lr.length?lr:[{'Date':'','Weight (lbs)':'','Exercise':'','Load (lbs)':'','Reps':'','True (lbs)':'','Vol (lbs)':'','Time (min)':'','Density':'','Rel Density':'','Notes':''}]);
+    wsL['!cols']=[12,13,24,12,12,8,12,11,10,12,18].map(w=>({wch:w}));
     const tr=await buildTrendRows();
     const wsT=XLSX.utils.json_to_sheet(tr);
     wsT['!cols']=[14,22,24].map(w=>({wch:w}));
@@ -3125,7 +3110,7 @@ async function confirmImport() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Import failed');
 
-    let msg = `<span style="color:#10B981;font-weight:600;">✓ Imported ${data.inserted} session(s)${data.phases_created ? ' and ' + data.phases_created + ' phase(s)' : ''}.</span>`;
+    let msg = `<span style="color:#10B981;font-weight:600;">✓ Imported ${data.inserted} session(s).</span>`;
     if (data.skipped?.length) {
       msg += `<br><span style="color:var(--text3);">Skipped ${data.skipped.length} existing date(s): ${data.skipped.join(', ')}</span>`;
     }
