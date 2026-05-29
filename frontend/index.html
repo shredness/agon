@@ -1744,15 +1744,6 @@ async function renderTrend() {
         xMin, xMax,
         backgroundColor: color,
         borderWidth: 0,
-        label: {
-          display: true,
-          content: ph.phase_type,
-          position: { x: 'start', y: 'start' },
-          font: { size: 9, weight: '600' },
-          color: color.replace('0.10', '0.9'),
-          padding: { x: 4, y: 2 },
-          backgroundColor: 'transparent',
-        }
       };
     });
   } catch(e) { /* phases non-fatal */ }
