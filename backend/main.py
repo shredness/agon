@@ -179,6 +179,22 @@ def init_db():
         except Exception:
             pass
 
+    # Supplement/peptide protocols table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS protocols (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            name       TEXT NOT NULL,
+            dose       TEXT,
+            frequency  TEXT,
+            notes      TEXT,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    conn.commit()
+
     # Training phases table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS phases (
@@ -343,6 +359,15 @@ class ProfileIn(BaseModel):
     week_start: Optional[str] = None        # Monday-Sunday
     height_in:  Optional[float] = None      # inches
     target_bw:  Optional[float] = None      # lbs
+
+class ProtocolIn(BaseModel):
+    name:      str
+    dose:      Optional[str] = None
+    frequency: Optional[str] = None
+    notes:     Optional[str] = None
+
+class ProtocolsBulkIn(BaseModel):
+    protocols: list
 
 class PhaseIn(BaseModel):
     phase_type: str
@@ -1426,3 +1451,51 @@ def get_recomp(user=Depends(current_user)):
         "target_bw":  target_bw,
         "to_goal":    to_goal,
     }
+
+# ── Protocol endpoints ────────────────────────────────────────
+@app.get("/protocols")
+def get_protocols(user=Depends(current_user)):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, name, dose, frequency, notes FROM protocols WHERE user_id=? ORDER BY sort_order, id",
+        (user["id"],)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/protocols")
+def add_protocol(body: ProtocolIn, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot add protocols")
+    conn = get_db()
+    max_order = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) FROM protocols WHERE user_id=?", (user["id"],)
+    ).fetchone()[0]
+    conn.execute(
+        "INSERT INTO protocols (user_id, name, dose, frequency, notes, sort_order) VALUES (?,?,?,?,?,?)",
+        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, max_order + 1)
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "added"}
+
+@app.put("/protocols/{protocol_id}")
+def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
+    conn = get_db()
+    conn.execute(
+        "UPDATE protocols SET name=?, dose=?, frequency=?, notes=? WHERE id=? AND user_id=?",
+        (body.name.strip(), body.dose, body.frequency, body.notes, protocol_id, user["id"])
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "updated"}
+
+@app.delete("/protocols/{protocol_id}")
+def delete_protocol(protocol_id: int, user=Depends(current_user)):
+    conn = get_db()
+    conn.execute("DELETE FROM protocols WHERE id=? AND user_id=?", (protocol_id, user["id"]))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
