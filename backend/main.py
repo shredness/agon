@@ -318,7 +318,7 @@ class SetData(BaseModel):
     rawLoad: float
     trueLbs: float
     vol: float
-    time: float = 2.0          # per-set time in minutes
+    time: float = 1.5          # per-set time in minutes
 
 class ExerciseData(BaseModel):
     name: str

@@ -1292,7 +1292,7 @@ function addSet(exId) {
     <td style="font-size:11px;color:var(--text3);">${sid+1}</td>
     <td><input type="number" id="l-${exId}-${sid}" step="0.5" placeholder="${def.isBW?'auto':'0'}" style="width:${def.isBW?62:78}px;" oninput="calcRD()" ${def.isBW?'disabled':''}></td>
     <td><input type="number" id="r-${exId}-${sid}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
-    <td><input type="number" id="t-${exId}-${sid}" step="0.5" min="0.5" value="2" placeholder="2" style="width:58px;" oninput="calcRD()"></td>
+    <td><input type="number" id="t-${exId}-${sid}" step="0.5" min="0.5" value="1.5" placeholder="1.5" style="width:58px;" oninput="calcRD()"></td>
     <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${exId}-${sid}">-</td>
     <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${exId},${sid})">✕</button></td>
   `;
@@ -2170,7 +2170,7 @@ function buildLogRows() {
     const phase = phaseMap[s.date] || '';
     (s.exercises||[]).forEach(ex=>{
       (ex.sets||[]).forEach(set=>{
-        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||2,'Density':+((set.vol/(set.time||ex.time||2))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':set.notes||'','Phase':phase});
+        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||1.5,'Density':+((set.vol/(set.time||ex.time||1.5))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':set.notes||'','Phase':phase});
       });
     });
   });
