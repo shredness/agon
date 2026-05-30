@@ -200,6 +200,25 @@
   .insights-input-bar { display: flex; gap: 8px; align-items: flex-end; }
   .insights-input-bar textarea { flex: 1; resize: none; max-height: 140px; font-family: inherit; font-size: 14px; line-height: 1.4; padding: 10px 12px; overflow-y: auto; }
   .insights-empty { text-align: center; color: var(--text3); font-size: 13px; padding: 40px 20px; }
+
+  /* ── Mobile landscape optimisations ── */
+  @media (max-height: 500px) and (orientation: landscape) {
+    /* Collapse tab bar to icons only */
+    .tab-label { display: none; }
+    .tab { padding: 5px 10px; }
+    /* Tighten header */
+    .app-header { padding: 6px 0; }
+    .subtitle { display: none; }
+    /* Reduce card padding */
+    .card { padding: 10px; }
+    /* Tighten metric grid */
+    .metric { padding: 8px 10px; }
+    .metric-value { font-size: 22px; }
+    /* Shrink tab panels top margin */
+    .tab-panel { padding-top: 4px; }
+    /* Keep chart usable */
+    #trendChart { height: 200px !important; }
+  }
 </style>
 </head>
 <body>
@@ -223,6 +242,7 @@
     </div>
     <div id="login-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:14px; text-align:center;"></div>
     <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%; padding:11px; font-size:15px;">Sign in</button>
+    <p id="login-version" style="text-align:center;margin-top:16px;font-size:11px;color:var(--text3);"></p>
   </div>
 </div>
 
@@ -556,6 +576,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+  <div style="text-align:center;padding:24px 0 12px;font-size:11px;color:var(--text3);" id="app-footer"></div>
 </div><!-- end main-app -->
 
   <!-- USERS (admin only) -->
@@ -835,6 +856,7 @@
 })();
 
 const API = '/api';
+const APP_VERSION = '0.1.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -892,6 +914,12 @@ function toggleTheme() {
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
+// Set version strings
+(function() {
+  const vEl = document.getElementById('login-version');
+  if (vEl) vEl.textContent = 'v' + APP_VERSION;
+})();
+
 // Apply saved theme immediately
 (function() {
   try {
@@ -910,7 +938,7 @@ function toggleTheme() {
     const r = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) throw new Error('invalid');
     const data = await r.json();
-    currentUser = { username: data.username, role: data.role };
+    currentUser = { username: data.username, role: data.role, id: data.id };
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
     applyRoleUI();
@@ -963,7 +991,7 @@ async function doLogin() {
     if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Login failed'); }
     const data = await r.json();
     localStorage.setItem('agon-token', data.access_token);
-    currentUser = { username: data.username, role: data.role };
+    currentUser = { username: data.username, role: data.role, id: data.id };
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('main-app').style.display = 'block';
     applyRoleUI();
@@ -1079,6 +1107,8 @@ async function init() {
   populateHistoryExerciseFilter();
   addExercise();
   if (currentUser) updateExportSummary();
+  const footer = document.getElementById('app-footer');
+  if (footer) footer.textContent = 'Agon v' + APP_VERSION + ' · strength through loss';
   prefillBodyweight();
   // Show onboarding for new users (not demo)
   if (currentUser && currentUser.role !== 'demo') {
@@ -2134,40 +2164,52 @@ function getMuscleTagsHtml(e) {
 }
 
 function renderBankTable() {
-  const inp = (val, idx, field, extra='') =>
-    `<input type="text" value="${String(val).replace(/"/g,'&quot;')}" data-field="${field}"
-      style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;"
-      onchange="updateBankField(${idx},'${field}',this.value)" ${extra}>`;
+  const isAdmin = currentUser?.role === 'admin';
+  const userId  = currentUser?.id;
 
-  const selTool = (val, idx) => `<select data-field="tool"
-    style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 6px;font-size:12px;"
-    onchange="updateBankField(${idx},'tool',this.value)">
+  const canEdit = (e) => isAdmin || !e.createdBy || e.createdBy === userId;
+
+  const inp = (val, idx, field, extra='', disabled=false) =>
+    `<input type="text" value="${String(val).replace(/"/g,'&quot;')}" data-field="${field}"
+      style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-size:12px;${disabled?'opacity:0.5;pointer-events:none;':''}"
+      onchange="updateBankField(${idx},'${field}',this.value)" ${extra} ${disabled?'disabled':''}>`
+
+  const selTool = (val, idx, disabled=false) => `<select data-field="tool"
+    style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 6px;font-size:12px;${disabled?'opacity:0.5;pointer-events:none;':''}"
+    onchange="updateBankField(${idx},'tool',this.value)" ${disabled?'disabled':''}>
     ${['Bar','Cable','Kettlebell','Bodyweight','Dumbbell','Machine'].map(t=>`<option${t===val?' selected':''}>${t}</option>`).join('')}
   </select>`;
 
-  const selBW = (val, idx) => `<select data-field="isBW"
-    style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 6px;font-size:12px;"
-    onchange="updateBankField(${idx},'isBW',this.value)">
+  const selBW = (val, idx, disabled=false) => `<select data-field="isBW"
+    style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 6px;font-size:12px;${disabled?'opacity:0.5;pointer-events:none;':''}"
+    onchange="updateBankField(${idx},'isBW',this.value)" ${disabled?'disabled':''}>
     <option value="false"${!val?' selected':''}>No</option>
     <option value="true"${val?' selected':''}>Yes</option>
   </select>`;
 
-  document.getElementById('bank-body').innerHTML = EXERCISE_BANK.map((e, idx) => `
-    <tr style="border-bottom:1px solid var(--border);">
-      <td style="padding:6px 10px;">${inp(e.name, idx, 'name')}</td>
-      <td style="padding:6px 8px;">${selTool(e.tool, idx)}</td>
-      <td style="padding:6px 4px;max-width:50px;overflow:hidden;">${inp(e.mult, idx, 'mult', 'style="width:46px;max-width:46px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 5px;font-size:12px;" type="number" step="0.05" min="0.1" maxlength="5"')}</td>
+  document.getElementById('bank-body').innerHTML = EXERCISE_BANK.map((e, idx) => {
+    const editable = canEdit(e);
+    const lockIcon = !editable ? `<i class="ti ti-lock" title="Created by admin — protected" style="color:var(--text3);font-size:12px;margin-left:4px;"></i>` : '';
+    return `
+    <tr style="border-bottom:1px solid var(--border);${!editable?'opacity:0.85;':''}">
+      <td style="padding:6px 10px;display:flex;align-items:center;">${inp(e.name, idx, 'name', '', !editable)}${lockIcon}</td>
+      <td style="padding:6px 8px;">${selTool(e.tool, idx, !editable)}</td>
+      <td style="padding:6px 4px;max-width:50px;overflow:hidden;">${inp(e.mult, idx, 'mult', 'style="width:46px;max-width:46px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 5px;font-size:12px;" type="number" step="0.05" min="0.1" maxlength="5"', !editable)}</td>
       <td style="padding:6px 8px;">
-        <div class="muscle-tags" onclick="openMusclePicker(${idx})" style="cursor:pointer;display:flex;flex-wrap:wrap;gap:3px;min-width:100px;padding:3px;border-radius:5px;border:1px solid var(--border);">
+        <div class="muscle-tags" onclick="${editable?`openMusclePicker(${idx})`:'void(0)'}" style="cursor:${editable?'pointer':'default'};display:flex;flex-wrap:wrap;gap:3px;min-width:100px;padding:3px;border-radius:5px;border:1px solid var(--border);">
           ${getMuscleTagsHtml(e)}
         </div>
       </td>
-      <td style="padding:6px 8px;">${selBW(e.isBW, idx)}</td>
+      <td style="padding:6px 8px;">${selBW(e.isBW, idx, !editable)}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--text3);font-style:italic;">${bankFormulaHint(e)}</td>
       <td style="padding:6px 8px;">
-        <button class="btn btn-danger btn-sm" style="padding:2px 8px;" onclick="deleteBankRow(${idx})">✕</button>
+        ${editable
+          ? `<button class="btn btn-danger btn-sm" style="padding:2px 8px;" onclick="deleteBankRow(${idx})">✕</button>`
+          : `<span style="color:var(--text3);font-size:11px;">—</span>`
+        }
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function buildLogRows() {

@@ -150,9 +150,16 @@ def init_db():
             load_hint  TEXT,
             is_bw      INTEGER NOT NULL DEFAULT 0,
             sort_order INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at TEXT DEFAULT (datetime('now')),
+            created_by INTEGER DEFAULT NULL
         )
     """)
+    # Migrate: add created_by if not exists
+    try:
+        conn.execute("ALTER TABLE exercises ADD COLUMN created_by INTEGER DEFAULT NULL")
+        conn.commit()
+    except Exception:
+        pass
 
     # Per-user AI settings, profile info, and preferences
     conn.execute("""
@@ -601,7 +608,8 @@ def get_exercise_bank(user=Depends(current_user)):
     conn.close()
     return [{"id":r["id"],"name":r["name"],"alias":r["alias"],"tool":r["tool"],
              "mult":r["mult"],"muscles":json.loads(r["muscles"]),"day":r["day"],
-             "loadHint":r["load_hint"],"isBW":bool(r["is_bw"]),"sortOrder":r["sort_order"]} for r in rows]
+             "loadHint":r["load_hint"],"isBW":bool(r["is_bw"]),"sortOrder":r["sort_order"],
+             "createdBy":r["created_by"]} for r in rows]
 
 @app.post("/exercises/bank")
 def add_exercise(body: ExerciseIn, user=Depends(current_user)):
@@ -610,14 +618,14 @@ def add_exercise(body: ExerciseIn, user=Depends(current_user)):
     conn = get_db()
     try:
         conn.execute("""
-            INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(name) DO UPDATE SET
                 alias=excluded.alias, tool=excluded.tool, mult=excluded.mult,
                 muscles=excluded.muscles, day=excluded.day, load_hint=excluded.load_hint,
                 is_bw=excluded.is_bw, sort_order=excluded.sort_order
         """, (body.name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
-              body.day, body.load_hint, int(body.is_bw), body.sort_order))
+              body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"]))
         conn.commit()
     except Exception as e:
         conn.close()
@@ -630,16 +638,22 @@ def update_exercise(ex_name: str, body: ExerciseIn, user=Depends(current_user)):
     if user["role"] not in ("admin", "guest"):
         raise HTTPException(status_code=403, detail="Read-only account")
     conn = get_db()
-    result = conn.execute(
-        "UPDATE exercises SET alias=?, tool=?, mult=?, muscles=?, day=?, load_hint=?, is_bw=?, sort_order=? WHERE name=?",
-        (body.alias, body.tool, body.mult, json.dumps(body.muscles),
-         body.day, body.load_hint, int(body.is_bw), body.sort_order, ex_name))
-    if result.rowcount == 0:
-        # Doesn't exist — insert it
+    existing = conn.execute("SELECT created_by FROM exercises WHERE name=?", (ex_name,)).fetchone()
+    if existing:
+        # Non-admin can only edit their own exercises
+        if user["role"] != "admin" and existing["created_by"] != user["id"]:
+            conn.close()
+            raise HTTPException(status_code=403, detail="You can only edit exercises you created")
+        result = conn.execute(
+            "UPDATE exercises SET alias=?, tool=?, mult=?, muscles=?, day=?, load_hint=?, is_bw=?, sort_order=? WHERE name=?",
+            (body.alias, body.tool, body.mult, json.dumps(body.muscles),
+             body.day, body.load_hint, int(body.is_bw), body.sort_order, ex_name))
+    else:
+        # New exercise — insert with ownership
         conn.execute(
-            "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order) VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (ex_name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
-             body.day, body.load_hint, int(body.is_bw), body.sort_order))
+             body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"]))
     conn.commit()
     conn.close()
     return {"status": "upserted"}
@@ -649,6 +663,13 @@ def delete_exercise(ex_name: str, user=Depends(current_user)):
     if user["role"] not in ("admin", "guest"):
         raise HTTPException(status_code=403, detail="Read-only account")
     conn = get_db()
+    existing = conn.execute("SELECT created_by FROM exercises WHERE name=?", (ex_name,)).fetchone()
+    if not existing:
+        conn.close()
+        return {"status": "not found"}
+    if user["role"] != "admin" and existing["created_by"] != user["id"]:
+        conn.close()
+        raise HTTPException(status_code=403, detail="You can only delete exercises you created")
     conn.execute("DELETE FROM exercises WHERE name=?", (ex_name,))
     conn.commit()
     conn.close()
