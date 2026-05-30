@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -206,6 +206,19 @@ def init_db():
     """)
     conn.commit()
 
+    # Application event log
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER,
+            username   TEXT,
+            event_type TEXT NOT NULL,
+            detail     TEXT,
+            ip         TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+
     # Training phases table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS phases (
@@ -254,6 +267,21 @@ def init_db():
 init_db()
 
 
+# ── Event logging ────────────────────────────────────────────────
+def log_event(user_id: int, username: str, event_type: str, detail: str = None, ip: str = None):
+    """Fire-and-forget event logger. Never raises."""
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO events (user_id, username, event_type, detail, ip) VALUES (?,?,?,?,?)",
+            (user_id, username, event_type, detail, ip)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
 # ── Auth ──────────────────────────────────────────────────────
 def verify_password(plain: str, hashed: str) -> bool:
     return _bcrypt.checkpw(plain.encode(), hashed.encode())
@@ -286,7 +314,7 @@ def create_token(data: dict):
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_user(conn, username: str):
-    return conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    return conn.execute("SELECT * FROM users WHERE username=?", (username.strip().lower(),)).fetchone()
 
 async def current_user(token: str = Depends(oauth2)):
     err = HTTPException(status_code=401, detail="Invalid or expired token",
@@ -399,13 +427,15 @@ def health():
     return {"status": "ok"}
 
 @app.post("/auth/login")
-def login(form: OAuth2PasswordRequestForm = Depends()):
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     conn = get_db()
-    user = get_user(conn, form.username)
+    user = get_user(conn, form.username.strip().lower())
     conn.close()
     if not user or not verify_password(form.password, user["hashed_pw"]):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     token = create_token({"sub": user["username"], "role": user["role"]})
+    log_event(user["id"], user["username"], "login",
+              f"role={user['role']}", request.client.host if request.client else None)
     return {"access_token": token, "token_type": "bearer",
             "role": user["role"], "username": user["username"]}
 
@@ -425,6 +455,7 @@ def list_users(user=Depends(admin_only)):
 @app.post("/admin/users")
 def create_user(body: UserCreate, user=Depends(admin_only)):
     conn = get_db()
+    body.username = body.username.strip().lower()
     if conn.execute("SELECT id FROM users WHERE username=?", (body.username,)).fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -511,6 +542,7 @@ def save_session(session: SessionIn, user=Depends(current_user)):
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
     conn.close()
+    log_event(user["id"], user["username"], "session_saved", f"date={session.date} rd={rd:.2f}")
     return {"status": "saved", "date": session.date, "rd": rd}
 
 @app.delete("/sessions/{date}")
@@ -1052,6 +1084,7 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
         conn.commit()
         conn.close()
 
+    log_event(user["id"], user["username"], "insights_ask", f"model={model}")
     return {"answer": answer}
 
 @app.post("/ai/test")
@@ -1416,12 +1449,51 @@ async def import_sessions(user=Depends(current_user), file: UploadFile = File(..
     conn.commit()
     conn.close()
 
+    log_event(user["id"], user["username"], "import",
+              f"inserted={inserted} phases={phases_created} skipped={len(skipped_dates)}")
     return {
         "inserted":       inserted,
         "skipped":        skipped_dates,
         "errors":         errors,
         "phases_created": phases_created,
     }
+
+# ── Admin: event log ─────────────────────────────────────────
+@app.get("/admin/events")
+def get_events(user=Depends(current_user), limit: int = 200):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT e.created_at, e.username, e.event_type, e.detail, e.ip
+           FROM events e ORDER BY e.id DESC LIMIT ?""",
+        (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.get("/admin/events/summary")
+def get_events_summary(user=Depends(current_user)):
+    """Per-user activity summary for admin."""
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT
+            username,
+            COUNT(*) as total_events,
+            SUM(CASE WHEN event_type='login' THEN 1 ELSE 0 END) as logins,
+            SUM(CASE WHEN event_type='session_saved' THEN 1 ELSE 0 END) as sessions_saved,
+            SUM(CASE WHEN event_type='insights_ask' THEN 1 ELSE 0 END) as insights_queries,
+            SUM(CASE WHEN event_type='import' THEN 1 ELSE 0 END) as imports,
+            MAX(created_at) as last_seen
+        FROM events
+        GROUP BY username
+        ORDER BY last_seen DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
 
 # ── Phase endpoints ───────────────────────────────────────────
 @app.get("/phases")

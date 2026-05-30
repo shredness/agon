@@ -598,6 +598,45 @@
         <tbody id="users-body"></tbody>
       </table>
     </div>
+
+    <!-- Activity summary -->
+    <div class="card" style="padding:16px; margin-top:0;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Activity summary</div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;" id="activity-summary-table">
+          <thead><tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:7px 8px;text-align:left;color:var(--text2);font-weight:600;">User</th>
+            <th style="padding:7px 8px;text-align:right;color:var(--text2);font-weight:600;">Logins</th>
+            <th style="padding:7px 8px;text-align:right;color:var(--text2);font-weight:600;">Sessions</th>
+            <th style="padding:7px 8px;text-align:right;color:var(--text2);font-weight:600;">AI queries</th>
+            <th style="padding:7px 8px;text-align:right;color:var(--text2);font-weight:600;">Imports</th>
+            <th style="padding:7px 8px;text-align:left;color:var(--text2);font-weight:600;">Last seen</th>
+          </tr></thead>
+          <tbody id="activity-summary-body"><tr><td colspan="6" style="padding:12px;color:var(--text3);font-size:12px;">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent event log -->
+    <div class="card" style="padding:16px;margin-top:0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;font-weight:600;">Recent activity</div>
+        <select id="events-user-filter" style="font-size:12px;padding:4px 8px;" onchange="renderEventLog()">
+          <option value="">All users</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:7px 8px;text-align:left;color:var(--text2);font-weight:600;">When</th>
+            <th style="padding:7px 8px;text-align:left;color:var(--text2);font-weight:600;">User</th>
+            <th style="padding:7px 8px;text-align:left;color:var(--text2);font-weight:600;">Event</th>
+            <th style="padding:7px 8px;text-align:left;color:var(--text2);font-weight:600;">Detail</th>
+          </tr></thead>
+          <tbody id="events-body"><tr><td colspan="4" style="padding:12px;color:var(--text3);font-size:12px;">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
 <!-- New user modal -->
@@ -856,7 +895,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.1.2';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -978,7 +1017,7 @@ function logout() {
 }
 
 async function doLogin() {
-  const username = document.getElementById('login-username').value.trim();
+  const username = document.getElementById('login-username').value.trim().toLowerCase();
   const password = document.getElementById('login-password').value;
   const errEl    = document.getElementById('login-error');
   const btn      = document.getElementById('login-btn');
@@ -1149,7 +1188,7 @@ function switchTab(name) {
   if (name==='export') updateExportSummary();
   if (name==='trend') { loadRecompScore(); loadPhases(); loadMacroData(); }
   if (name==='insights') openInsights();
-  if (name==='users') loadUsers();
+  if (name==='users') { loadUsers(); loadActivityLog(); }
 }
 
 function getExDef(name) {
@@ -2698,6 +2737,79 @@ async function loadProgress() {
 }
 
 // ── Users (admin) ────────────────────────────────────────────
+
+// ── Activity log ──────────────────────────────────────────────
+let _allEvents = [];
+
+const EVENT_LABELS = {
+  'login':         { label: 'Login',          color: '#3B82F6' },
+  'session_saved': { label: 'Session saved',  color: '#10B981' },
+  'insights_ask':  { label: 'AI query',       color: '#8B5CF6' },
+  'import':        { label: 'Import',         color: '#F59E0B' },
+  'export':        { label: 'Export',         color: '#888780' },
+};
+
+async function loadActivityLog() {
+  try {
+    const [events, summary] = await Promise.all([
+      apiFetch('/admin/events?limit=200'),
+      apiFetch('/admin/events/summary')
+    ]);
+    _allEvents = events || [];
+
+    // Populate summary table
+    const sumBody = document.getElementById('activity-summary-body');
+    if (sumBody) {
+      sumBody.innerHTML = summary.length ? summary.map(r => `
+        <tr style="border-bottom:0.5px solid var(--border);">
+          <td style="padding:7px 8px;font-weight:600;color:var(--text);">${escapeHtml(r.username)}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--text2);">${r.logins}</td>
+          <td style="padding:7px 8px;text-align:right;color:var(--text2);">${r.sessions_saved}</td>
+          <td style="padding:7px 8px;text-align:right;color:#8B5CF6;">${r.insights_queries}</td>
+          <td style="padding:7px 8px;text-align:right;color:#F59E0B;">${r.imports}</td>
+          <td style="padding:7px 8px;color:var(--text3);font-size:11px;">${r.last_seen ? r.last_seen.slice(0,16).replace('T',' ') : '-'}</td>
+        </tr>`).join('')
+        : '<tr><td colspan="6" style="padding:12px;color:var(--text3);">No activity yet.</td></tr>';
+    }
+
+    // Populate user filter
+    const filter = document.getElementById('events-user-filter');
+    if (filter) {
+      const users = [...new Set(_allEvents.map(e => e.username))].sort();
+      filter.innerHTML = '<option value="">All users</option>' +
+        users.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+    }
+
+    renderEventLog();
+  } catch(e) {
+    const b = document.getElementById('events-body');
+    if (b) b.innerHTML = `<tr><td colspan="4" style="padding:12px;color:var(--red-text);">Could not load events: ${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+function renderEventLog() {
+  const body = document.getElementById('events-body');
+  if (!body) return;
+  const userFilter = document.getElementById('events-user-filter')?.value || '';
+  const filtered = userFilter ? _allEvents.filter(e => e.username === userFilter) : _allEvents;
+
+  if (!filtered.length) {
+    body.innerHTML = '<tr><td colspan="4" style="padding:12px;color:var(--text3);">No events yet.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = filtered.slice(0, 100).map(e => {
+    const meta = EVENT_LABELS[e.event_type] || { label: e.event_type, color: 'var(--text2)' };
+    const when = (e.created_at || '').slice(0,16).replace('T', ' ');
+    return `<tr style="border-bottom:0.5px solid var(--border);">
+      <td style="padding:6px 8px;color:var(--text3);font-size:11px;white-space:nowrap;">${when}</td>
+      <td style="padding:6px 8px;color:var(--text);font-weight:500;">${escapeHtml(e.username || '')}</td>
+      <td style="padding:6px 8px;"><span style="color:${meta.color};font-weight:600;font-size:11px;">${meta.label}</span></td>
+      <td style="padding:6px 8px;color:var(--text3);font-size:11px;">${escapeHtml(e.detail || '')}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function loadUsers() {
   const tbody = document.getElementById('users-body');
   if (!tbody) return;
