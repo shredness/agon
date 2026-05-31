@@ -478,13 +478,13 @@
           <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Color scale</div>
           <div style="font-size:11px;line-height:1.8;color:var(--text2);">
             <div style="margin-bottom:8px;">
-              <div style="display:inline-block;width:16px;height:16px;background:#4ade80;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>Gain
+              <div style="display:inline-block;width:16px;height:16px;background:#a8e6a1;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>Gain
             </div>
             <div style="margin-bottom:8px;">
-              <div style="display:inline-block;width:16px;height:16px;background:#60a5fa;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>No change
+              <div style="display:inline-block;width:16px;height:16px;background:#3b82f6;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>No change
             </div>
             <div style="margin-bottom:8px;">
-              <div style="display:inline-block;width:16px;height:16px;background:#ef4444;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>Loss
+              <div style="display:inline-block;width:16px;height:16px;background:#ff6b6b;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>Loss
             </div>
           </div>
           <div style="font-size:11px;color:var(--text3);margin-top:12px;font-style:italic;">Hover for details</div>
@@ -4175,20 +4175,24 @@ function getStrengthDelta(muscleGroup, days) {
 function getMuscleColor(pct) {
   const clamped = Math.max(-100, Math.min(100, pct));
   if (clamped >= 3) {
-    // Green: +3 to +100
+    // Green: +3 to +100 — saturated and bright
     const intensity = clamped / 100;
-    const g = Math.round(74 + (255-74) * intensity);
-    const r = Math.round(74 - 74 * intensity);
+    const base_g = 168;
+    const base_r = 74;
+    const g = Math.round(base_g + (200 - base_g) * intensity);
+    const r = Math.round(base_r - base_r * intensity);
     return `rgb(${r}, ${g}, 64)`;
   } else if (clamped <= -3) {
-    // Red: -3 to -100
+    // Red: -3 to -100 — saturated and bright
     const intensity = Math.abs(clamped) / 100;
-    const r = Math.round(239 + (255-239) * intensity);
-    const g = Math.round(68 - 68 * intensity);
+    const base_r = 220;
+    const base_g = 100;
+    const r = Math.round(base_r + (255 - base_r) * intensity);
+    const g = Math.round(base_g - base_g * intensity);
     return `rgb(${r}, ${g}, 68)`;
   } else {
-    // Blue: -3 to +3
-    return '#60a5fa';
+    // Blue: -3 to +3 — bright cyan-blue
+    return '#3b82f6';
   }
 }
 
