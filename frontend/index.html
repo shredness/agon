@@ -3876,18 +3876,17 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.2.6': [
+    'Exercise bank: lock icon now displays correctly next to protected exercises',
+  ],
   '0.2.5': [
-    'Scoped export: filter by date range and phase before downloading',
-    'External API key: generate a read-only key to share your data with any AI or external tool',
-    "What's new modal shows changes since your last login",
-    'Phase dropdown in Data tab now populates correctly',
-    'Users tab layout fixed to match other panels',
+    'Phase dropdown in scoped export now populates correctly on Data tab open',
   ],
   '0.2.0': [
-    'External API key management added to Settings',
-    'Scoped export with date range presets and phase filter',
-    'Activity logging for admin visibility into guest usage',
-    'Username login is now case-insensitive',
+    'Scoped export — filter downloads by date range and phase',
+    'External API key — generate a read-only key to share your data with any AI or tool',
+    "What's new modal shows changes since your last login",
+    'Activity logging — admin can see logins, sessions, and AI queries per user',
   ],
   '0.1.4': [
     'Users tab restructured — activity summary and event log now inside main layout',
@@ -3923,7 +3922,7 @@ async function checkWhatsNew() {
     const lastSeen = prof.last_seen_version || '0.0.0';
     if (lastSeen === APP_VERSION) return;
 
-    // Collect all versions newer than lastSeen
+    // Collect all versions newer than lastSeen, cap at 3 most recent
     const versions = Object.keys(CHANGELOG).sort((a,b) => {
       const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
       for (let i=0; i<3; i++) if (pa[i]!==pb[i]) return pb[i]-pa[i];
@@ -3933,7 +3932,8 @@ async function checkWhatsNew() {
       const pv = v.split('.').map(Number), pl = lastSeen.split('.').map(Number);
       for (let i=0; i<3; i++) if (pv[i]!==pl[i]) return pv[i]>pl[i];
       return false;
-    });
+    }).slice(0, 3); // max 3 versions shown
+
     if (!newVersions.length) return;
 
     // Build content
