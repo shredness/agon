@@ -940,7 +940,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.2.5';
+const APP_VERSION = '0.2.6';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2281,10 +2281,14 @@ function renderBankTable() {
 
   document.getElementById('bank-body').innerHTML = EXERCISE_BANK.map((e, idx) => {
     const editable = canEdit(e);
-    const lockIcon = !editable ? `<i class="ti ti-lock" title="Created by admin — protected" style="color:var(--text3);font-size:12px;margin-left:4px;"></i>` : '';
     return `
     <tr style="border-bottom:1px solid var(--border);${!editable?'opacity:0.85;':''}">
-      <td style="padding:6px 10px;display:flex;align-items:center;">${inp(e.name, idx, 'name', '', !editable)}${lockIcon}</td>
+      <td style="padding:6px 10px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${inp(e.name, idx, 'name', '', !editable)}
+          ${!editable ? `<i class="ti ti-lock" title="Admin exercise - protected" style="color:var(--text3);font-size:13px;flex-shrink:0;"></i>` : ''}
+        </div>
+      </td>
       <td style="padding:6px 8px;">${selTool(e.tool, idx, !editable)}</td>
       <td style="padding:6px 4px;max-width:50px;overflow:hidden;">${inp(e.mult, idx, 'mult', 'style="width:46px;max-width:46px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 5px;font-size:12px;" type="number" step="0.05" min="0.1" maxlength="5"', !editable)}</td>
       <td style="padding:6px 8px;">
@@ -3872,6 +3876,19 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.2.5': [
+    'Scoped export: filter by date range and phase before downloading',
+    'External API key: generate a read-only key to share your data with any AI or external tool',
+    "What's new modal shows changes since your last login",
+    'Phase dropdown in Data tab now populates correctly',
+    'Users tab layout fixed to match other panels',
+  ],
+  '0.2.0': [
+    'External API key management added to Settings',
+    'Scoped export with date range presets and phase filter',
+    'Activity logging for admin visibility into guest usage',
+    'Username login is now case-insensitive',
+  ],
   '0.1.4': [
     'Users tab restructured — activity summary and event log now inside main layout',
     'Footer and Users panel placement fixed',
@@ -3931,7 +3948,9 @@ async function checkWhatsNew() {
     document.getElementById('wn-version').textContent = APP_VERSION;
     document.getElementById('wn-content').innerHTML = content;
     document.getElementById('whats-new-modal').style.display = 'flex';
-  } catch(e) { /* non-fatal */ }
+  } catch(e) {
+    console.warn('checkWhatsNew error:', e.message);
+  }
 }
 
 async function closeWhatsNew() {
