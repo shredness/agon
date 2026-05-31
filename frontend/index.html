@@ -454,44 +454,6 @@
 
   <!-- PROGRESS -->
   <div id="tab-progress" class="tab-panel">
-    <!-- Anatomy Heatmap -->
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
-        <div>
-          <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Strength Progress by Muscle</div>
-          <div style="font-size:13px;color:var(--text2);">% change in max load per muscle group</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <label style="font-size:12px;color:var(--text2);">Period</label>
-          <select id="anatomy-period" style="font-size:12px;padding:5px 8px;" onchange="renderAnatomyHeatmap()">
-            <option value="7">Last 7 days</option>
-            <option value="30" selected>Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="180">Last 6 months</option>
-            <option value="365">Last year</option>
-          </select>
-        </div>
-      </div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-        <div id="anatomy-svg-container" style="flex:1;min-width:200px;"></div>
-        <div style="flex:0 0 140px;">
-          <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px;">Color scale</div>
-          <div style="font-size:11px;line-height:1.8;color:var(--text2);">
-            <div style="margin-bottom:8px;">
-              <div style="display:inline-block;width:16px;height:16px;background:#4ade80;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>Gain
-            </div>
-            <div style="margin-bottom:8px;">
-              <div style="display:inline-block;width:16px;height:16px;background:#60a5fa;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>No change
-            </div>
-            <div style="margin-bottom:8px;">
-              <div style="display:inline-block;width:16px;height:16px;background:#ef4444;border-radius:2px;margin-right:6px;vertical-align:middle;"></div>Loss
-            </div>
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:12px;font-style:italic;">Hover for details</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Exercise selector and sub-panels -->
     <div class="card" style="padding:16px 20px;">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -979,7 +941,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.3.1';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1269,7 +1231,7 @@ function switchTab(name) {
   }
   if (name==='bank') renderBankTable();
   if (name==='trend') renderTrend();
-  if (name==='progress') { renderAnatomyHeatmap(); initProgress(); }
+  if (name==='progress') initProgress();
   if (name==='export') {
     const doExportTab = () => { buildLogRows(); populateExportPhaseDropdown(); updateExportScopeCount(); updateExportSummary(); };
     if (!_allPhases || !_allPhases.length) {
