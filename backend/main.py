@@ -406,10 +406,12 @@ class ProfileIn(BaseModel):
     external_api_key:   Optional[str] = None
 
 class ProtocolIn(BaseModel):
-    name:      str
-    dose:      Optional[str] = None
-    frequency: Optional[str] = None
-    notes:     Optional[str] = None
+    name:       str
+    dose:       Optional[str] = None
+    frequency:  Optional[str] = None
+    notes:      Optional[str] = None
+    start_date: Optional[str] = None
+    end_date:   Optional[str] = None
 
 class PhaseIn(BaseModel):
     phase_type: str
@@ -1633,7 +1635,7 @@ def get_recomp(user=Depends(current_user)):
 def get_protocols(user=Depends(current_user)):
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, name, dose, frequency, notes FROM protocols WHERE user_id=? ORDER BY sort_order, id",
+        "SELECT id, name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=? ORDER BY sort_order, id",
         (user["id"],)
     ).fetchall()
     conn.close()
@@ -1648,8 +1650,8 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
         "SELECT COALESCE(MAX(sort_order),0) FROM protocols WHERE user_id=?", (user["id"],)
     ).fetchone()[0]
     conn.execute(
-        "INSERT INTO protocols (user_id, name, dose, frequency, notes, sort_order) VALUES (?,?,?,?,?,?)",
-        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, max_order + 1)
+        "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order) VALUES (?,?,?,?,?,?,?,?)",
+        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1)
     )
     conn.commit()
     conn.close()
@@ -1661,8 +1663,8 @@ def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_use
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
     conn = get_db()
     conn.execute(
-        "UPDATE protocols SET name=?, dose=?, frequency=?, notes=? WHERE id=? AND user_id=?",
-        (body.name.strip(), body.dose, body.frequency, body.notes, protocol_id, user["id"])
+        "UPDATE protocols SET name=?, dose=?, frequency=?, notes=?, start_date=?, end_date=? WHERE id=? AND user_id=?",
+        (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, protocol_id, user["id"])
     )
     conn.commit()
     conn.close()
