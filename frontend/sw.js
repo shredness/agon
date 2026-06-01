@@ -1,4 +1,4 @@
-const CACHE = 'prometheus-v1';
+const CACHE = 'agon-v2';
 
 // Assets to cache on install — the app shell
 const PRECACHE = [
