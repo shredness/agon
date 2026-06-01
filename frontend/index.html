@@ -983,7 +983,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.3.9';
+const APP_VERSION = '0.3.10';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4272,32 +4272,31 @@ function renderAnatomyHeatmap() {
 
   // Color each muscle highlight path and attach hover
   const muscleDeltas = {};
+  // Build delta map first
   Object.entries(muscleMap).forEach(([muscle, ids]) => {
     if (!ids || !ids.length) return;
     const delta = getStrengthDelta(muscle, days);
-    const color = getMuscleColor(delta.pct);
     muscleDeltas[muscle] = delta.pct;
-    ids.forEach(id => {
-      const el = container.querySelector('#' + id);
-      if (el) {
-        el.setAttribute('fill', color);
-        el.setAttribute('fill-opacity', '0.72');
-      }
-    });
   });
 
-  // Attach hover events directly to each .hi-region path
+  // Attach hover events and apply colors
   container.querySelectorAll('.hi-region').forEach(el => {
-    const muscle = el.getAttribute('data-muscle');
     const mapKey = Object.keys(muscleMap).find(k => muscleMap[k].includes(el.id));
-    const pct = mapKey ? (muscleDeltas[mapKey] || 0) : 0;
-    const clone = el.cloneNode(true);
-    el.parentNode.replaceChild(clone, el);
-    clone.addEventListener('mouseenter', function(e) {
+    if (!mapKey) return;
+    const pct = muscleDeltas[mapKey] || 0;
+    const color = getMuscleColor(pct);
+    const muscle = mapKey;
+
+    // Apply color via style (overrides the hardcoded fill="transparent")
+    el.style.fill = color;
+    el.style.fillOpacity = '0.72';
+
+    // Attach events directly — no clone needed since SVG was freshly injected
+    el.addEventListener('mouseenter', function(e) {
       showAnatomyTooltip(e, muscle, pct);
     });
-    clone.addEventListener('mouseleave', hideAnatomyTooltip);
-    clone.addEventListener('mousemove', function(e) {
+    el.addEventListener('mouseleave', hideAnatomyTooltip);
+    el.addEventListener('mousemove', function(e) {
       const tip = document.getElementById('anatomy-tooltip');
       if (tip && tip.style.display !== 'none') {
         tip.style.left = (e.clientX + 14) + 'px';
