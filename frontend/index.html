@@ -757,8 +757,11 @@
 
 <!-- Settings modal -->
 <div class="modal-overlay" id="settings-modal" style="display:none;" onclick="if(event.target===this)closeSettings()">
-  <div class="modal" style="max-width:480px;max-height:90vh;overflow-y:auto;">
-    <h3>Settings</h3>
+  <div class="modal" style="max-width:720px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;">Settings</h3>
+      <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text2);padding:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
 
     <!-- ── Profile ── -->
     <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Profile</div>
