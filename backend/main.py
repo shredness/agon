@@ -206,6 +206,12 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+    # Migrate: add start_date / end_date if not present
+    existing_cols = [r[1] for r in conn.execute("PRAGMA table_info(protocols)").fetchall()]
+    if 'start_date' not in existing_cols:
+        conn.execute("ALTER TABLE protocols ADD COLUMN start_date TEXT")
+    if 'end_date' not in existing_cols:
+        conn.execute("ALTER TABLE protocols ADD COLUMN end_date TEXT")
     conn.commit()
 
     # Application event log
