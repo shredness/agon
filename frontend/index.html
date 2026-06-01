@@ -983,7 +983,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.3.8';
+const APP_VERSION = '0.3.9';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4121,15 +4121,7 @@ const ANATOMY_MUSCLES = [
 ];
 
 function getStrengthDelta(muscleGroup, days) {
-  // Debug: log first call per muscle
-  if (!window._sdDebug) window._sdDebug = {};
-  if (!window._sdDebug[muscleGroup]) {
-    window._sdDebug[muscleGroup] = true;
-    const sampleEx = EXERCISE_BANK.find(ex => ex.muscles && Array.isArray(ex.muscles) && ex.muscles.includes(muscleGroup));
-    const sampleExStr = EXERCISE_BANK.find(ex => typeof ex.muscles === 'string' && ex.muscles.includes(muscleGroup));
-    console.log(`[SD] ${muscleGroup}: array match=${!!sampleEx}, string match=${!!sampleExStr}, bank size=${EXERCISE_BANK.length}`);
-    if (EXERCISE_BANK.length > 0) console.log(`[SD] sample ex:`, JSON.stringify(EXERCISE_BANK[0]).slice(0,200));
-  }
+
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
@@ -4138,8 +4130,6 @@ function getStrengthDelta(muscleGroup, days) {
   const muscleExercises = EXERCISE_BANK
     .filter(ex => { if (!ex.muscles) return false; if (Array.isArray(ex.muscles)) return ex.muscles.includes(muscleGroup); if (typeof ex.muscles === 'string') return ex.muscles.split(',').map(m=>m.trim()).includes(muscleGroup); return false; })
     .map(ex => ex.name);
-  
-  console.log(`[${muscleGroup}] found ${muscleExercises.length} exercises: ${muscleExercises.join(', ')}`);
   
   if (!muscleExercises.length) return { pct: 0 };
   
@@ -4160,8 +4150,6 @@ function getStrengthDelta(muscleGroup, days) {
       });
     });
   });
-  
-  console.log(`[${muscleGroup}] found ${periodSets.length} sets since ${cutoffStr}`);
   if (periodSets.length) console.log(`  loads: ${periodSets.map(s => s.load).join(', ')}`);
   
   if (!periodSets.length) return { pct: 0 };
@@ -4175,36 +4163,30 @@ function getStrengthDelta(muscleGroup, days) {
   const startLoad = Math.max(...firstHalf.map(s => s.load || 0), 0);
   const endLoad = Math.max(...secondHalf.map(s => s.load || 0), 0);
   
-  console.log(`[${muscleGroup}] start=${startLoad}, end=${endLoad}`);
-  
   if (startLoad === 0 && endLoad === 0) return { pct: 0 };
   if (startLoad === 0) return { pct: 100 };
   
   const pct = Math.round(((endLoad - startLoad) / startLoad) * 100);
-  console.log(`[${muscleGroup}] pct=${pct}`);
   return { pct };
 }
 
 function getMuscleColor(pct) {
-  const clamped = Math.max(-100, Math.min(100, pct));
-  if (clamped >= 3) {
-    // Green: +3 to +100 — saturated and bright
-    const intensity = clamped / 100;
-    const base_g = 168;
-    const base_r = 74;
-    const g = Math.round(base_g + (200 - base_g) * intensity);
-    const r = Math.round(base_r - base_r * intensity);
-    return `rgb(${r}, ${g}, 64)`;
-  } else if (clamped <= -3) {
-    // Red: -3 to -100 — saturated and bright
-    const intensity = Math.abs(clamped) / 100;
-    const base_r = 220;
-    const base_g = 100;
-    const r = Math.round(base_r + (255 - base_r) * intensity);
-    const g = Math.round(base_g - base_g * intensity);
-    return `rgb(${r}, ${g}, 68)`;
+  const clamped = Math.max(-50, Math.min(50, pct));
+  if (clamped >= 1) {
+    // Green: +1% and above — scale intensity up to +15%
+    const intensity = Math.min(clamped / 15, 1);
+    const r = Math.round(0 + (100 - 0) * (1 - intensity));
+    const g = Math.round(180 + (230 - 180) * intensity);
+    const b = Math.round(60 - 60 * intensity);
+    return `rgb(${r}, ${g}, ${b})`;
+  } else if (clamped <= -1) {
+    // Red: -1% and below — scale intensity up to -15%
+    const intensity = Math.min(Math.abs(clamped) / 15, 1);
+    const r = Math.round(200 + (255 - 200) * intensity);
+    const g = Math.round(80 - 80 * intensity);
+    return `rgb(${r}, ${g}, 60)`;
   } else {
-    // Blue: -3 to +3 — bright cyan-blue
+    // Blue: exactly 0 or <1% either way
     return '#3b82f6';
   }
 }
@@ -4284,13 +4266,8 @@ function renderAnatomyHeatmap() {
     'Shoulders':  ['hi_shoulders'],
     'Biceps':     ['hi_biceps'],
     'Triceps':    ['hi_triceps'],
-    'Forearms':   [],
-    'Quads':      ['hi_legs'],
-    'Hamstrings': ['hi_legs'],
-    'Glutes':     [],
-    'Calves':     [],
-    'Abs':        ['hi_core'],
-    'Traps':      [],
+    'Legs':       ['hi_legs'],
+    'Core':       ['hi_core'],
   };
 
   // Color each muscle highlight path and attach hover
