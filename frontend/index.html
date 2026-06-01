@@ -197,8 +197,8 @@
   .guide-tab-label { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
   .guide-tab-label i { color: var(--accent); font-size: 15px; }
   .insights-messages { display: flex; flex-direction: column; gap: 14px; min-height: 280px; max-height: 56vh; overflow-y: auto; padding: 8px 2px 16px; }
-  .insights-msg { max-width: 88%; padding: 11px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
-  .insights-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+  .insights-msg { max-width: 88%; padding: 11px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; word-wrap: break-word; }
+  .insights-msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; white-space: pre-wrap; }
   .insights-msg.model { align-self: flex-start; background: var(--bg2); border: 0.5px solid var(--border); color: var(--text); border-bottom-left-radius: 4px; }
   .insights-msg.thinking { align-self: flex-start; color: var(--text3); font-style: italic; }
   .insights-input-bar { display: flex; gap: 8px; align-items: flex-end; }
@@ -465,7 +465,7 @@
           <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Strength Progress by Muscle</div>
           <div style="font-size:13px;color:var(--text2);">% change in max load per muscle group</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <label style="font-size:12px;color:var(--text2);">Period</label>
           <select id="anatomy-period" style="font-size:12px;padding:5px 8px;" onchange="renderAnatomyHeatmap()">
             <option value="7">Last 7 days</option>
@@ -473,6 +473,10 @@
             <option value="90">Last 90 days</option>
             <option value="180">Last 6 months</option>
             <option value="365">Last year</option>
+          </select>
+          <label style="font-size:12px;color:var(--text2);">Phase</label>
+          <select id="anatomy-phase" style="font-size:12px;padding:5px 8px;" onchange="renderAnatomyHeatmap()">
+            <option value="">All phases</option>
           </select>
         </div>
       </div>
@@ -832,9 +836,19 @@
       <input type="text" id="proto-name" placeholder="Name (e.g. Retatrutide)" style="font-size:12px;">
       <input type="text" id="proto-dose" placeholder="Dose (e.g. 5mg)" style="font-size:12px;">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <input type="text" id="proto-freq" placeholder="Frequency (e.g. Weekly)" style="font-size:12px;">
       <input type="text" id="proto-notes" placeholder="Notes (e.g. GLP)" style="font-size:12px;">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div>
+        <label style="font-size:11px;color:var(--text3);">Start date (optional)</label>
+        <input type="date" id="proto-start" style="font-size:12px;width:100%;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);">End date (optional — leave blank if active)</label>
+        <input type="date" id="proto-end" style="font-size:12px;width:100%;">
+      </div>
     </div>
     <button class="btn btn-sm" onclick="addProtocol()">+ Add protocol</button>
 
@@ -983,7 +997,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.3.18';
+const APP_VERSION = '0.3.19';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1273,7 +1287,7 @@ function switchTab(name) {
   }
   if (name==='bank') renderBankTable();
   if (name==='trend') renderTrend();
-  if (name==='progress') { renderAnatomyHeatmap(); initProgress(); }
+  if (name==='progress') { if (_allPhases) populateAnatomyPhases(); else apiFetch('/phases').then(ph => { _allPhases = ph || []; populateAnatomyPhases(); }); renderAnatomyHeatmap(); initProgress(); }
   if (name==='export') {
     const doExportTab = () => { buildLogRows(); populateExportPhaseDropdown(); updateExportScopeCount(); updateExportSummary(); };
     if (!_allPhases || !_allPhases.length) {
@@ -3172,7 +3186,7 @@ async function loadInsightsHistory() {
       return;
     }
     box.innerHTML = msgs.map(m =>
-      `<div class="insights-msg ${m.role === 'user' ? 'user' : 'model'}">${escapeHtml(m.content)}</div>`
+      `<div class="insights-msg ${m.role === 'user' ? 'user' : 'model'}">${m.role === 'user' ? escapeHtml(m.content) : parseMarkdown(m.content)}</div>`
     ).join('');
     box.scrollTop = box.scrollHeight;
   } catch(e) {
@@ -3215,7 +3229,7 @@ async function askInsights() {
   try {
     const data = await aiFetch('/insights/ask', { method:'POST', body: JSON.stringify({ question: q }) });
     document.getElementById('insights-thinking')?.remove();
-    box.insertAdjacentHTML('beforeend', `<div class="insights-msg model">${escapeHtml(data.answer)}</div>`);
+    box.insertAdjacentHTML('beforeend', `<div class="insights-msg model">${parseMarkdown(data.answer)}</div>`);
   } catch(e) {
     document.getElementById('insights-thinking')?.remove();
     box.insertAdjacentHTML('beforeend', `<div class="insights-msg model" style="color:var(--red-text);">${escapeHtml(e.message)}</div>`);
@@ -3308,17 +3322,24 @@ async function loadProtocols() {
         <th style="padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;">Name</th>
         <th style="padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;">Dose</th>
         <th style="padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;">Frequency</th>
+        <th style="padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;">Dates</th>
         <th style="padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;">Notes</th>
         <th style="padding:5px 6px;width:24px;"></th>
       </tr></thead>
-      <tbody>${rows.map(r => `
+      <tbody>${rows.map(r => {
+        const dateRange = r.start_date
+          ? (r.end_date ? `${r.start_date} → ${r.end_date}` : `${r.start_date} → active`)
+          : '';
+        const isActive = r.start_date && !r.end_date;
+        return `
         <tr style="border-bottom:0.5px solid var(--border);">
           <td style="padding:5px 6px;color:var(--text);">${escapeHtml(r.name)}</td>
           <td style="padding:5px 6px;color:var(--text2);">${escapeHtml(r.dose||'')}</td>
           <td style="padding:5px 6px;color:var(--text2);">${escapeHtml(r.frequency||'')}</td>
+          <td style="padding:5px 6px;color:${isActive ? 'var(--accent)' : 'var(--text3)'};font-size:11px;">${escapeHtml(dateRange)}</td>
           <td style="padding:5px 6px;color:var(--text3);">${escapeHtml(r.notes||'')}</td>
           <td style="padding:5px 6px;"><button onclick="deleteProtocol(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;">✕</button></td>
-        </tr>`).join('')}
+        </tr>`;}).join('')}
       </tbody>
     </table>`;
   } catch(e) {
@@ -3334,12 +3355,14 @@ async function addProtocol() {
       method: 'POST',
       body: JSON.stringify({
         name,
-        dose:      document.getElementById('proto-dose').value.trim()  || null,
-        frequency: document.getElementById('proto-freq').value.trim()  || null,
-        notes:     document.getElementById('proto-notes').value.trim() || null,
+        dose:       document.getElementById('proto-dose').value.trim()  || null,
+        frequency:  document.getElementById('proto-freq').value.trim()  || null,
+        notes:      document.getElementById('proto-notes').value.trim() || null,
+        start_date: document.getElementById('proto-start').value || null,
+        end_date:   document.getElementById('proto-end').value   || null,
       })
     });
-    ['proto-name','proto-dose','proto-freq','proto-notes'].forEach(id => {
+    ['proto-name','proto-dose','proto-freq','proto-notes','proto-start','proto-end'].forEach(id => {
       document.getElementById(id).value = '';
     });
     await loadProtocols();
@@ -4217,8 +4240,23 @@ function hideAnatomyTooltip() {
 function showMuscleTooltip(e, muscle) { showAnatomyTooltip(e, muscle, getStrengthDelta(muscle, 30).pct); }
 function hideTooltip() { hideAnatomyTooltip(); }
 
+function populateAnatomyPhases() {
+  const sel = document.getElementById('anatomy-phase');
+  if (!sel || !_allPhases) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All phases</option>';
+  _allPhases.forEach(ph => {
+    const opt = document.createElement('option');
+    opt.value = ph.id;
+    opt.textContent = ph.phase_type + (ph.end_date ? '' : ' (current)');
+    sel.appendChild(opt);
+  });
+  sel.value = current;
+}
+
 function renderAnatomyHeatmap() {
   const days = parseInt(document.getElementById('anatomy-period')?.value || 30);
+  const phaseId = document.getElementById('anatomy-phase')?.value || '';
   const container = document.getElementById('anatomy-svg-container');
   if (!container) return;
 
@@ -4263,7 +4301,7 @@ function renderAnatomyHeatmap() {
   // Build delta map first
   Object.entries(muscleMap).forEach(([muscle, ids]) => {
     if (!ids || !ids.length) return;
-    const delta = getStrengthDelta(muscle, days);
+    const delta = getStrengthDelta(muscle, days, phaseId);
     muscleDeltas[muscle] = delta.pct;
   });
 
