@@ -983,7 +983,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.3.12';
+const APP_VERSION = '0.3.13';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4242,6 +4242,11 @@ function renderAnatomyHeatmap() {
   // Force a reflow so SVG elements are queryable
   void container.offsetHeight;
 
+  // Remove hardcoded fill attribute from hi-region paths so style.fill takes effect
+  container.querySelectorAll('.hi-region').forEach(el => {
+    el.removeAttribute('fill');
+  });
+
   // Color the regions
   const muscleMap = {
     'Chest':      ['hi_chest'],
@@ -4264,16 +4269,6 @@ function renderAnatomyHeatmap() {
 
   // Attach hover events and apply colors
   const hiRegions = container.querySelectorAll('.hi-region');
-  console.log('[Heatmap] hi-region elements found:', hiRegions.length, '| container:', !!container, '| svg length:', svg.length);
-  if (hiRegions.length === 0) {
-    // Fallback: try querying by ID directly
-    Object.keys(muscleMap).forEach(muscle => {
-      (muscleMap[muscle] || []).forEach(id => {
-        const el = container.querySelector('#' + id);
-        if (el) console.log('[Heatmap] Found by ID:', id, el.tagName, el.className);
-      });
-    });
-  }
   hiRegions.forEach(el => {
     const mapKey = Object.keys(muscleMap).find(k => muscleMap[k].includes(el.id));
     if (!mapKey) return;
