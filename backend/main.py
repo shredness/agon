@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 import sqlite3, json, os
 import httpx
+import pyotp, qrcode, io, base64
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import bcrypt as _bcrypt
@@ -185,7 +186,9 @@ def init_db():
                          ('activity_level',"'1.55'"),
                          ('onboarded',"'0'"),
                          ('external_api_key','NULL'),
-                         ('last_seen_version',"'0.0.0'")]:
+                         ('last_seen_version',"'0.0.0'"),
+                         ('totp_secret','NULL'),
+                         ('totp_enabled',"'0'")]:
         try:
             conn.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT {default}")
             conn.commit()
@@ -429,6 +432,9 @@ class AISettingsIn(BaseModel):
     ai_key: Optional[str] = None      # plaintext key from user; None = don't change
     ai_model: Optional[str] = None
 
+class MFAVerify(BaseModel):
+    code: str
+
 class InsightsQuery(BaseModel):
     question: str
 
@@ -442,14 +448,159 @@ def health():
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     conn = get_db()
     user = get_user(conn, form.username.strip().lower())
-    conn.close()
     if not user or not verify_password(form.password, user["hashed_pw"]):
+        conn.close()
         raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    # Check if MFA is enabled for this user
+    settings = conn.execute(
+        "SELECT totp_enabled FROM user_settings WHERE user_id=?", (user["id"],)
+    ).fetchone()
+    conn.close()
+
+    mfa_enabled = settings and settings["totp_enabled"] == "1"
+
+    if mfa_enabled:
+        # Issue a short-lived MFA pending token (5 min), no app access
+        pending_token = create_token({
+            "sub": user["username"],
+            "role": user["role"],
+            "mfa_pending": True,
+            "exp": datetime.utcnow() + timedelta(minutes=5),
+        })
+        log_event(user["id"], user["username"], "login_mfa_pending",
+                  f"role={user['role']}", request.client.host if request.client else None)
+        return {"mfa_required": True, "pending_token": pending_token}
+
     token = create_token({"sub": user["username"], "role": user["role"]})
     log_event(user["id"], user["username"], "login",
               f"role={user['role']}", request.client.host if request.client else None)
     return {"access_token": token, "token_type": "bearer",
             "role": user["role"], "username": user["username"]}
+
+
+@app.post("/auth/mfa/verify")
+def mfa_verify(body: MFAVerify, request: Request, token: str = Depends(oauth2)):
+    """Second step: verify TOTP code using the pending token, return full JWT."""
+    err = HTTPException(status_code=401, detail="Invalid or expired MFA session")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise err
+    if not payload.get("mfa_pending"):
+        raise HTTPException(status_code=400, detail="Token is not an MFA pending token")
+
+    username = payload.get("sub")
+    conn = get_db()
+    user = get_user(conn, username)
+    if not user:
+        conn.close()
+        raise err
+
+    settings = conn.execute(
+        "SELECT totp_secret FROM user_settings WHERE user_id=?", (user["id"],)
+    ).fetchone()
+    conn.close()
+
+    if not settings or not settings["totp_secret"]:
+        raise HTTPException(status_code=400, detail="MFA not configured")
+
+    secret = decrypt_secret(settings["totp_secret"])
+    totp = pyotp.TOTP(secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid TOTP code")
+
+    full_token = create_token({"sub": user["username"], "role": user["role"]})
+    log_event(user["id"], user["username"], "login_mfa_ok",
+              f"role={user['role']}", request.client.host if request.client else None)
+    return {"access_token": full_token, "token_type": "bearer",
+            "role": user["role"], "username": user["username"]}
+
+
+@app.get("/auth/mfa/setup")
+def mfa_setup(user=Depends(current_user)):
+    """Generate a new TOTP secret and return QR code PNG as base64. Does NOT enable MFA yet."""
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    label = f"Agon:{user['username']}"
+    uri = totp.provisioning_uri(name=label, issuer_name="Agon")
+
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    # Store the (unconfirmed) secret encrypted — will be activated on /enable
+    enc = encrypt_secret(secret)
+    conn = get_db()
+    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
+    if existing:
+        conn.execute("UPDATE user_settings SET totp_secret=?, totp_enabled='0' WHERE user_id=?",
+                     (enc, user["id"]))
+    else:
+        conn.execute("INSERT INTO user_settings (user_id, totp_secret, totp_enabled) VALUES (?,?,'0')",
+                     (user["id"], enc))
+    conn.commit()
+    conn.close()
+    return {"qr": qr_b64, "secret": secret, "uri": uri}
+
+
+@app.post("/auth/mfa/enable")
+def mfa_enable(body: MFAVerify, user=Depends(current_user)):
+    """Confirm TOTP code is working, then flip totp_enabled = 1."""
+    conn = get_db()
+    settings = conn.execute(
+        "SELECT totp_secret FROM user_settings WHERE user_id=?", (user["id"],)
+    ).fetchone()
+    conn.close()
+
+    if not settings or not settings["totp_secret"]:
+        raise HTTPException(status_code=400, detail="Run /auth/mfa/setup first")
+
+    secret = decrypt_secret(settings["totp_secret"])
+    totp = pyotp.TOTP(secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid TOTP code — try again")
+
+    conn = get_db()
+    conn.execute("UPDATE user_settings SET totp_enabled='1' WHERE user_id=?", (user["id"],))
+    conn.commit()
+    conn.close()
+    log_event(user["id"], user["username"], "mfa_enabled", "TOTP activated")
+    return {"status": "mfa_enabled"}
+
+
+@app.post("/auth/mfa/disable")
+def mfa_disable(user=Depends(admin_only)):
+    """Admin only: disable MFA for themselves (or any user via body)."""
+    conn = get_db()
+    conn.execute(
+        "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=?",
+        (user["id"],)
+    )
+    conn.commit()
+    conn.close()
+    log_event(user["id"], user["username"], "mfa_disabled", "TOTP removed")
+    return {"status": "mfa_disabled"}
+
+
+@app.post("/admin/users/{username}/mfa/disable")
+def admin_disable_user_mfa(username: str, user=Depends(admin_only)):
+    """Admin: disable MFA for any user by username."""
+    conn = get_db()
+    target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    conn.execute(
+        "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=?",
+        (target["id"],)
+    )
+    conn.commit()
+    conn.close()
+    log_event(user["id"], user["username"], "mfa_disabled", f"admin disabled MFA for {username}")
+    return {"status": "mfa_disabled", "username": username}
+
 
 @app.get("/auth/me")
 def me(user=Depends(current_user)):
@@ -461,8 +612,14 @@ def me(user=Depends(current_user)):
 def list_users(user=Depends(admin_only)):
     conn = get_db()
     rows = conn.execute("SELECT id, username, role, created_at FROM users ORDER BY id").fetchall()
+    result = []
+    for r in rows:
+        s = conn.execute(
+            "SELECT totp_enabled FROM user_settings WHERE user_id=?", (r["id"],)
+        ).fetchone()
+        result.append({**dict(r), "mfa_enabled": bool(s and s["totp_enabled"] == "1")})
     conn.close()
-    return [dict(r) for r in rows]
+    return result
 
 @app.post("/admin/users")
 def create_user(body: UserCreate, user=Depends(admin_only)):

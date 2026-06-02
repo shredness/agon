@@ -236,21 +236,71 @@
       <h1 style="font-size:22px; font-weight:700; margin-bottom:4px;">Agon</h1>
       <p style="font-size:13px; color:var(--text2); font-style:italic;">strength through loss</p>
     </div>
-    <div class="form-group" style="margin-bottom:14px;">
-      <label>Username</label>
-      <input type="text" id="login-username" autocomplete="username" style="width:100%;" placeholder="username" onkeydown="if(event.key==='Enter')doLogin()">
+    <!-- Step 1: username + password -->
+    <div id="login-step-pw">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>Username</label>
+        <input type="text" id="login-username" autocomplete="username" style="width:100%;" placeholder="username" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>Password</label>
+        <input type="password" id="login-password" autocomplete="current-password" style="width:100%;" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div id="login-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:14px; text-align:center;"></div>
+      <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%; padding:11px; font-size:15px;">Sign in</button>
     </div>
-    <div class="form-group" style="margin-bottom:20px;">
-      <label>Password</label>
-      <input type="password" id="login-password" autocomplete="current-password" style="width:100%;" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <!-- Step 2: TOTP code (shown only when MFA is required) -->
+    <div id="login-step-mfa" style="display:none;">
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:28px;margin-bottom:8px;">🔐</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Two-factor authentication</div>
+        <div style="font-size:12px;color:var(--text2);">Enter the 6-digit code from your authenticator app</div>
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <input type="text" id="login-totp" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+          style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;padding:12px;"
+          placeholder="000000" onkeydown="if(event.key==='Enter')doMfaVerify()">
+      </div>
+      <div id="login-mfa-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:14px; text-align:center;"></div>
+      <button class="btn btn-primary" id="login-mfa-btn" onclick="doMfaVerify()" style="width:100%; padding:11px; font-size:15px;">Verify</button>
+      <button class="btn" onclick="cancelMfa()" style="width:100%;margin-top:8px;font-size:13px;">← Back</button>
     </div>
-    <div id="login-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:14px; text-align:center;"></div>
-    <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%; padding:11px; font-size:15px;">Sign in</button>
     <p id="login-version" style="text-align:center;margin-top:16px;font-size:11px;color:var(--text3);"></p>
   </div>
 </div>
 
 <div id="login-screen-hide" style="display:none;"></div>
+
+<!-- MFA Setup modal -->
+<div class="modal-overlay" id="mfa-setup-modal" style="display:none;" onclick="if(event.target===this)closeMfaSetup()">
+  <div class="modal" style="max-width:400px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;">Set up two-factor auth</h3>
+      <button onclick="closeMfaSetup()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text2);padding:0;">✕</button>
+    </div>
+    <div id="mfa-setup-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code to confirm.</p>
+      <div style="text-align:center;margin-bottom:14px;">
+        <img id="mfa-qr-img" src="" style="width:200px;height:200px;border:4px solid white;border-radius:8px;">
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:16px;text-align:center;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Manual entry key</div>
+        <code id="mfa-secret-text" style="font-size:13px;letter-spacing:2px;color:var(--text);word-break:break-all;"></code>
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Confirm code</label>
+        <input type="text" id="mfa-confirm-code" inputmode="numeric" maxlength="6"
+          style="width:100%;text-align:center;font-size:22px;letter-spacing:8px;padding:10px;"
+          placeholder="000000" onkeydown="if(event.key==='Enter')confirmMfaEnable()">
+      </div>
+      <div id="mfa-setup-error" style="display:none;color:var(--red-text);font-size:13px;margin-bottom:12px;text-align:center;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-sm" onclick="closeMfaSetup()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="confirmMfaEnable()">Enable 2FA</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="app" id="main-app" style="display:none;">
   <div class="app-header">
@@ -665,6 +715,7 @@
           <tr style="border-bottom:1px solid var(--border);">
             <th style="padding:10px 14px; text-align:left; font-size:11px; font-weight:600; color:var(--text2);">Username</th>
             <th style="padding:10px 8px; font-size:11px; font-weight:600; color:var(--text2);">Role</th>
+            <th style="padding:10px 8px; font-size:11px; font-weight:600; color:var(--text2);">2FA</th>
             <th style="padding:10px 8px; font-size:11px; font-weight:600; color:var(--text2);">Created</th>
             <th style="padding:10px 8px; width:80px;"></th>
           </tr>
@@ -1000,7 +1051,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.3.25';
+const APP_VERSION = '0.4.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1119,6 +1170,9 @@ function logout() {
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-username').value = '';
   document.getElementById('login-password').value = '';
+  document.getElementById('login-step-pw').style.display = 'block';
+  document.getElementById('login-step-mfa').style.display = 'none';
+  _pendingMfaToken = null;
 }
 
 async function doLogin() {
@@ -1134,6 +1188,17 @@ async function doLogin() {
     const r = await fetch(API + '/auth/login', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: form });
     if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Login failed'); }
     const data = await r.json();
+    if (data.mfa_required) {
+      // Switch to MFA step
+      _pendingMfaToken = data.pending_token;
+      document.getElementById('login-step-pw').style.display = 'none';
+      document.getElementById('login-step-mfa').style.display = 'block';
+      document.getElementById('login-totp').value = '';
+      document.getElementById('login-mfa-error').style.display = 'none';
+      setTimeout(() => document.getElementById('login-totp').focus(), 100);
+      btn.innerHTML = 'Sign in'; btn.disabled = false;
+      return;
+    }
     localStorage.setItem('agon-token', data.access_token);
     currentUser = { username: data.username, role: data.role, id: data.id };
     document.getElementById('login-screen').style.display = 'none';
@@ -2944,21 +3009,117 @@ async function loadUsers() {
   try {
     const users = await apiFetch('/admin/users');
     const roleColors = { admin:'var(--accent)', demo:'var(--text2)', guest:'var(--green)' };
-    tbody.innerHTML = users.map(u => `
-      <tr style="border-bottom:1px solid var(--border);">
+    tbody.innerHTML = users.map(u => {
+      const mfaBadge = u.mfa_enabled
+        ? `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:rgba(74,222,128,0.15);color:var(--green);font-weight:600;">ON</span>`
+        : `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--bg2);color:var(--text3);font-weight:600;">off</span>`;
+      const mfaBtn = u.mfa_enabled
+        ? `<button class="btn btn-sm" onclick="adminDisableMfa('${escapeHtml(u.username)}')" title="Disable 2FA" style="font-size:11px;margin-right:4px;">🔓</button>`
+        : (u.username === currentUser?.username
+            ? `<button class="btn btn-sm" onclick="openMfaSetup()" title="Enable 2FA" style="font-size:11px;margin-right:4px;">🔐</button>`
+            : `<span style="display:inline-block;width:4px;margin-right:4px;"></span>`);
+      return `<tr style="border-bottom:1px solid var(--border);">
         <td style="padding:9px 14px; font-weight:500;">${escapeHtml(u.username)}</td>
         <td style="padding:9px 8px;">
           <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg2);color:${roleColors[u.role]||'var(--text2)'};font-weight:600;text-transform:uppercase;">${u.role}</span>
         </td>
+        <td style="padding:9px 8px;">${mfaBadge}</td>
         <td style="padding:9px 8px; font-size:12px; color:var(--text2);">${u.created_at?.slice(0,10)||'-'}</td>
-        <td style="padding:9px 8px;">
-            <button class="btn btn-sm" onclick="openChpwModal('${escapeHtml(u.username)}')" title="Change password" style="margin-right:4px;">🔑</button>
+        <td style="padding:9px 8px;white-space:nowrap;">
+          ${mfaBtn}
+          <button class="btn btn-sm" onclick="openChpwModal('${escapeHtml(u.username)}')" title="Change password" style="margin-right:4px;">🔑</button>
           ${u.username !== 'manny' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">✕</button>` : ''}
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   } catch(e) {}
 }
 
+// ── MFA ───────────────────────────────────────────────────────
+let _pendingMfaToken = null;
+
+async function doMfaVerify() {
+  const code  = document.getElementById('login-totp').value.trim();
+  const errEl = document.getElementById('login-mfa-error');
+  const btn   = document.getElementById('login-mfa-btn');
+  if (!code) { errEl.textContent='Enter the 6-digit code.'; errEl.style.display='block'; return; }
+  btn.innerHTML = '<span class="spinner"></span>Verifying…'; btn.disabled = true;
+  errEl.style.display = 'none';
+  try {
+    const r = await fetch(API + '/auth/mfa/verify', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + _pendingMfaToken },
+      body: JSON.stringify({ code })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Invalid code'); }
+    const data = await r.json();
+    _pendingMfaToken = null;
+    localStorage.setItem('agon-token', data.access_token);
+    currentUser = { username: data.username, role: data.role, id: data.id };
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    applyRoleUI();
+    await init();
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+  btn.innerHTML = 'Verify'; btn.disabled = false;
+}
+
+function cancelMfa() {
+  _pendingMfaToken = null;
+  document.getElementById('login-step-mfa').style.display = 'none';
+  document.getElementById('login-step-pw').style.display = 'block';
+  document.getElementById('login-totp').value = '';
+  document.getElementById('login-mfa-error').style.display = 'none';
+}
+
+async function openMfaSetup() {
+  document.getElementById('mfa-setup-modal').style.display = 'flex';
+  document.getElementById('mfa-qr-img').src = '';
+  document.getElementById('mfa-secret-text').textContent = 'Loading…';
+  document.getElementById('mfa-confirm-code').value = '';
+  document.getElementById('mfa-setup-error').style.display = 'none';
+  try {
+    const data = await apiFetch('/auth/mfa/setup');
+    document.getElementById('mfa-qr-img').src = 'data:image/png;base64,' + data.qr;
+    document.getElementById('mfa-secret-text').textContent = data.secret;
+    setTimeout(() => document.getElementById('mfa-confirm-code').focus(), 200);
+  } catch(e) {
+    document.getElementById('mfa-secret-text').textContent = 'Error loading QR';
+  }
+}
+
+function closeMfaSetup() {
+  document.getElementById('mfa-setup-modal').style.display = 'none';
+}
+
+async function confirmMfaEnable() {
+  const code  = document.getElementById('mfa-confirm-code').value.trim();
+  const errEl = document.getElementById('mfa-setup-error');
+  if (code.length !== 6) { errEl.textContent='Enter the 6-digit code from your app.'; errEl.style.display='block'; return; }
+  try {
+    await apiFetch('/auth/mfa/enable', { method:'POST', body: JSON.stringify({ code }) });
+    closeMfaSetup();
+    showToast('Two-factor authentication enabled ✓');
+    loadUsers();
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function adminDisableMfa(username) {
+  if (!confirm(`Disable 2FA for ${username}?`)) return;
+  try {
+    await apiFetch(`/admin/users/${username}/mfa/disable`, { method:'POST' });
+    showToast(`2FA disabled for ${username}`);
+    loadUsers();
+  } catch(e) { showToast(e.message); }
+}
+
+// ── Users (admin) ─────────────────────────────────────────────
 function openNewUserModal() {
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
@@ -3995,6 +4156,10 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.0': [
+    'Security: TOTP two-factor authentication — enable via Admin panel, scan QR in any authenticator app',
+    'Admin: Users tab renamed to Admin with shield icon; 2FA status column and per-user controls added',
+  ],
   '0.3.24': [
     'Progress: chest hotspot repositioned and resized using interactive preview — two ellipses at confirmed coordinates',
   ],
