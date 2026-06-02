@@ -927,6 +927,13 @@
 
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
 
+    <!-- ── Two-Factor Authentication ── -->
+    <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Two-factor authentication</div>
+    <div id="settings-mfa-status" style="margin-bottom:12px;">
+      <!-- populated by loadSettingsMfa() -->
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
     <!-- ── External API ── -->
     <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">External API</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Generate a read-only API key to share your training data with external tools or AI assistants. Anyone with this key can read your data.</div>
@@ -1051,7 +1058,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.4.2';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -3103,6 +3110,7 @@ async function confirmMfaEnable() {
     await apiFetch('/auth/mfa/enable', { method:'POST', body: JSON.stringify({ code }) });
     closeMfaSetup();
     showToast('Two-factor authentication enabled ✓');
+    loadSettingsMfa();
     loadUsers();
   } catch(e) {
     errEl.textContent = e.message;
@@ -3120,6 +3128,16 @@ async function adminDisableMfa(username) {
 }
 
 // ── Users (admin) ─────────────────────────────────────────────
+function validatePassword(pw) {
+  const errs = [];
+  if (pw.length < 10)               errs.push('at least 10 characters');
+  if (!/[A-Z]/.test(pw))            errs.push('one uppercase letter');
+  if (!/[a-z]/.test(pw))            errs.push('one lowercase letter');
+  if (!/\d/.test(pw))               errs.push('one number');
+  if (!/[^A-Za-z0-9]/.test(pw))     errs.push('one special character');
+  return errs.length ? 'Password requires: ' + errs.join(', ') : null;
+}
+
 function openNewUserModal() {
   document.getElementById('nu-username').value = '';
   document.getElementById('nu-password').value = '';
@@ -3139,6 +3157,8 @@ async function confirmNewUser() {
   const role     = document.getElementById('nu-role').value;
   const errEl    = document.getElementById('nu-error');
   if (!username || !password) { errEl.textContent='Fill in all fields.'; errEl.style.display='block'; return; }
+  const pwErr = validatePassword(password);
+  if (pwErr) { errEl.textContent = pwErr; errEl.style.display='block'; return; }
   try {
     await apiFetch('/admin/users', { method:'POST', body: JSON.stringify({username, password, role}) });
     closeNewUserModal();
@@ -3179,7 +3199,8 @@ async function confirmChpw() {
   const confirm  = document.getElementById('chpw-confirm').value;
   const errEl    = document.getElementById('chpw-error');
   errEl.style.display = 'none';
-  if (pw.length < 4) { errEl.textContent = 'Password must be at least 4 characters.'; errEl.style.display='block'; return; }
+  const pwErr = validatePassword(pw);
+  if (pwErr) { errEl.textContent = pwErr; errEl.style.display='block'; return; }
   if (pw !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.style.display='block'; return; }
   try {
     await apiFetch('/admin/users/'+username+'/password', {
@@ -3227,6 +3248,39 @@ function updateKeyPlaceholder() {
   }
 }
 
+async function loadSettingsMfa() {
+  const el = document.getElementById('settings-mfa-status');
+  if (!el) return;
+  try {
+    const me = await aiFetch('/auth/me');
+    const mfaEnabled = !!me.mfa_enabled;
+    if (mfaEnabled) {
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-size:13px;color:var(--green);font-weight:600;">✓ Two-factor authentication is enabled</span>
+          <button class="btn btn-sm btn-danger" onclick="settingsDisableMfa()">Disable 2FA</button>
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px;">Your account requires an authenticator code at each login.</div>`;
+    } else {
+      el.innerHTML = `
+        <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Add an extra layer of security. You'll be asked for a code from your authenticator app each time you sign in.</div>
+        <button class="btn btn-sm btn-primary" onclick="openMfaSetup()">Enable two-factor authentication</button>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--text3);">Could not load 2FA status.</div>`;
+  }
+}
+
+async function settingsDisableMfa() {
+  if (!confirm('Disable two-factor authentication? Your account will only require a password to sign in.')) return;
+  try {
+    await aiFetch('/auth/mfa/disable', { method: 'POST' });
+    showToast('Two-factor authentication disabled');
+    loadSettingsMfa();
+    loadUsers(); // refresh admin panel if open
+  } catch(e) { showToast(e.message); }
+}
+
 async function openSettings() {
   document.getElementById('settings-modal').style.display = 'flex';
   document.getElementById('settings-msg').style.display = 'none';
@@ -3234,6 +3288,7 @@ async function openSettings() {
   loadSettingsProfile();
   loadProtocols();
   loadExtKey();
+  loadSettingsMfa();
   try {
     const s = await aiFetch('/ai/settings');
     _aiHasKey = s.has_key;
@@ -3600,7 +3655,8 @@ async function saveSettingsPw() {
 
   if (!cur || !nw || !conf) { show('All three fields are required.', true); return; }
   if (nw !== conf)           { show('New passwords do not match.', true); return; }
-  if (nw.length < 4)         { show('Password must be at least 4 characters.', true); return; }
+  const pwErr = validatePassword(nw);
+  if (pwErr)                 { show(pwErr, true); return; }
 
   try {
     // Re-authenticate to verify current password
@@ -4156,6 +4212,12 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.2': [
+    'Settings: Two-factor authentication section — any user can enable or disable MFA from Settings without admin intervention',
+  ],
+  '0.4.1': [
+    'Security: password complexity enforced — 10+ chars, uppercase, lowercase, number, special character',
+  ],
   '0.4.0': [
     'Security: TOTP two-factor authentication — enable via Admin panel, scan QR in any authenticator app',
     'Admin: Users tab renamed to Admin with shield icon; 2FA status column and per-user controls added',

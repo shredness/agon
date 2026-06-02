@@ -300,6 +300,23 @@ def verify_password(plain: str, hashed: str) -> bool:
 def hash_password(plain: str) -> str:
     return _bcrypt.hashpw(plain.encode(), _bcrypt.gensalt()).decode()
 
+def validate_password(pw: str):
+    """Raise HTTPException if password doesn't meet complexity requirements."""
+    import re
+    errors = []
+    if len(pw) < 10:
+        errors.append("at least 10 characters")
+    if not re.search(r"[A-Z]", pw):
+        errors.append("one uppercase letter")
+    if not re.search(r"[a-z]", pw):
+        errors.append("one lowercase letter")
+    if not re.search(r"\d", pw):
+        errors.append("one number")
+    if not re.search(r"[^A-Za-z0-9]", pw):
+        errors.append("one special character")
+    if errors:
+        raise HTTPException(status_code=400, detail="Password requires: " + ", ".join(errors))
+
 
 # ── AI key encryption (Fernet, derived from SECRET_KEY) ───────
 import base64 as _b64, hashlib as _hashlib
@@ -571,8 +588,8 @@ def mfa_enable(body: MFAVerify, user=Depends(current_user)):
 
 
 @app.post("/auth/mfa/disable")
-def mfa_disable(user=Depends(admin_only)):
-    """Admin only: disable MFA for themselves (or any user via body)."""
+def mfa_disable(user=Depends(current_user)):
+    """Any user: disable their own MFA."""
     conn = get_db()
     conn.execute(
         "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=?",
@@ -604,7 +621,14 @@ def admin_disable_user_mfa(username: str, user=Depends(admin_only)):
 
 @app.get("/auth/me")
 def me(user=Depends(current_user)):
-    return {"username": user["username"], "role": user["role"], "id": user["id"]}
+    conn = get_db()
+    s = conn.execute(
+        "SELECT totp_enabled FROM user_settings WHERE user_id=?", (user["id"],)
+    ).fetchone()
+    conn.close()
+    mfa_enabled = bool(s and s["totp_enabled"] == "1")
+    return {"username": user["username"], "role": user["role"], "id": user["id"],
+            "mfa_enabled": mfa_enabled}
 
 
 # ── Admin ─────────────────────────────────────────────────────
@@ -623,6 +647,7 @@ def list_users(user=Depends(admin_only)):
 
 @app.post("/admin/users")
 def create_user(body: UserCreate, user=Depends(admin_only)):
+    validate_password(body.password)
     conn = get_db()
     body.username = body.username.strip().lower()
     if conn.execute("SELECT id FROM users WHERE username=?", (body.username,)).fetchone():
@@ -647,8 +672,7 @@ def delete_user(username: str, user=Depends(admin_only)):
 @app.put("/admin/users/{username}/password")
 def change_password(username: str, body: dict, user=Depends(admin_only)):
     new_pw = body.get("password", "")
-    if len(new_pw) < 4:
-        raise HTTPException(status_code=400, detail="Password too short")
+    validate_password(new_pw)
     conn = get_db()
     conn.execute("UPDATE users SET hashed_pw=? WHERE username=?",
                  (hash_password(new_pw), username))
