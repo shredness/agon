@@ -1058,7 +1058,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.2';
+const APP_VERSION = '0.4.3';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4212,6 +4212,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.3': [
+    'Docs: user guide updated — Settings section now covers two-factor authentication setup and recovery',
+  ],
   '0.4.2': [
     'Settings: Two-factor authentication section — any user can enable or disable MFA from Settings without admin intervention',
   ],
@@ -4729,6 +4732,7 @@ function parseMarkdown(text) {
         <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, training week start, activity level. Used by the macro calculator and AI Insights</li>
         <li><strong>Protocols</strong> - supplements, peptides, and medications. Passed to the AI as context only. Agon does not provide medical advice</li>
         <li><strong>Account</strong> - change your password</li>
+        <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA for your account. Scan the QR code with any authenticator app (Google Authenticator, Authy, etc). Once enabled, every login requires your password plus a 6-digit code. You can disable it here at any time. Admins can also reset it for you via the Admin panel if you lose access to your authenticator</li>
         <li><strong>External API</strong> - generate a read-only API key for your data. Share the endpoint URL with any external AI or tool to give it access to your full training history. Revoke at any time</li>
         <li><strong>AI Insights</strong> - connect a Gemini or Claude API key. Keys are encrypted and stored on your server</li>
       </ul>
