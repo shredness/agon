@@ -1,60 +1,41 @@
-const CACHE = 'agon-v2';
-
-// Assets to cache on install — the app shell
+const CACHE = 'agon-v0.4.5';
 const PRECACHE = [
   '/',
   '/index.html',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
 ];
 
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting())
   );
 });
 
-self.addEventListener('activate', event => {
-  // Remove old caches
-  event.waitUntil(
+self.addEventListener('activate', e => {
+  e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-
-  // API calls: network first, no caching
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  // CDN assets: cache first (they're versioned)
-  if (url.hostname.includes('cdnjs.cloudflare.com')) {
-    event.respondWith(
-      caches.match(event.request).then(cached =>
-        cached || fetch(event.request).then(res => {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(event.request, clone));
-          return res;
-        })
-      )
+self.addEventListener('fetch', e => {
+  // Network-first for API calls, cache-first for static assets
+  if (e.request.url.includes('/api/')) {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match(e.request))
     );
-    return;
+  } else {
+    e.respondWith(
+      caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
+        if (resp && resp.status === 200 && e.request.method === 'GET') {
+          const clone = resp.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return resp;
+      }))
+    );
   }
-
-  // App shell: network first with cache fallback
-  event.respondWith(
-    fetch(event.request)
-      .then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(event.request, clone));
-        return res;
-      })
-      .catch(() => caches.match(event.request))
-  );
 });

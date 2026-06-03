@@ -1059,7 +1059,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.5';
+const APP_VERSION = '0.4.6';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4214,6 +4214,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.6': [
+    'PWA: service worker registered — Android Chrome install prompt now works',
+  ],
   '0.4.5': [
     'Branding: new Agon icon — lambda A over white flame, PWA manifest updated',
   ],
@@ -4900,5 +4903,12 @@ function parseMarkdown(text) {
     <div id="wn-content"></div>
   </div>
 </div>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+</script>
 </body>
 </html>
