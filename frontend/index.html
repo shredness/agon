@@ -277,8 +277,8 @@
         <div style="font-size:12px;color:var(--text2);">Free access, guest role. Your data stays on this server.</div>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label>Username</label>
-        <input type="text" id="reg-username" autocomplete="username" style="width:100%;" placeholder="username or email address" onkeydown="if(event.key==='Enter')doRegister()">
+        <label>Email address</label>
+        <input type="email" id="reg-username" autocomplete="email" style="width:100%;" placeholder="your@email.com" onkeydown="if(event.key==='Enter')doRegister()">
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label>Password</label>
@@ -1089,7 +1089,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.9';
+const APP_VERSION = '0.5.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4368,6 +4368,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.5.0': [
+    'Auth: email address enforced as username on registration',
+  ],
   '0.4.9': [
     'Auth: email addresses now accepted as usernames during registration',
   ],
