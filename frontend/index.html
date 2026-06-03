@@ -1058,7 +1058,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.3';
+const APP_VERSION = '0.4.4';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2423,7 +2423,6 @@ function renderBankTable() {
       <td style="padding:6px 10px;">
         <div style="display:flex;align-items:center;gap:6px;">
           ${inp(e.name, idx, 'name', '', !editable)}
-          ${!editable ? `<i class="ti ti-lock" title="Admin exercise - protected" style="color:var(--text3);font-size:13px;flex-shrink:0;"></i>` : ''}
         </div>
       </td>
       <td style="padding:6px 8px;">${selTool(e.tool, idx, !editable)}</td>
@@ -2435,10 +2434,10 @@ function renderBankTable() {
       </td>
       <td style="padding:6px 8px;">${selBW(e.isBW, idx, !editable)}</td>
       <td style="padding:6px 8px;font-size:11px;color:var(--text3);font-style:italic;">${bankFormulaHint(e)}</td>
-      <td style="padding:6px 8px;">
+      <td style="padding:6px 8px;text-align:center;">
         ${editable
           ? `<button class="btn btn-danger btn-sm" style="padding:2px 8px;" onclick="deleteBankRow(${idx})">✕</button>`
-          : `<span style="color:var(--text3);font-size:11px;">—</span>`
+          : `<i class="ti ti-lock" title="Admin exercise - protected" style="color:var(--text3);font-size:13px;"></i>`
         }
       </td>
     </tr>`;
@@ -3927,9 +3926,11 @@ function calcMacros() {
         <div style="font-size:10px;color:var(--text3);">${carbCal} kcal</div>
       </div>
     </div>
-    <button class="btn btn-sm" onclick="askForMealPlan()" style="font-size:12px;">
-      <i class="ti ti-sparkles"></i> Build a meal plan with AI
-    </button>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+      <button class="btn btn-sm" onclick="askForMealPlan()" style="font-size:12px;">
+        <i class="ti ti-sparkles"></i> Build a meal plan with AI
+      </button>
+    </div>
   `;
   renderPhaseMacroHistory();
 }
@@ -4212,6 +4213,10 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.4': [
+    'Exercises: lock icon moved to the action column (right side) for protected exercises',
+    'Trend: "Build a meal plan with AI" button aligned to the right of the macro calculator',
+  ],
   '0.4.3': [
     'Docs: user guide updated — Settings section now covers two-factor authentication setup and recovery',
   ],
