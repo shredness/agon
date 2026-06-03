@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Agon">
-<meta name="theme-color" content="#7A5C2E" id="theme-color-meta">
+<meta name="theme-color" content="#111111" id="theme-color-meta">
 <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
-<title>Agon</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzExMTExMCIvPgogIDx0ZXh0IHg9IjE2IiB5PSIyMyIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtc2l6ZT0iMjIiIGZvbnQtd2VpZ2h0PSI3MDAiIAogICAgICAgIGZpbGw9IiNFMDVBMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkE8L3RleHQ+Cjwvc3ZnPg==">
+<link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png">
+<link rel="shortcut icon" href="/favicon.ico">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
@@ -1058,7 +1059,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.4';
+const APP_VERSION = '0.4.5';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4213,6 +4214,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.5': [
+    'Branding: new Agon icon — lambda A over white flame, PWA manifest updated',
+  ],
   '0.4.4': [
     'Exercises: lock icon moved to the action column (right side) for protected exercises',
     'Trend: "Build a meal plan with AI" button aligned to the right of the macro calculator',
