@@ -741,18 +741,20 @@
         <button class="btn btn-sm btn-primary" onclick="openNewUserModal()">+ New user</button>
       </div>
       <div id="users-pending" style="display:none;margin-top:14px;"></div>
-      <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:12px;">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border);">
-            <th style="padding:10px 14px; text-align:left; font-size:11px; font-weight:600; color:var(--text2);">Username</th>
-            <th style="padding:10px 8px; font-size:11px; font-weight:600; color:var(--text2);">Role</th>
-            <th style="padding:10px 8px; font-size:11px; font-weight:600; color:var(--text2);">2FA</th>
-            <th style="padding:10px 8px; font-size:11px; font-weight:600; color:var(--text2);">Created</th>
-            <th style="padding:10px 8px; width:80px;"></th>
-          </tr>
-        </thead>
-        <tbody id="users-body"></tbody>
-      </table>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px;">
+        <table style="width:100%;min-width:480px;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);">Username</th>
+              <th style="padding:10px 8px;font-size:11px;font-weight:600;color:var(--text2);">Role</th>
+              <th style="padding:10px 8px;font-size:11px;font-weight:600;color:var(--text2);">2FA</th>
+              <th style="padding:10px 8px;font-size:11px;font-weight:600;color:var(--text2);">Created</th>
+              <th style="padding:10px 8px;width:80px;"></th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Activity summary -->
@@ -1089,7 +1091,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.5.1';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4368,6 +4370,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.5.1': [
+    'Admin: user table now scrolls horizontally on mobile instead of overflowing',
+  ],
   '0.5.0': [
     'Auth: email address enforced as username on registration',
   ],
