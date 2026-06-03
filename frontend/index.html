@@ -249,6 +249,10 @@
       </div>
       <div id="login-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:14px; text-align:center;"></div>
       <button class="btn btn-primary" id="login-btn" onclick="doLogin()" style="width:100%; padding:11px; font-size:15px;">Sign in</button>
+      <div id="login-register-link" style="display:none;text-align:center;margin-top:14px;">
+        <span style="font-size:13px;color:var(--text2);">New to Agon? </span>
+        <button onclick="showRegister()" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--accent);text-decoration:underline;padding:0;">Create an account</button>
+      </div>
     </div>
     <!-- Step 2: TOTP code (shown only when MFA is required) -->
     <div id="login-step-mfa" style="display:none;">
@@ -265,6 +269,31 @@
       <div id="login-mfa-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:14px; text-align:center;"></div>
       <button class="btn btn-primary" id="login-mfa-btn" onclick="doMfaVerify()" style="width:100%; padding:11px; font-size:15px;">Verify</button>
       <button class="btn" onclick="cancelMfa()" style="width:100%;margin-top:8px;font-size:13px;">← Back</button>
+    </div>
+    <!-- Step 3: Register (shown only when registration is open) -->
+    <div id="login-step-register" style="display:none;">
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Create your account</div>
+        <div style="font-size:12px;color:var(--text2);">Free access, guest role. Your data stays on this server.</div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Username</label>
+        <input type="text" id="reg-username" autocomplete="username" style="width:100%;" placeholder="choose a username" onkeydown="if(event.key==='Enter')doRegister()">
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Password</label>
+        <input type="password" id="reg-password" autocomplete="new-password" style="width:100%;" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
+      </div>
+      <div class="form-group" style="margin-bottom:18px;">
+        <label>Confirm password</label>
+        <input type="password" id="reg-confirm" autocomplete="new-password" style="width:100%;" placeholder="••••••••" onkeydown="if(event.key==='Enter')doRegister()">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.5;">
+        Password requires 10+ characters, uppercase, lowercase, a number, and a special character.
+      </div>
+      <div id="reg-error" style="display:none;color:var(--red-text);font-size:13px;margin-bottom:14px;text-align:center;"></div>
+      <button class="btn btn-primary" id="reg-btn" onclick="doRegister()" style="width:100%;padding:11px;font-size:15px;">Create account</button>
+      <button class="btn" onclick="cancelRegister()" style="width:100%;margin-top:8px;font-size:13px;">← Back to sign in</button>
     </div>
     <p id="login-version" style="text-align:center;margin-top:16px;font-size:11px;color:var(--text3);"></p>
   </div>
@@ -711,6 +740,7 @@
         <div style="font-size:13px; color:var(--text2);">Manage user accounts. Guests have full access to their own data. Demo is read-only and displays sample data.</div>
         <button class="btn btn-sm btn-primary" onclick="openNewUserModal()">+ New user</button>
       </div>
+      <div id="users-pending" style="display:none;margin-top:14px;"></div>
       <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:12px;">
         <thead>
           <tr style="border-bottom:1px solid var(--border);">
@@ -1059,7 +1089,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.6';
+const APP_VERSION = '0.4.8';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1136,7 +1166,11 @@ function toggleTheme() {
 // Check for existing session on page load
 (async function bootstrap() {
   const token = localStorage.getItem('agon-token');
-  if (!token) { document.getElementById('login-screen').style.display='flex'; return; }
+  if (!token) {
+    document.getElementById('login-screen').style.display='flex';
+    checkRegistrationOpen();
+    return;
+  }
   try {
     const r = await fetch(API + '/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
     if (!r.ok) throw new Error('invalid');
@@ -1180,7 +1214,18 @@ function logout() {
   document.getElementById('login-password').value = '';
   document.getElementById('login-step-pw').style.display = 'block';
   document.getElementById('login-step-mfa').style.display = 'none';
+  document.getElementById('login-step-register').style.display = 'none';
   _pendingMfaToken = null;
+  checkRegistrationOpen();
+}
+
+async function checkRegistrationOpen() {
+  try {
+    const r = await fetch(API + '/auth/registration-status');
+    const data = await r.json();
+    const link = document.getElementById('login-register-link');
+    if (link) link.style.display = data.open ? 'block' : 'none';
+  } catch(e) { /* silently fail — link stays hidden */ }
 }
 
 async function doLogin() {
@@ -3015,8 +3060,37 @@ async function loadUsers() {
   if (!tbody) return;
   try {
     const users = await apiFetch('/admin/users');
+    const pending = users.filter(u => u.status === 'pending');
+    const active  = users.filter(u => u.status !== 'pending');
     const roleColors = { admin:'var(--accent)', demo:'var(--text2)', guest:'var(--green)' };
-    tbody.innerHTML = users.map(u => {
+
+    // Pending approvals section
+    const pendingEl = document.getElementById('users-pending');
+    if (pendingEl) {
+      if (pending.length) {
+        pendingEl.style.display = 'block';
+        pendingEl.innerHTML = `
+          <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">
+            Pending approval (${pending.length})
+          </div>
+          ${pending.map(u => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;gap:12px;flex-wrap:wrap;">
+              <div>
+                <span style="font-weight:500;color:var(--text);">${escapeHtml(u.username)}</span>
+                <span style="font-size:11px;color:var(--text3);margin-left:8px;">${u.created_at?.slice(0,10)||''}</span>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="approveUser('${escapeHtml(u.username)}')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectUser('${escapeHtml(u.username)}')">Reject</button>
+              </div>
+            </div>`).join('')}
+          <hr style="border:none;border-top:1px solid var(--border);margin:12px 0;">`;
+      } else {
+        pendingEl.style.display = 'none';
+      }
+    }
+
+    tbody.innerHTML = active.map(u => {
       const mfaBadge = u.mfa_enabled
         ? `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:rgba(74,222,128,0.15);color:var(--green);font-weight:600;">ON</span>`
         : `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--bg2);color:var(--text3);font-weight:600;">off</span>`;
@@ -3026,12 +3100,12 @@ async function loadUsers() {
             ? `<button class="btn btn-sm" onclick="openMfaSetup()" title="Enable 2FA" style="font-size:11px;margin-right:4px;">🔐</button>`
             : `<span style="display:inline-block;width:4px;margin-right:4px;"></span>`);
       return `<tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:9px 14px; font-weight:500;">${escapeHtml(u.username)}</td>
+        <td style="padding:9px 14px;font-weight:500;">${escapeHtml(u.username)}</td>
         <td style="padding:9px 8px;">
           <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg2);color:${roleColors[u.role]||'var(--text2)'};font-weight:600;text-transform:uppercase;">${u.role}</span>
         </td>
         <td style="padding:9px 8px;">${mfaBadge}</td>
-        <td style="padding:9px 8px; font-size:12px; color:var(--text2);">${u.created_at?.slice(0,10)||'-'}</td>
+        <td style="padding:9px 8px;font-size:12px;color:var(--text2);">${u.created_at?.slice(0,10)||'-'}</td>
         <td style="padding:9px 8px;white-space:nowrap;">
           ${mfaBtn}
           <button class="btn btn-sm" onclick="openChpwModal('${escapeHtml(u.username)}')" title="Change password" style="margin-right:4px;">🔑</button>
@@ -3040,6 +3114,23 @@ async function loadUsers() {
       </tr>`;
     }).join('');
   } catch(e) {}
+}
+
+async function approveUser(username) {
+  try {
+    await apiFetch(`/admin/users/${username}/approve`, { method:'POST' });
+    showToast(`${username} approved`);
+    loadUsers();
+  } catch(e) { showToast(e.message); }
+}
+
+async function rejectUser(username) {
+  if (!confirm(`Reject and delete "${username}"? This cannot be undone.`)) return;
+  try {
+    await apiFetch(`/admin/users/${username}/reject`, { method:'POST' });
+    showToast(`${username} rejected`);
+    loadUsers();
+  } catch(e) { showToast(e.message); }
 }
 
 // ── MFA ───────────────────────────────────────────────────────
@@ -3080,6 +3171,69 @@ function cancelMfa() {
   document.getElementById('login-step-pw').style.display = 'block';
   document.getElementById('login-totp').value = '';
   document.getElementById('login-mfa-error').style.display = 'none';
+}
+
+function showRegister() {
+  document.getElementById('login-step-pw').style.display = 'none';
+  document.getElementById('login-step-register').style.display = 'block';
+  document.getElementById('reg-username').value = '';
+  document.getElementById('reg-password').value = '';
+  document.getElementById('reg-confirm').value = '';
+  document.getElementById('reg-error').style.display = 'none';
+  setTimeout(() => document.getElementById('reg-username').focus(), 100);
+}
+
+function cancelRegister() {
+  document.getElementById('login-step-register').style.display = 'none';
+  document.getElementById('login-step-pw').style.display = 'block';
+  document.getElementById('reg-error').style.display = 'none';
+}
+
+async function doRegister() {
+  const username = document.getElementById('reg-username').value.trim().toLowerCase();
+  const password = document.getElementById('reg-password').value;
+  const confirm  = document.getElementById('reg-confirm').value;
+  const errEl    = document.getElementById('reg-error');
+  const btn      = document.getElementById('reg-btn');
+
+  errEl.style.display = 'none';
+  if (!username || !password || !confirm) { errEl.textContent = 'All fields are required.'; errEl.style.display = 'block'; return; }
+  if (password !== confirm)               { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+  const pwErr = validatePassword(password);
+  if (pwErr)                              { errEl.textContent = pwErr; errEl.style.display = 'block'; return; }
+
+  btn.innerHTML = '<span class="spinner"></span>Creating account…'; btn.disabled = true;
+  try {
+    const r = await fetch(API + '/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Registration failed'); }
+    const data = await r.json();
+    if (data.pending) {
+      // Show confirmation, don't log in
+      document.getElementById('login-step-register').innerHTML = `
+        <div style="text-align:center;padding:8px 0;">
+          <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Request submitted</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;">${escapeHtml(data.message)}</div>
+          <button class="btn" onclick="cancelRegister()" style="width:100%;">← Back to sign in</button>
+        </div>`;
+      return;
+    }
+    // Fallback: immediate login if server somehow returns a token
+    localStorage.setItem('agon-token', data.access_token);
+    currentUser = { username: data.username, role: data.role };
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    applyRoleUI();
+    await init();
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+  btn.innerHTML = 'Create account'; btn.disabled = false;
 }
 
 async function openMfaSetup() {
@@ -4214,6 +4368,14 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.8': [
+    'Auth: registration requires admin approval — new accounts land in pending state until approved',
+    'Admin: pending approval queue shown at top of Admin panel with Approve and Reject buttons',
+  ],
+  '0.4.7': [
+    'Auth: public registration toggle — set ALLOW_REGISTRATION=true in docker-compose to open sign-ups',
+    'Login: "Create an account" link appears automatically when registration is enabled',
+  ],
   '0.4.6': [
     'PWA: service worker registered — Android Chrome install prompt now works',
   ],

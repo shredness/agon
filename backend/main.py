@@ -32,8 +32,9 @@ TOKEN_EXPIRE_DAYS = 30
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-ADMIN_USER = os.environ.get("ADMIN_USER", "manny")
-ADMIN_PASS = os.environ.get("ADMIN_PASS", "pR0m3th3us")
+ADMIN_USER        = os.environ.get("ADMIN_USER", "manny")
+ADMIN_PASS        = os.environ.get("ADMIN_PASS", "pR0m3th3us")
+ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "false").lower() == "true"
 DEMO_USER  = "demo"
 DEMO_PASS  = "demo"
 
@@ -100,6 +101,7 @@ def init_db():
             username   TEXT NOT NULL UNIQUE,
             hashed_pw  TEXT NOT NULL,
             role       TEXT NOT NULL DEFAULT 'guest',
+            status     TEXT NOT NULL DEFAULT 'active',
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
@@ -124,6 +126,11 @@ def init_db():
     if "notes" not in cols:
         conn.execute("ALTER TABLE sessions ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
 
+    # Migrate users table
+    user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "status" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+        conn.commit()
     conn.commit()
 
     # Seed admin
@@ -452,6 +459,10 @@ class AISettingsIn(BaseModel):
 class MFAVerify(BaseModel):
     code: str
 
+class UserRegister(BaseModel):
+    username: str
+    password: str
+
 class InsightsQuery(BaseModel):
     question: str
 
@@ -461,6 +472,45 @@ class InsightsQuery(BaseModel):
 def health():
     return {"status": "ok"}
 
+@app.get("/auth/registration-status")
+def registration_status():
+    """Public — lets the frontend know whether to show the sign-up link."""
+    return {"open": ALLOW_REGISTRATION}
+
+@app.post("/auth/register")
+def register(body: UserRegister, request: Request):
+    """Self-service account creation. Only active when ALLOW_REGISTRATION=true."""
+    if not ALLOW_REGISTRATION:
+        raise HTTPException(status_code=403, detail="Registration is not open")
+
+    username = body.username.strip().lower()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    if len(username) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if not username.replace("_","").replace("-","").isalnum():
+        raise HTTPException(status_code=400, detail="Username may only contain letters, numbers, hyphens, and underscores")
+
+    validate_password(body.password)
+
+    conn = get_db()
+    if conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    conn.execute(
+        "INSERT INTO users (username, hashed_pw, role, status) VALUES (?,?,?,?)",
+        (username, hash_password(body.password), "guest", "pending")
+    )
+    conn.commit()
+    user = get_user(conn, username)
+    conn.close()
+
+    log_event(user["id"], user["username"], "register",
+              "pending approval", request.client.host if request.client else None)
+    return {"pending": True,
+            "message": "Account created. You'll be able to sign in once an admin approves your request."}
+
 @app.post("/auth/login")
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     conn = get_db()
@@ -468,6 +518,14 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
     if not user or not verify_password(form.password, user["hashed_pw"]):
         conn.close()
         raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    status = user["status"] if "status" in user.keys() else "active"
+    if status == "pending":
+        conn.close()
+        raise HTTPException(status_code=403, detail="Your account is pending admin approval.")
+    if status == "suspended":
+        conn.close()
+        raise HTTPException(status_code=403, detail="Your account has been suspended. Contact an admin.")
 
     # Check if MFA is enabled for this user
     settings = conn.execute(
@@ -635,7 +693,7 @@ def me(user=Depends(current_user)):
 @app.get("/admin/users")
 def list_users(user=Depends(admin_only)):
     conn = get_db()
-    rows = conn.execute("SELECT id, username, role, created_at FROM users ORDER BY id").fetchall()
+    rows = conn.execute("SELECT id, username, role, status, created_at FROM users ORDER BY id").fetchall()
     result = []
     for r in rows:
         s = conn.execute(
@@ -644,6 +702,34 @@ def list_users(user=Depends(admin_only)):
         result.append({**dict(r), "mfa_enabled": bool(s and s["totp_enabled"] == "1")})
     conn.close()
     return result
+
+
+@app.post("/admin/users/{username}/approve")
+def approve_user(username: str, user=Depends(admin_only)):
+    conn = get_db()
+    target = conn.execute("SELECT id, status FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    conn.execute("UPDATE users SET status='active' WHERE username=?", (username,))
+    conn.commit()
+    conn.close()
+    log_event(user["id"], user["username"], "user_approved", f"approved {username}")
+    return {"status": "approved", "username": username}
+
+
+@app.post("/admin/users/{username}/reject")
+def reject_user(username: str, user=Depends(admin_only)):
+    conn = get_db()
+    target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    conn.execute("DELETE FROM users WHERE username=?", (username,))
+    conn.commit()
+    conn.close()
+    log_event(user["id"], user["username"], "user_rejected", f"rejected and deleted {username}")
+    return {"status": "rejected", "username": username}
 
 @app.post("/admin/users")
 def create_user(body: UserCreate, user=Depends(admin_only)):
