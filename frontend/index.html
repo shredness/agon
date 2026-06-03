@@ -278,7 +278,7 @@
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label>Username</label>
-        <input type="text" id="reg-username" autocomplete="username" style="width:100%;" placeholder="choose a username" onkeydown="if(event.key==='Enter')doRegister()">
+        <input type="text" id="reg-username" autocomplete="username" style="width:100%;" placeholder="username or email address" onkeydown="if(event.key==='Enter')doRegister()">
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label>Password</label>
@@ -1089,7 +1089,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.4.8';
+const APP_VERSION = '0.4.9';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4368,6 +4368,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.4.9': [
+    'Auth: email addresses now accepted as usernames during registration',
+  ],
   '0.4.8': [
     'Auth: registration requires admin approval — new accounts land in pending state until approved',
     'Admin: pending approval queue shown at top of Admin panel with Approve and Reject buttons',

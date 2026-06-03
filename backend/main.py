@@ -488,8 +488,12 @@ def register(body: UserRegister, request: Request):
         raise HTTPException(status_code=400, detail="Username is required")
     if len(username) < 3:
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
-    if not username.replace("_","").replace("-","").isalnum():
-        raise HTTPException(status_code=400, detail="Username may only contain letters, numbers, hyphens, and underscores")
+    # Allow plain usernames OR email addresses
+    import re as _re
+    plain_ok = bool(_re.match(r'^[a-z0-9][a-z0-9_\-]*$', username))
+    email_ok = bool(_re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', username))
+    if not plain_ok and not email_ok:
+        raise HTTPException(status_code=400, detail="Username may only contain letters, numbers, hyphens, and underscores — or use a valid email address")
 
     validate_password(body.password)
 
