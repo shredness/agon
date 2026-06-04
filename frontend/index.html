@@ -207,7 +207,7 @@
   .insights-empty { text-align: center; color: var(--text3); font-size: 13px; padding: 40px 20px; }
 
   /* ── Mobile landscape optimisations ── */
-  @media (max-height: 500px) and (orientation: landscape) {
+  @media (max-height: 600px) and (orientation: landscape) {
     /* Collapse tab bar to icons only */
     .tab-label { display: none; }
     .tab { padding: 5px 10px; }
@@ -306,7 +306,7 @@
   <div class="modal" style="max-width:400px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <h3 style="margin:0;">Set up two-factor auth</h3>
-      <button onclick="closeMfaSetup()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text2);padding:0;">✕</button>
+      <button onclick="closeMfaSetup()" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text2);padding:4px 10px;border:1px solid var(--border);border-radius:20px;">Close</button>
     </div>
     <div id="mfa-setup-body">
       <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code to confirm.</p>
@@ -325,7 +325,7 @@
       </div>
       <div id="mfa-setup-error" style="display:none;color:var(--red-text);font-size:13px;margin-bottom:12px;text-align:center;"></div>
       <div class="modal-footer">
-        <button class="btn btn-sm" onclick="closeMfaSetup()">Cancel</button>
+        <button class="btn btn-sm" onclick="closeMfaSetup()">Close</button>
         <button class="btn btn-primary btn-sm" onclick="confirmMfaEnable()">Enable 2FA</button>
       </div>
     </div>
@@ -403,7 +403,7 @@
       </div>
       <div id="hist-count" style="font-size:12px;color:var(--text2);margin-top:8px;"></div>
     </div>
-    <div class="card" style="padding:0;"><div id="history-list"></div></div>
+    <div class="card" style="padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch;"><div id="history-list"></div></div>
   </div>
 
   <!-- TREND -->
@@ -467,7 +467,9 @@
     <!-- Phase macro history -->
     <div class="card" style="padding:16px;" id="phase-macro-card" style="display:none;">
       <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Macro targets by phase</div>
-      <div id="phase-macro-output" style="font-size:13px;color:var(--text3);">Loading...</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="phase-macro-output" style="font-size:13px;color:var(--text3);min-width:480px;">Loading...</div>
+      </div>
     </div>
 
   </div>
@@ -501,7 +503,7 @@
         <input type="text" id="phase-notes" style="width:100%;" placeholder="e.g. Pre-contest cut">
       </div>
       <div class="modal-footer">
-        <button class="btn btn-sm" onclick="closePhaseModal()">Cancel</button>
+        <button class="btn btn-sm" onclick="closePhaseModal()">Close</button>
         <button class="btn btn-primary btn-sm" onclick="savePhase()">Save phase</button>
       </div>
     </div>
@@ -818,7 +820,7 @@
     </div>
     <div id="nu-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:10px;"></div>
     <div class="modal-footer">
-      <button class="btn btn-sm" onclick="closeNewUserModal()">Cancel</button>
+      <button class="btn btn-sm" onclick="closeNewUserModal()">Close</button>
       <button class="btn btn-primary btn-sm" onclick="confirmNewUser()">Create</button>
     </div>
   </div>
@@ -833,7 +835,7 @@
     <div class="form-group" style="margin-bottom:12px;"><label>Confirm password</label><input type="password" id="chpw-confirm" style="width:100%;" placeholder="••••••••" onkeydown="if(event.key==='Enter')confirmChpw()"></div>
     <div id="chpw-error" style="display:none; color:var(--red-text); font-size:13px; margin-bottom:10px;"></div>
     <div class="modal-footer">
-      <button class="btn btn-sm" onclick="closeChpwModal()">Cancel</button>
+      <button class="btn btn-sm" onclick="closeChpwModal()">Close</button>
       <button class="btn btn-primary btn-sm" onclick="confirmChpw()">Update password</button>
     </div>
   </div>
@@ -844,7 +846,7 @@
   <div class="modal" style="max-width:720px;max-height:90vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <h3 style="margin:0;">Settings</h3>
-      <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text2);padding:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">✕</button>
+      <button onclick="closeSettings()" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text2);padding:4px 10px;border:1px solid var(--border);border-radius:20px;">Close</button>
     </div>
 
     <!-- ── Profile ── -->
@@ -1031,7 +1033,7 @@
     <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Select all that apply for this exercise.</p>
     <div id="muscle-chip-container" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
     <div class="modal-footer">
-      <button class="btn btn-sm" onclick="closeMusclePicker()">Cancel</button>
+      <button class="btn btn-sm" onclick="closeMusclePicker()">Close</button>
       <button class="btn btn-primary btn-sm" onclick="confirmMusclePicker()">Save</button>
     </div>
   </div>
@@ -1069,7 +1071,7 @@
     </div>
     <div id="new-ex-formula" style="font-size:12px;color:var(--text3);font-style:italic;margin-top:4px;"></div>
     <div class="modal-footer">
-      <button class="btn btn-sm" onclick="closeAddExModal()">Cancel</button>
+      <button class="btn btn-sm" onclick="closeAddExModal()">Close</button>
       <button class="btn btn-primary btn-sm" onclick="confirmAddEx()">Add exercise</button>
     </div>
   </div>
@@ -1091,7 +1093,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.5.1';
+const APP_VERSION = '0.5.3';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1335,7 +1337,7 @@ function applyRoleUI() {
     badge.id = 'user-badge';
     badge.style.cssText = 'display:flex;align-items:center;gap:8px;';
     badge.innerHTML = `
-      <span onclick="openSettings()" title="Settings &amp; Profile" style="font-size:12px;color:var(--text2);cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--border);">${escapeHtml(currentUser.username)}</span>
+      <span onclick="openSettings()" title="Settings &amp; Profile" style="font-size:12px;color:var(--text2);cursor:pointer;padding:5px 12px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);white-space:nowrap;">${escapeHtml(currentUser.username)}</span>
       ${isDemo ? '<span style="font-size:10px;background:var(--accent-bg);color:var(--accent-text);padding:2px 7px;border-radius:20px;font-weight:600;">DEMO</span>' : ''}
       <button class="theme-toggle" onclick="logout()" title="Sign out" style="font-size:13px;">↩</button>
     `;
@@ -3045,7 +3047,7 @@ function renderEventLog() {
     return;
   }
 
-  body.innerHTML = filtered.slice(0, 100).map(e => {
+  body.innerHTML = filtered.slice(0, 10).map(e => {
     const meta = EVENT_LABELS[e.event_type] || { label: e.event_type, color: 'var(--text2)' };
     const when = (e.created_at || '').slice(0,16).replace('T', ' ');
     return `<tr style="border-bottom:0.5px solid var(--border);">
@@ -4370,6 +4372,16 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.5.3': [
+    'Header: username now displayed in a pill matching the other header buttons',
+    'UI: all modal dismiss buttons standardized to "Close"',
+  ],
+  '0.5.2': [
+    'Mobile: landscape mode now triggers at max-height 600px (was 500px)',
+    'Mobile: History exercise list scrolls horizontally',
+    'Mobile: Trend macro targets by phase table scrolls horizontally',
+    'Admin: Recent activity capped at last 10 entries',
+  ],
   '0.5.1': [
     'Admin: user table now scrolls horizontally on mobile instead of overflowing',
   ],
@@ -5071,7 +5083,7 @@ function parseMarkdown(text) {
   <div class="modal" style="max-width:480px;max-height:88vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
       <h3 style="margin:0;">What's new in v<span id="wn-version"></span></h3>
-      <button class="btn btn-sm" onclick="closeWhatsNew()">Got it</button>
+      <button class="btn btn-sm" onclick="closeWhatsNew()">Close</button>
     </div>
     <div id="wn-content"></div>
   </div>
