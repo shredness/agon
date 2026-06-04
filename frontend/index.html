@@ -219,15 +219,17 @@
     #trendChart { height: 200px !important; }
   }
   /* Class-based fallback for browsers that don't refire orientation media queries on rotation */
-  html.landscape .tab-label { display: none; }
-  html.landscape .tab { padding: 5px 10px; }
-  html.landscape .app-header { padding: 6px 0; }
-  html.landscape .subtitle { display: none; }
-  html.landscape .card { padding: 10px; }
-  html.landscape .metric { padding: 8px 10px; }
-  html.landscape .metric-value { font-size: 22px; }
-  html.landscape .tab-panel { padding-top: 4px; }
-  html.landscape #trendChart { height: 200px !important; }
+  @media (max-height: 600px) {
+    html.landscape .tab-label { display: none; }
+    html.landscape .tab { padding: 5px 10px; }
+    html.landscape .app-header { padding: 6px 0; }
+    html.landscape .subtitle { display: none; }
+    html.landscape .card { padding: 10px; }
+    html.landscape .metric { padding: 8px 10px; }
+    html.landscape .metric-value { font-size: 22px; }
+    html.landscape .tab-panel { padding-top: 4px; }
+    html.landscape #trendChart { height: 200px !important; }
+  }
 </style>
 </head>
 <body>
@@ -1097,7 +1099,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.5.4';
+const APP_VERSION = '0.5.5';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4376,6 +4378,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.5.5': [
+    'Mobile: landscape mode uses matchMedia change listener — reliably fires on rotation without repaint flash',
+  ],
   '0.5.4': [
     'Mobile: landscape mode now triggers reliably on device rotation — JS orientation listener added as fallback for Chrome Android',
   ],
@@ -5102,23 +5107,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Force layout reflow on device rotation so landscape CSS triggers correctly
-function handleOrientationChange() {
-  document.documentElement.classList.remove('landscape', 'portrait');
-  // Small defer lets the browser finish the rotation resize before we read dimensions
-  setTimeout(() => {
-    const isLandscape = window.innerWidth > window.innerHeight;
-    document.documentElement.classList.add(isLandscape ? 'landscape' : 'portrait');
-    // Nudge the body to force a repaint — fixes Chrome Android not re-evaluating media queries
-    document.body.style.display = 'none';
-    void document.body.offsetHeight;
-    document.body.style.display = '';
-  }, 100);
+// Landscape mode — class-based, fires on rotation
+function applyOrientation() {
+  const landscape = window.matchMedia('(orientation: landscape)').matches;
+  document.documentElement.classList.toggle('landscape', landscape);
+  document.documentElement.classList.toggle('portrait', !landscape);
 }
-
-window.addEventListener('orientationchange', handleOrientationChange);
-window.addEventListener('resize', handleOrientationChange);
-handleOrientationChange();
+applyOrientation();
+window.matchMedia('(orientation: landscape)').addEventListener('change', applyOrientation);
+window.addEventListener('resize', applyOrientation);
 </script>
 </body>
 </html>
