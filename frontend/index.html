@@ -208,22 +208,26 @@
 
   /* ── Mobile landscape optimisations ── */
   @media (max-height: 600px) and (orientation: landscape) {
-    /* Collapse tab bar to icons only */
     .tab-label { display: none; }
     .tab { padding: 5px 10px; }
-    /* Tighten header */
     .app-header { padding: 6px 0; }
     .subtitle { display: none; }
-    /* Reduce card padding */
     .card { padding: 10px; }
-    /* Tighten metric grid */
     .metric { padding: 8px 10px; }
     .metric-value { font-size: 22px; }
-    /* Shrink tab panels top margin */
     .tab-panel { padding-top: 4px; }
-    /* Keep chart usable */
     #trendChart { height: 200px !important; }
   }
+  /* Class-based fallback for browsers that don't refire orientation media queries on rotation */
+  html.landscape .tab-label { display: none; }
+  html.landscape .tab { padding: 5px 10px; }
+  html.landscape .app-header { padding: 6px 0; }
+  html.landscape .subtitle { display: none; }
+  html.landscape .card { padding: 10px; }
+  html.landscape .metric { padding: 8px 10px; }
+  html.landscape .metric-value { font-size: 22px; }
+  html.landscape .tab-panel { padding-top: 4px; }
+  html.landscape #trendChart { height: 200px !important; }
 </style>
 </head>
 <body>
@@ -1093,7 +1097,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.5.3';
+const APP_VERSION = '0.5.4';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4372,6 +4376,9 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.5.4': [
+    'Mobile: landscape mode now triggers reliably on device rotation — JS orientation listener added as fallback for Chrome Android',
+  ],
   '0.5.3': [
     'Header: username now displayed in a pill matching the other header buttons',
     'UI: all modal dismiss buttons standardized to "Close"',
@@ -5094,6 +5101,24 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+// Force layout reflow on device rotation so landscape CSS triggers correctly
+function handleOrientationChange() {
+  document.documentElement.classList.remove('landscape', 'portrait');
+  // Small defer lets the browser finish the rotation resize before we read dimensions
+  setTimeout(() => {
+    const isLandscape = window.innerWidth > window.innerHeight;
+    document.documentElement.classList.add(isLandscape ? 'landscape' : 'portrait');
+    // Nudge the body to force a repaint — fixes Chrome Android not re-evaluating media queries
+    document.body.style.display = 'none';
+    void document.body.offsetHeight;
+    document.body.style.display = '';
+  }, 100);
+}
+
+window.addEventListener('orientationchange', handleOrientationChange);
+window.addEventListener('resize', handleOrientationChange);
+handleOrientationChange();
 </script>
 </body>
 </html>
