@@ -15,7 +15,9 @@ services:
     environment:
       - DB_PATH=/data/sessions.db
       - SECRET_KEY=f7K#mP2$nX9qRvL4wZ8jYtB6cHsE3uA5dGiNpW1oF0yCkVbMeQhTxJlUzDrS
-      # Set to "true" to allow public self-registration (guest role)
+      # Comma-separated list of allowed CORS origins
+      - ALLOWED_ORIGINS=https://agon.savo.us,http://localhost,http://localhost:3800
+      # Set to "true" to allow public self-registration (guest role, pending admin approval)
       - ALLOW_REGISTRATION=false
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]

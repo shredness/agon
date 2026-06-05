@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -29,6 +29,14 @@ DB_PATH           = os.environ.get("DB_PATH", "/data/sessions.db")
 SECRET_KEY        = os.environ.get("SECRET_KEY", "agon-change-this-in-production")
 ALGORITHM         = "HS256"
 TOKEN_EXPIRE_DAYS = 30
+
+# Refuse to run with the known default secret unless explicitly allowed (e.g. local dev)
+_DEFAULT_SECRET = "agon-change-this-in-production"
+if SECRET_KEY == _DEFAULT_SECRET and os.environ.get("ALLOW_DEFAULT_SECRET", "false").lower() != "true":
+    raise RuntimeError(
+        "SECRET_KEY is still the insecure default. Set a strong SECRET_KEY env var, "
+        "or set ALLOW_DEFAULT_SECRET=true for local development only."
+    )
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
@@ -340,7 +348,7 @@ def encrypt_secret(plain: str) -> str:
 def decrypt_secret(token: str) -> str:
     try:
         return _fernet().decrypt(token.encode()).decode()
-    except (InvalidToken, Exception):
+    except InvalidToken:
         return ""
 
 def create_token(data: dict):
@@ -746,9 +754,16 @@ def create_user(body: UserCreate, user=Depends(admin_only)):
 
 @app.delete("/admin/users/{username}")
 def delete_user(username: str, user=Depends(admin_only)):
-    if username == ADMIN_USER:
-        raise HTTPException(status_code=400, detail="Cannot delete system accounts")
+    if username == user["username"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
     conn = get_db()
+    target = conn.execute("SELECT role FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    if target["role"] == "admin":
+        conn.close()
+        raise HTTPException(status_code=400, detail="Cannot delete an admin account")
     conn.execute("DELETE FROM users WHERE username=?", (username,))
     conn.commit()
     conn.close()
@@ -759,6 +774,10 @@ def change_password(username: str, body: dict, user=Depends(admin_only)):
     new_pw = body.get("password", "")
     validate_password(new_pw)
     conn = get_db()
+    target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
     conn.execute("UPDATE users SET hashed_pw=? WHERE username=?",
                  (hash_password(new_pw), username))
     conn.commit()
@@ -1994,14 +2013,32 @@ def revoke_external_key(user=Depends(current_user)):
     return {"status": "revoked"}
 
 @app.get("/external/data")
-def get_external_data(key: str):
-    """Public read-only endpoint for external consumers. Authenticated by external API key."""
+def get_external_data(request: Request, key: Optional[str] = None,
+                      x_api_key: Optional[str] = Header(default=None),
+                      authorization: Optional[str] = Header(default=None)):
+    """Public read-only endpoint for external consumers.
+    Authenticated by external API key, supplied via (in order of preference):
+      - Authorization: Bearer <key>
+      - X-API-Key: <key>
+      - ?key=<key>  (deprecated — avoid, leaks into logs)
+    """
+    api_key = None
+    if authorization and authorization.lower().startswith("bearer "):
+        api_key = authorization[7:].strip()
+    elif x_api_key:
+        api_key = x_api_key.strip()
+    elif key:
+        api_key = key.strip()
+
+    if not api_key:
+        raise HTTPException(status_code=401, detail="API key required (use Authorization: Bearer header)")
+
     conn = get_db()
     try:
         row = conn.execute(
             "SELECT u.id, u.username, us.external_api_key FROM users u "
             "JOIN user_settings us ON us.user_id = u.id "
-            "WHERE us.external_api_key=?", (key,)
+            "WHERE us.external_api_key=?", (api_key,)
         ).fetchone()
     except Exception:
         row = None

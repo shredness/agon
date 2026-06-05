@@ -1,5 +1,6 @@
 FROM nginx:alpine
 
+COPY ratelimit.conf /etc/nginx/conf.d/00-ratelimit.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY index.html /usr/share/nginx/html/index.html
 COPY sw.js /usr/share/nginx/html/sw.js

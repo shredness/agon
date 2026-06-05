@@ -1099,7 +1099,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.5.5';
+const APP_VERSION = '0.6.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -3119,7 +3119,7 @@ async function loadUsers() {
         <td style="padding:9px 8px;white-space:nowrap;">
           ${mfaBtn}
           <button class="btn btn-sm" onclick="openChpwModal('${escapeHtml(u.username)}')" title="Change password" style="margin-right:4px;">🔑</button>
-          ${u.username !== 'manny' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">✕</button>` : ''}
+          ${(u.role !== 'admin' && u.username !== currentUser?.username) ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">✕</button>` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -4378,6 +4378,12 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.6.0': [
+    'Security: rate limiting on login, registration, and external data endpoints',
+    'Security: external API key now passed via Authorization header instead of URL parameter',
+    'Security: app refuses to start with the default SECRET_KEY in production',
+    'Admin: cannot delete admin accounts or your own account; password reset verifies user exists',
+  ],
   '0.5.5': [
     'Mobile: landscape mode uses matchMedia change listener — reliably fires on rotation without repaint flash',
   ],
@@ -4566,10 +4572,12 @@ async function generateExtKey() {
     valEl.textContent = d.key;
     valEl.style.display = 'block';
     statusEl.textContent = 'New key generated — copy it now, it will not be shown again in full.';
-    const dataUrl = window.location.origin + '/api/external/data?key=' + d.key;
+    const endpoint = window.location.origin + '/api/external/data';
     if (urlEl) {
-      urlEl.innerHTML = 'Endpoint: <span style="font-family:monospace;font-size:11px;color:var(--text);">' +
-        escapeHtml(dataUrl) + '</span>';
+      urlEl.innerHTML =
+        'Endpoint: <span style="font-family:monospace;font-size:11px;color:var(--text);">' + escapeHtml(endpoint) + '</span><br>' +
+        'Auth header: <span style="font-family:monospace;font-size:11px;color:var(--text);">Authorization: Bearer ' + escapeHtml(d.key) + '</span><br>' +
+        '<span style="font-size:10px;color:var(--text3);">Example: curl -H "Authorization: Bearer ' + escapeHtml(d.key) + '" ' + escapeHtml(endpoint) + '</span>';
     }
     revokeBtn.style.display = '';
     showToast('Key generated');
