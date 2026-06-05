@@ -3,10 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Optional
-import sqlite3, json, os
+import sqlite3, json, os, re
 import httpx
 import pyotp, qrcode, io, base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as _date
 from jose import JWTError, jwt
 import bcrypt as _bcrypt
 
@@ -40,11 +40,9 @@ if SECRET_KEY == _DEFAULT_SECRET and os.environ.get("ALLOW_DEFAULT_SECRET", "fal
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-ADMIN_USER        = os.environ.get("ADMIN_USER", "manny")
-ADMIN_PASS        = os.environ.get("ADMIN_PASS", "pR0m3th3us")
+ADMIN_USER         = os.environ.get("ADMIN_USER", "manny")
+ADMIN_PASS         = os.environ.get("ADMIN_PASS", "pR0m3th3us")
 ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "false").lower() == "true"
-DEMO_USER  = "demo"
-DEMO_PASS  = "demo"
 
 
 # ── DB ────────────────────────────────────────────────────────
@@ -148,10 +146,10 @@ def init_db():
             (ADMIN_USER, _bcrypt.hashpw(ADMIN_PASS.encode(), _bcrypt.gensalt()).decode(), "admin")
         )
     # Seed demo
-    if not conn.execute("SELECT id FROM users WHERE username=?", (DEMO_USER,)).fetchone():
+    if not conn.execute("SELECT id FROM users WHERE username=?", ("demo",)).fetchone():
         conn.execute(
             "INSERT INTO users (username, hashed_pw, role) VALUES (?,?,?)",
-            (DEMO_USER, _bcrypt.hashpw(DEMO_PASS.encode(), _bcrypt.gensalt()).decode(), "demo")
+            ("demo", _bcrypt.hashpw(b"demo", _bcrypt.gensalt()).decode(), "demo")
         )
 
     conn.execute("""
@@ -317,7 +315,6 @@ def hash_password(plain: str) -> str:
 
 def validate_password(pw: str):
     """Raise HTTPException if password doesn't meet complexity requirements."""
-    import re
     errors = []
     if len(pw) < 10:
         errors.append("at least 10 characters")
@@ -406,7 +403,7 @@ class ExerciseData(BaseModel):
     tool: Optional[str] = "Bar"
     mult: Optional[float] = 2.0
     isBW: Optional[bool] = False
-    time: Optional[float] = None  # kept for legacy compat, ignored in calc
+    time: Optional[float] = None  # legacy field — per-set time is now in SetData.time
 
 class ExerciseIn(BaseModel):
     name: str
@@ -467,6 +464,13 @@ class AISettingsIn(BaseModel):
 class MFAVerify(BaseModel):
     code: str
 
+class PasswordSelfChange(BaseModel):
+    current_password: str
+    new_password: str
+
+class PasswordChange(BaseModel):
+    password: str
+
 class UserRegister(BaseModel):
     username: str
     password: str
@@ -494,8 +498,7 @@ def register(body: UserRegister, request: Request):
     username = body.username.strip().lower()
     if not username:
         raise HTTPException(status_code=400, detail="Email address is required")
-    import re as _re
-    if not _re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', username):
+    if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', username):
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
 
     validate_password(body.password)
@@ -696,6 +699,26 @@ def me(user=Depends(current_user)):
             "mfa_enabled": mfa_enabled}
 
 
+@app.put("/auth/password")
+def change_own_password(body: PasswordSelfChange, user=Depends(current_user)):
+    """Any authenticated user can change their own password by providing their current one."""
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot change their password")
+    conn = get_db()
+    stored = conn.execute("SELECT hashed_pw FROM users WHERE id=?", (user["id"],)).fetchone()
+    conn.close()
+    if not stored or not verify_password(body.current_password, stored["hashed_pw"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    validate_password(body.new_password)
+    conn = get_db()
+    conn.execute("UPDATE users SET hashed_pw=? WHERE id=?",
+                 (hash_password(body.new_password), user["id"]))
+    conn.commit()
+    conn.close()
+    log_event(user["id"], user["username"], "password_changed", "self-service")
+    return {"status": "updated"}
+
+
 # ── Admin ─────────────────────────────────────────────────────
 @app.get("/admin/users")
 def list_users(user=Depends(admin_only)):
@@ -770,16 +793,15 @@ def delete_user(username: str, user=Depends(admin_only)):
     return {"status": "deleted", "username": username}
 
 @app.put("/admin/users/{username}/password")
-def change_password(username: str, body: dict, user=Depends(admin_only)):
-    new_pw = body.get("password", "")
-    validate_password(new_pw)
+def change_password(username: str, body: PasswordChange, user=Depends(admin_only)):
+    validate_password(body.password)
     conn = get_db()
     target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
     if not target:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
     conn.execute("UPDATE users SET hashed_pw=? WHERE username=?",
-                 (hash_password(new_pw), username))
+                 (hash_password(body.password), username))
     conn.commit()
     conn.close()
     return {"status": "updated"}
@@ -1156,19 +1178,10 @@ def build_training_context(uid: int) -> str:
 
     lines = []
     # Load profile for richer AI context
-    try:
-        prof = conn.execute(
-            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw FROM user_settings WHERE user_id=?",
-            (uid,)
-        ).fetchone()
-    except Exception:
-        try:
-            prof = conn.execute(
-                "SELECT first_name, last_name, dob, gender, week_start FROM user_settings WHERE user_id=?",
-                (uid,)
-            ).fetchone()
-        except Exception:
-            prof = None
+    prof = conn.execute(
+        "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw FROM user_settings WHERE user_id=?",
+        (uid,)
+    ).fetchone()
 
     def prof_get(key, default=None):
         try:
@@ -1181,7 +1194,6 @@ def build_training_context(uid: int) -> str:
         age_str = ""
         if prof_get("dob"):
             try:
-                from datetime import date as _date
                 dob = datetime.strptime(prof_get("dob"), "%Y-%m-%d").date()
                 age_str = f", age {(_date.today().year - dob.year - ((_date.today().month, _date.today().day) < (dob.month, dob.day)))}"
             except Exception:
@@ -1840,7 +1852,6 @@ def delete_phase(phase_id: int, user=Depends(current_user)):
 
 @app.put("/phases/{phase_id}/close")
 def close_phase(phase_id: int, user=Depends(current_user)):
-    from datetime import date as _date
     today = _date.today().strftime("%Y-%m-%d")
     conn = get_db()
     conn.execute(

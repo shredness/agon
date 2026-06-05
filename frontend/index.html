@@ -1099,7 +1099,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -3815,6 +3815,7 @@ async function saveSettingsPw() {
     msg.textContent = text;
     msg.style.color = err ? 'var(--red-text)' : '#10B981';
     msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 3000);
   };
 
   if (!cur || !nw || !conf) { show('All three fields are required.', true); return; }
@@ -3823,17 +3824,9 @@ async function saveSettingsPw() {
   if (pwErr)                 { show(pwErr, true); return; }
 
   try {
-    // Re-authenticate to verify current password
-    const r = await fetch(API + '/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: currentUser.username, password: cur })
-    });
-    if (!r.ok) { show('Current password is incorrect.', true); return; }
-
-    await aiFetch('/admin/users/' + encodeURIComponent(currentUser.username) + '/password', {
+    await aiFetch('/auth/password', {
       method: 'PUT',
-      body: JSON.stringify({ password: nw })
+      body: JSON.stringify({ current_password: cur, new_password: nw })
     });
     show('✓ Password updated.', false);
     document.getElementById('s-pw-cur').value = '';
@@ -4378,6 +4371,11 @@ function closeGuide() {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.6.1': [
+    'Code: imports consolidated to top-level (re, date), dead fallback query removed from AI context builder',
+    'Security: self-service password change now uses dedicated /auth/password endpoint — guests can now change their own password without admin privileges',
+    'Code: change_password endpoint uses proper Pydantic model instead of raw dict',
+  ],
   '0.6.0': [
     'Security: rate limiting on login, registration, and external data endpoints',
     'Security: external API key now passed via Authorization header instead of URL parameter',
