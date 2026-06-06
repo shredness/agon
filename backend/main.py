@@ -174,6 +174,12 @@ def init_db():
         conn.commit()
     except Exception:
         pass
+    # Migrate: add rep_trigger_override to exercises
+    try:
+        conn.execute("ALTER TABLE exercises ADD COLUMN rep_trigger_override INTEGER DEFAULT NULL")
+        conn.commit()
+    except Exception:
+        pass
 
     # Per-user AI settings, profile info, and preferences
     conn.execute("""
@@ -201,7 +207,8 @@ def init_db():
                          ('external_api_key','NULL'),
                          ('last_seen_version',"'0.0.0'"),
                          ('totp_secret','NULL'),
-                         ('totp_enabled',"'0'")]:
+                         ('totp_enabled',"'0'"),
+                         ('rep_trigger',"'50'")]:
         try:
             conn.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT {default}")
             conn.commit()
@@ -415,6 +422,7 @@ class ExerciseIn(BaseModel):
     load_hint: Optional[str] = ''
     is_bw: bool = False
     sort_order: int = 0
+    rep_trigger_override: Optional[int] = None
 
 class SessionIn(BaseModel):
     date: str
@@ -442,6 +450,7 @@ class ProfileIn(BaseModel):
     onboarded:          Optional[str] = None
     last_seen_version:  Optional[str] = None
     external_api_key:   Optional[str] = None
+    rep_trigger:        Optional[int] = None    # cumulative rep threshold (default 50)
 
 class ProtocolIn(BaseModel):
     name:       str
@@ -960,7 +969,9 @@ def get_exercise_bank(user=Depends(current_user)):
     return [{"id":r["id"],"name":r["name"],"alias":r["alias"],"tool":r["tool"],
              "mult":r["mult"],"muscles":json.loads(r["muscles"]),"day":r["day"],
              "loadHint":r["load_hint"],"isBW":bool(r["is_bw"]),"sortOrder":r["sort_order"],
-             "createdBy":r["created_by"]} for r in rows]
+             "createdBy":r["created_by"],
+             "repTriggerOverride": r["rep_trigger_override"] if r["rep_trigger_override"] else None
+             } for r in rows]
 
 @app.post("/exercises/bank")
 def add_exercise(body: ExerciseIn, user=Depends(current_user)):
@@ -971,14 +982,16 @@ def add_exercise(body: ExerciseIn, user=Depends(current_user)):
     conn = get_db()
     try:
         conn.execute("""
-            INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by, rep_trigger_override)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(name) DO UPDATE SET
                 alias=excluded.alias, tool=excluded.tool, mult=excluded.mult,
                 muscles=excluded.muscles, day=excluded.day, load_hint=excluded.load_hint,
-                is_bw=excluded.is_bw, sort_order=excluded.sort_order
+                is_bw=excluded.is_bw, sort_order=excluded.sort_order,
+                rep_trigger_override=excluded.rep_trigger_override
         """, (body.name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
-              body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"]))
+              body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"],
+              body.rep_trigger_override))
         conn.commit()
     except Exception as e:
         conn.close()
@@ -998,15 +1011,17 @@ def update_exercise(ex_name: str, body: ExerciseIn, user=Depends(current_user)):
             conn.close()
             raise HTTPException(status_code=403, detail="You can only edit exercises you created")
         result = conn.execute(
-            "UPDATE exercises SET alias=?, tool=?, mult=?, muscles=?, day=?, load_hint=?, is_bw=?, sort_order=? WHERE name=?",
+            "UPDATE exercises SET alias=?, tool=?, mult=?, muscles=?, day=?, load_hint=?, is_bw=?, sort_order=?, rep_trigger_override=? WHERE name=?",
             (body.alias, body.tool, body.mult, json.dumps(body.muscles),
-             body.day, body.load_hint, int(body.is_bw), body.sort_order, ex_name))
+             body.day, body.load_hint, int(body.is_bw), body.sort_order,
+             body.rep_trigger_override, ex_name))
     else:
         # New exercise — insert with ownership
         conn.execute(
-            "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by, rep_trigger_override) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (ex_name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
-             body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"]))
+             body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"],
+             body.rep_trigger_override))
     conn.commit()
     conn.close()
     return {"status": "upserted"}
@@ -1027,6 +1042,51 @@ def delete_exercise(ex_name: str, user=Depends(current_user)):
     conn.commit()
     conn.close()
     return {"status": "deleted"}
+
+
+@app.get("/exercises/{ex_name}/set-curve")
+def get_set_curve(ex_name: str, user=Depends(current_user)):
+    """Per-set rep data for fixed-load accessory blocks (2–9 sets, all same load ±0.5 lbs)."""
+    uid = data_user_id(user)
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT date, exercises FROM sessions WHERE user_id=? ORDER BY date ASC", (uid,)
+    ).fetchall()
+    conn.close()
+
+    curve_sessions = []
+    load_history   = []
+
+    for row in rows:
+        try:
+            exs = json.loads(row["exercises"])
+        except Exception:
+            continue
+        for ex in exs:
+            if ex.get("name", "").lower() != ex_name.lower():
+                continue
+            sets = ex.get("sets", [])
+            if len(sets) < 2 or len(sets) >= 10:
+                continue
+            loads = [s.get("trueLbs") or s.get("rawLoad") or 0 for s in sets]
+            if not all(abs(l - loads[0]) < 0.5 for l in loads):
+                continue
+            reps_per_set = [s.get("reps", 0) for s in sets]
+            total_reps   = sum(reps_per_set)
+            block_load   = round(loads[0], 1)
+            curve_sessions.append({
+                "date":         row["date"],
+                "load":         block_load,
+                "reps_per_set": reps_per_set,
+                "total_reps":   total_reps,
+                "set_count":    len(sets),
+                "floor_rep":    min(reps_per_set),
+                "opening_rep":  reps_per_set[0] if reps_per_set else 0,
+            })
+            load_history.append({"date": row["date"], "load": block_load})
+
+    return {"exercise": ex_name, "sessions": curve_sessions, "load_history": load_history}
+
 
 @app.get("/exercises/logged")
 def get_logged_exercises(user=Depends(current_user)):
@@ -1075,6 +1135,7 @@ def get_profile(user=Depends(current_user)):
         "activity_level":   row["activity_level"]   if "activity_level"   in row.keys() else "1.55",
         "onboarded":        row["onboarded"]        if "onboarded"        in row.keys() else "0",
         "last_seen_version": row["last_seen_version"] if "last_seen_version" in row.keys() else "0.0.0",
+        "rep_trigger":      int(row["rep_trigger"]) if "rep_trigger" in row.keys() and row["rep_trigger"] else 50,
     }
 
 @app.post("/profile")
@@ -1096,10 +1157,12 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
                 activity_level=COALESCE(?,activity_level),
                 onboarded=COALESCE(?,onboarded),
                 last_seen_version=COALESCE(?,last_seen_version),
+                rep_trigger=COALESCE(?,rep_trigger),
                 updated_at=datetime('now')
             WHERE user_id=?
         """, (body.first_name, body.last_name, body.dob, body.gender, body.week_start,
-                body.height_in, body.target_bw, body.activity_level, body.onboarded, body.last_seen_version, user["id"]))
+                body.height_in, body.target_bw, body.activity_level, body.onboarded,
+                body.last_seen_version, body.rep_trigger, user["id"]))
     else:
         conn.execute("""
             INSERT INTO user_settings (user_id, first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded)

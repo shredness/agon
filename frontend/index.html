@@ -633,6 +633,31 @@
         </table>
       </div>
     </div>
+    <div class="card" style="padding:16px;" id="progress-curve-card" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <span class="section-label" style="margin-bottom:0;">Block rep curve</span>
+        <span id="curve-trigger-badge" style="display:none;font-size:11px;padding:2px 10px;border-radius:20px;background:rgba(74,222,128,0.15);color:var(--green);font-weight:600;">👑 Trigger hit last session</span>
+      </div>
+      <div id="curve-load-info" style="font-size:12px;color:var(--text3);margin-bottom:12px;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Last session — reps per set</div>
+      <div id="curve-set-bars" style="display:flex;gap:6px;align-items:flex-end;height:80px;margin-bottom:16px;"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Total reps per session <span id="curve-threshold-label" style="font-weight:400;color:var(--text3);"></span></div>
+      <div style="position:relative;width:100%;height:160px;margin-bottom:16px;">
+        <canvas id="curveTotalChart"></canvas>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Set 1 reps — adaptation trend</div>
+      <div style="position:relative;width:100%;height:120px;margin-bottom:16px;">
+        <canvas id="curveOpeningChart"></canvas>
+      </div>
+      <div id="curve-reset-section" style="display:none;">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Load history — reset arc</div>
+        <div id="curve-reset-info" style="font-size:12px;color:var(--text2);padding:10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border);"></div>
+      </div>
+      <div id="curve-floor-warning" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:6px;font-size:12px;color:var(--red-text);">
+        ⚠️ One or more sets dropped below 4 reps last session — load may have jumped too far.
+      </div>
+    </div>
+
     <div class="card" style="padding:16px;" id="progress-vol-card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
         <span class="section-label" style="margin-bottom:0;">Session volume over time</span>
@@ -920,6 +945,10 @@
         <option value="1.9">Extremely active (twice daily)</option>
       </select>
     </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Rep accumulation trigger <span style="font-size:11px;color:var(--text3);">(default 50 — lower for smaller muscles, raise if needed)</span></label>
+      <input type="number" id="s-rep-trigger" min="10" max="200" step="1" value="50" style="width:100px;">
+    </div>
     <button class="btn btn-sm" onclick="saveSettingsProfile()" style="margin-bottom:14px;">Save profile</button>
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
 
@@ -1099,7 +1128,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.7.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1112,6 +1141,7 @@ function escapeHtml(s) {
 
 let sessions = []; // always an array
 let exCount = 0, setCounts = {};
+let _userRepTrigger = 50; // loaded from profile, configurable per user
 let tC = null;
 
 function getToken() {
@@ -2433,7 +2463,9 @@ function getSessionTriggers(session) {
     if (!allSameLoad) continue;
 
     const totalReps = sets.reduce((sum, s) => sum + (s.reps || 0), 0);
-    const threshold = isBW ? 100 : 50;
+    const globalTrigger = (typeof _userRepTrigger !== 'undefined') ? _userRepTrigger : 50;
+    const exDef = EXERCISE_BANK.find(e => e.name === ex.name) || {};
+    const threshold = isBW ? 100 : (exDef.repTriggerOverride || globalTrigger);
 
     if (totalReps >= threshold) {
       triggered.push({ name: ex.name, reps: totalReps, load: loads[0], isBW });
@@ -2801,6 +2833,7 @@ async function loadProgress() {
   const name = document.getElementById('progress-exercise').value;
   renderCustomStats();
   renderStrengthMaintenance();
+  loadRepCurve(name);
   if (!name) return;
 
   let data = [];
@@ -3063,6 +3096,182 @@ function renderEventLog() {
       <td style="padding:6px 8px;color:var(--text3);font-size:11px;">${escapeHtml(e.detail || '')}</td>
     </tr>`;
   }).join('');
+}
+
+// ── Rep Curve Analytics ───────────────────────────────────────
+let _curveTotalChart = null;
+let _curveOpeningChart = null;
+
+async function loadRepCurve(exerciseName) {
+  const card = document.getElementById('progress-curve-card');
+  if (!card || !exerciseName) { if (card) card.style.display = 'none'; return; }
+
+  const hasFixedBlock = sessions.some(s =>
+    (s.exercises || []).some(ex => {
+      if (ex.name !== exerciseName) return false;
+      const sets = ex.sets || [];
+      if (sets.length < 2 || sets.length >= 10) return false;
+      const loads = sets.map(s => s.trueLbs || s.rawLoad || 0);
+      return loads.every(l => Math.abs(l - loads[0]) < 0.5);
+    })
+  );
+
+  if (!hasFixedBlock) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  try {
+    const data = await aiFetch('/exercises/' + encodeURIComponent(exerciseName) + '/set-curve');
+    renderRepCurve(data);
+  } catch(e) {
+    card.style.display = 'none';
+  }
+}
+
+function renderRepCurve(data) {
+  const { sessions: cs, exercise } = data;
+  if (!cs || !cs.length) return;
+
+  const globalTrigger = _userRepTrigger || 50;
+  const exDef = (typeof EXERCISE_BANK !== 'undefined') ? (EXERCISE_BANK.find(e => e.name === exercise) || {}) : {};
+  const threshold = exDef.repTriggerOverride || globalTrigger;
+
+  const last   = cs[cs.length - 1];
+  const recent = cs.slice(-12);
+
+  const loadInfo = document.getElementById('curve-load-info');
+  if (loadInfo) loadInfo.textContent =
+    `Current load: ${last.load} lbs  ·  ${last.set_count} sets  ·  ${last.total_reps} total reps last session`;
+
+  const badge = document.getElementById('curve-trigger-badge');
+  if (badge) badge.style.display = last.total_reps >= threshold ? 'inline-block' : 'none';
+
+  const thLabel = document.getElementById('curve-threshold-label');
+  if (thLabel) thLabel.textContent = `(target: ${threshold} reps)`;
+
+  const floorWarn = document.getElementById('curve-floor-warning');
+  if (floorWarn) floorWarn.style.display = last.floor_rep < 4 ? 'block' : 'none';
+
+  const barsEl = document.getElementById('curve-set-bars');
+  if (barsEl) {
+    const rps = last.reps_per_set;
+    const maxReps = Math.max(...rps, 1);
+    barsEl.innerHTML = rps.map((r, i) => {
+      const h = Math.round((r / maxReps) * 72);
+      const col = r < 4 ? '#ff6b6b' : (i === 0 ? '#4ade80' : 'var(--accent)');
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;">
+        <span style="font-size:10px;color:var(--text2);">${r}</span>
+        <div style="width:100%;height:${h}px;background:${col};border-radius:3px 3px 0 0;min-height:4px;"></div>
+        <span style="font-size:10px;color:var(--text3);">S${i+1}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const labels  = recent.map(s => s.date.slice(5));
+  const totals  = recent.map(s => s.total_reps);
+  const opening = recent.map(s => s.opening_rep);
+
+  if (_curveTotalChart) { _curveTotalChart.destroy(); _curveTotalChart = null; }
+  const totalCtx = document.getElementById('curveTotalChart');
+  if (totalCtx && typeof Chart !== 'undefined') {
+    _curveTotalChart = new Chart(totalCtx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Total reps',
+          data: totals,
+          backgroundColor: totals.map(t => t >= threshold ? 'rgba(74,222,128,0.7)' : 'rgba(229,90,43,0.6)'),
+          borderRadius: 3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } }, grid: { display: false } },
+          y: {
+            ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            suggestedMax: Math.max(threshold + 10, Math.max(...totals) + 5),
+          }
+        }
+      }
+    });
+    const origDraw = _curveTotalChart.draw.bind(_curveTotalChart);
+    _curveTotalChart.draw = function() {
+      origDraw();
+      const chart = _curveTotalChart;
+      if (!chart || !chart.scales || !chart.scales.y) return;
+      const ctx2 = chart.ctx;
+      const y = chart.scales.y.getPixelForValue(threshold);
+      ctx2.save();
+      ctx2.beginPath();
+      ctx2.setLineDash([4, 4]);
+      ctx2.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx2.lineWidth = 1;
+      ctx2.moveTo(chart.chartArea.left, y);
+      ctx2.lineTo(chart.chartArea.right, y);
+      ctx2.stroke();
+      ctx2.setLineDash([]);
+      ctx2.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx2.font = '10px sans-serif';
+      ctx2.fillText(threshold + ' target', chart.chartArea.right - 58, y - 4);
+      ctx2.restore();
+    };
+  }
+
+  if (_curveOpeningChart) { _curveOpeningChart.destroy(); _curveOpeningChart = null; }
+  const openCtx = document.getElementById('curveOpeningChart');
+  if (openCtx && typeof Chart !== 'undefined') {
+    _curveOpeningChart = new Chart(openCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Set 1 reps',
+          data: opening,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.1)',
+          borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        }
+      }
+    });
+  }
+
+  const resetSection = document.getElementById('curve-reset-section');
+  const resetInfo    = document.getElementById('curve-reset-info');
+  if (resetSection && resetInfo && cs.length >= 2) {
+    const loads = cs.map(s => s.load);
+    const peak  = Math.max(...loads);
+    const curr  = loads[loads.length - 1];
+    let resetIdx = null;
+    for (let i = loads.length - 1; i > 0; i--) {
+      if (loads[i] < loads[i-1]) { resetIdx = i; break; }
+    }
+    if (resetIdx !== null && curr < peak) {
+      const resetLoad = cs[resetIdx].load;
+      const resetDate = cs[resetIdx].date;
+      const pct = peak > resetLoad
+        ? Math.min(100, Math.round(((curr - resetLoad) / (peak - resetLoad)) * 100))
+        : 100;
+      resetSection.style.display = 'block';
+      resetInfo.innerHTML = `Reset from <strong>${resetLoad} lbs</strong> on ${resetDate} &nbsp;·&nbsp; Current: <strong>${curr} lbs</strong> &nbsp;·&nbsp; Peak: <strong>${peak} lbs</strong><br>
+        <div style="margin-top:6px;background:var(--border);border-radius:4px;height:6px;overflow:hidden;">
+          <div style="width:${Math.max(pct,2)}%;height:100%;background:var(--accent);border-radius:4px;transition:width 0.4s;"></div>
+        </div>
+        <span style="font-size:11px;color:var(--text3);">${pct}% rebuilt toward peak</span>`;
+    } else {
+      resetSection.style.display = 'none';
+    }
+  }
 }
 
 async function loadUsers() {
@@ -3649,6 +3858,9 @@ async function loadSettingsProfile() {
     }
     document.getElementById('s-target-bw').value  = p.target_bw   || '';
     document.getElementById('s-activity').value    = p.activity_level || '1.55';
+    _userRepTrigger = p.rep_trigger || 50;
+    const rtEl = document.getElementById('s-rep-trigger');
+    if (rtEl) rtEl.value = _userRepTrigger;
   } catch(e) { /* non-fatal */ }
 }
 
@@ -3675,6 +3887,7 @@ async function saveSettingsProfile() {
         height_in:  heightIn,
         target_bw:      parseFloat(document.getElementById('s-target-bw').value) || null,
         activity_level: document.getElementById('s-activity').value || '1.55',
+        rep_trigger:    parseInt(document.getElementById('s-rep-trigger')?.value) || 50,
       })
     });
     show('Profile saved.', false);
@@ -4361,16 +4574,36 @@ async function obSkip() {
   document.getElementById('onboarding-modal').style.display = 'none';
 }
 
-function openGuide() {
+function openGuide(tab) {
   document.getElementById('guide-modal').style.display = 'flex';
+  switchGuideTab(tab || 'howto');
 }
 function closeGuide() {
   document.getElementById('guide-modal').style.display = 'none';
+}
+function switchGuideTab(tab) {
+  ['howto','method'].forEach(t => {
+    const btn     = document.getElementById('guide-tab-' + t);
+    const content = document.getElementById('guide-content-' + t);
+    const active  = t === tab;
+    if (btn) {
+      btn.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+      btn.style.color      = active ? 'var(--text)' : 'var(--text2)';
+      btn.style.fontWeight = active ? '600' : '400';
+    }
+    if (content) content.style.display = active ? 'block' : 'none';
+  });
 }
 
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.0': [
+    'Progress: Block Rep Curve panel — fatigue decay bars, total reps trend, Set 1 adaptation trend, load reset arc',
+    'Settings: configurable rep accumulation trigger (default 50) — applies globally, overridable per exercise',
+    'Guide: two-tab layout — How to use + The Method (density block science, GLP-1 context, reading the curve)',
+    'Crown icon now respects per-user and per-exercise trigger thresholds',
+  ],
   '0.6.1': [
     'Code: imports consolidated to top-level (re, date), dead fallback query removed from AI context builder',
     'Security: self-service password change now uses dedicated /auth/password endpoint — guests can now change their own password without admin privileges',
@@ -4878,80 +5111,150 @@ function parseMarkdown(text) {
 
 <!-- User guide modal -->
 <div class="modal-overlay" id="guide-modal" style="display:none;" onclick="if(event.target===this)closeGuide()">
-  <div class="modal" style="max-width:600px;max-height:88vh;overflow-y:auto;">
+  <div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;">Agon — User guide</h3>
+      <h3 style="margin:0;">Agon — Guide</h3>
       <button class="btn btn-sm" onclick="closeGuide()">Close</button>
     </div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.6;">
-      Agon tracks <strong>Relative Density (RD)</strong> - your total session volume divided by total time multiplied by bodyweight. A rising RD means you are getting stronger relative to your bodyweight, regardless of whether that weight is going up or down.
+
+    <!-- Guide tabs -->
+    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border);">
+      <button id="guide-tab-howto" onclick="switchGuideTab('howto')"
+        style="background:none;border:none;border-bottom:2px solid var(--accent);padding:8px 16px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;">
+        How to use
+      </button>
+      <button id="guide-tab-method" onclick="switchGuideTab('method')"
+        style="background:none;border:none;border-bottom:2px solid transparent;padding:8px 16px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;">
+        The Method
+      </button>
     </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-barbell"></i> Workout</div>
-      <p>Log each training session here. Set the date, your bodyweight, and optional session notes. Add exercises one by one - each set gets its own load, reps, and time. The app calculates volume, density, and RD automatically as you build the session. Hit Save to commit. Saved sessions appear in History.</p>
-      <ul>
-        <li><strong>Bar type</strong> - toggle between Standard (total weight) and Vitruvian (weight per side x2)</li>
-        <li><strong>Bodyweight exercises</strong> - choose Normal, Vest (adds lbs), or Assisted (subtracts %)</li>
-        <li><strong>Crown icon 👑</strong> in History - flags when an exercise hit its rep trigger (50 reps at same load), signaling time to increase weight</li>
-      </ul>
-    </div>
+    <!-- How to use tab -->
+    <div id="guide-content-howto">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.6;">
+        Agon tracks <strong>Relative Density (RD)</strong> — your total session volume divided by total time multiplied by bodyweight. A rising RD means you are getting stronger relative to your bodyweight, regardless of whether that weight is going up or down.
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-history"></i> History</div>
-      <p>Filterable log of all sessions. Defaults to the current month. Use the date range and exercise filter to look further back. Edit or delete sessions from here. The delta badge shows RD change vs the prior session.</p>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-barbell"></i> Workout</div>
+        <p>Log each training session here. Set the date, your bodyweight, and optional session notes. Add exercises one by one - each set gets its own load, reps, and time. The app calculates volume, density, and RD automatically as you build the session. Hit Save to commit. Saved sessions appear in History.</p>
+        <ul>
+          <li><strong>Bar type</strong> - toggle between Standard (total weight) and Vitruvian (weight per side ×2)</li>
+          <li><strong>Bodyweight exercises</strong> - choose Normal, Vest (adds lbs), or Assisted (subtracts %)</li>
+          <li><strong>Crown icon 👑</strong> in History - flags when an exercise hit its rep accumulation trigger, signaling time to increase weight. The trigger is configurable in Settings</li>
+        </ul>
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-trending-up"></i> Trend</div>
-      <p>Weekly RD and bodyweight overlaid on a dual-axis chart. Colored bands show your training phases (Weight Loss, Cut, Recomp, Bulk, etc). The Recomp score card tells you whether you are building strength while losing weight, maintaining, or regressing.</p>
-      <ul>
-        <li><strong>Training phases</strong> - add phases to track your training cycles. Phases inform the AI and the macro calculator</li>
-        <li><strong>Macro calculator</strong> - computes BMR, TDEE, and daily macro targets based on your profile and current phase. The "Build a meal plan with AI" button pre-fills the Insights tab with a prompt based on your macros</li>
-        <li><strong>Macro targets by phase</strong> - retroactive macro history across all logged phases using average bodyweight per phase period</li>
-      </ul>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-history"></i> History</div>
+        <p>Filterable log of all sessions. Defaults to the current month. Use the date range and exercise filter to look further back. Edit or delete sessions from here. The delta badge shows RD change vs the prior session.</p>
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-target"></i> Progress</div>
-      <p>Per-exercise analysis. Select any logged exercise to see top-set load over time, estimated 1RM (Epley formula), PR table by rep count, and 4-week volume trend. The 7-day volume and Strength vs Peak cards show how the selected exercise is tracking. The Strength Maintenance table at the bottom shows current vs peak load for every exercise with a color-coded ratio.</p>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-trending-up"></i> Trend</div>
+        <p>Weekly RD and bodyweight overlaid on a dual-axis chart. Colored bands show your training phases (Weight Loss, Cut, Recomp, Bulk, etc). The Recomp score card tells you whether you are building strength while losing weight, maintaining, or regressing.</p>
+        <ul>
+          <li><strong>Training phases</strong> - add phases to track your training cycles. Phases inform the AI and the macro calculator</li>
+          <li><strong>Macro calculator</strong> - computes BMR, TDEE, and daily macro targets based on your profile and current phase</li>
+          <li><strong>Macro targets by phase</strong> - retroactive macro history across all logged phases using average bodyweight per phase period</li>
+        </ul>
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-sparkles"></i> Insights</div>
-      <p>AI-powered analysis of your training data. Ask plain-English questions and get answers grounded in your actual session history, profile, active phase, and protocols. Requires a Gemini or Claude API key set in Settings. Conversation persists across sessions.</p>
-      <ul>
-        <li>Example questions: "Am I losing strength on my pulls?", "Which sessions had the best RD?", "How does my RD compare between my Weight Loss and Recomp phases?"</li>
-        <li>The "Build a meal plan with AI" button on the Trend tab sends your macro targets directly here</li>
-      </ul>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-target"></i> Progress</div>
+        <p>Per-exercise analysis. Select any logged exercise to see top-set load over time, estimated 1RM (Epley formula), PR table by rep count, and session volume trend. For fixed-load accessory exercises, the <strong>Block Rep Curve</strong> panel appears showing the fatigue decay, total reps trend, Set 1 adaptation trend, and load reset arc. See The Method tab for an explanation of this system.</p>
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-list-details"></i> Exercises</div>
-      <p>The shared exercise bank. Add, edit, or remove exercises. Each exercise has a tool type (Bar, Cable, Dumbbell, Kettlebell, Machine, Bodyweight), a multiplier that determines how load is calculated, muscle group tags, and a load hint. Changes apply to all users.</p>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-sparkles"></i> Insights</div>
+        <p>AI-powered analysis of your training data. Ask plain-English questions and get answers grounded in your actual session history, profile, active phase, and protocols. Requires a Gemini or Claude API key set in Settings.</p>
+        <ul>
+          <li>Example questions: "Am I losing strength on my pulls?", "Which sessions had the best RD?", "How does my RD compare between my Weight Loss and Recomp phases?"</li>
+          <li>The "Build a meal plan with AI" button on the Trend tab sends your macro targets directly here</li>
+        </ul>
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label"><i class="ti ti-file-download"></i> Data</div>
-      <p>Import and export your session data as Excel files.</p>
-      <ul>
-        <li><strong>Import</strong> - download the template, fill it out (each row is one set), upload it. The Phase column is optional but will create phase records automatically from consecutive same-phase dates</li>
-        <li><strong>Export</strong> - filter by date range (last 30/90/180/365 days or custom) and by phase before downloading. Exports a full Log sheet (all sets with Phase column), a Trend sheet, and an ExerciseBank sheet</li>
-      </ul>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-list-details"></i> Exercises</div>
+        <p>The shared exercise bank. Add, edit, or remove exercises. Each exercise has a tool type, a multiplier, muscle group tags, and a load hint. You can set a per-exercise rep trigger override here to override your global default for specific exercises.</p>
+      </div>
 
-    <div class="guide-section">
-      <div class="guide-tab-label">Settings (click your username)</div>
-      <p>Opens via clicking your username in the top-right corner.</p>
-      <ul>
-        <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, training week start, activity level. Used by the macro calculator and AI Insights</li>
-        <li><strong>Protocols</strong> - supplements, peptides, and medications. Passed to the AI as context only. Agon does not provide medical advice</li>
-        <li><strong>Account</strong> - change your password</li>
-        <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA for your account. Scan the QR code with any authenticator app (Google Authenticator, Authy, etc). Once enabled, every login requires your password plus a 6-digit code. You can disable it here at any time. Admins can also reset it for you via the Admin panel if you lose access to your authenticator</li>
-        <li><strong>External API</strong> - generate a read-only API key for your data. Share the endpoint URL with any external AI or tool to give it access to your full training history. Revoke at any time</li>
-        <li><strong>AI Insights</strong> - connect a Gemini or Claude API key. Keys are encrypted and stored on your server</li>
-      </ul>
-    </div>
+      <div class="guide-section">
+        <div class="guide-tab-label"><i class="ti ti-file-download"></i> Data</div>
+        <p>Import and export your session data as Excel files.</p>
+        <ul>
+          <li><strong>Import</strong> - download the template, fill it out (each row is one set), upload it. The Phase column is optional but will create phase records automatically</li>
+          <li><strong>Export</strong> - filter by date range and phase before downloading. Exports Log, Trend, and ExerciseBank sheets</li>
+        </ul>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Settings (click your username)</div>
+        <p>Opens via clicking your username in the top-right corner.</p>
+        <ul>
+          <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, week start, activity level, and rep accumulation trigger (default 50)</li>
+          <li><strong>Protocols</strong> - supplements, peptides, and medications. Passed to the AI as context only. Agon does not provide medical advice</li>
+          <li><strong>Account</strong> - change your password</li>
+          <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA. Scan the QR code with any authenticator app. Admins can reset it via the Admin panel if you lose your device</li>
+          <li><strong>External API</strong> - generate a read-only API key for your data for use with external AI tools</li>
+          <li><strong>AI Insights</strong> - connect a Gemini or Claude API key. Keys are encrypted and stored on your server</li>
+        </ul>
+      </div>
+    </div><!-- end guide-content-howto -->
+
+    <!-- The Method tab -->
+    <div id="guide-content-method" style="display:none;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;">
+        Agon is built around a specific training methodology that combines density-block accumulation for accessories with dual-wave progressive overload for compound lifts. This page explains the science behind both systems and why they work especially well during active weight loss or GLP-1 therapy.
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Why Relative Density?</div>
+        <p>Conventional strength trackers reward absolute load on the bar. But when you are actively losing weight — through dieting, a cut phase, or GLP-1 medication — your bodyweight is a variable. A 200 lb person lifting 100 lbs is doing more relative work than a 220 lb person lifting the same weight. RD captures this: <strong>RD = volume ÷ (time × bodyweight)</strong>. A rising RD alongside a falling bodyweight is the signal that you are preserving or building strength while losing mass.</p>
+        <p>This matters most for people on GLP-1 medications (semaglutide, tirzepatide, retatrutide), where weight loss can be rapid and the risk of losing lean mass alongside fat is real. If your RD is rising, your muscle is being preserved. If it is falling while your weight falls, you need to adjust training or nutrition before a body composition scan would show it.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Accessory blocks — 6 sets, fixed load, cumulative reps</div>
+        <p>Accessory exercises (bicep curls, lateral raises, flyes, tricep extensions, etc.) are trained in fixed-load density blocks: 6 sets at the same weight, AMRAP each set, 70 seconds rest between sets. The goal is to accumulate a target number of total reps across the block before increasing the load.</p>
+        <p>Taking each set close to muscular failure is the primary driver of both hypertrophy and strength across a wide rep range (Schoenfeld et al., 2017). Fixed load with timed rest creates a predictable fatigue curve — your first sets will be higher rep, your later sets lower as fatigue accumulates. This is expected and correct. The 70-second rest window sits squarely in the research-supported range for hypertrophy-focused work (Schoenfeld, 2010).</p>
+        <p>The rep accumulation target acts as a readiness signal: once your fatigued state is still producing enough total reps, the load is no longer a sufficient stimulus and it is time to progress. A typical progression looks like:</p>
+        <ul>
+          <li>Session 1 at new load: 10, 8, 6, 6, 5, 5 = 40 reps — still building</li>
+          <li>Session 3: 12, 10, 8, 7, 7, 6 = 50 reps — trigger hit, load up next session</li>
+        </ul>
+        <p>Load increments are deliberately small — 1 lb for smaller muscle groups (biceps, triceps, shoulders), up to 1.5 lb for larger ones — because microloading allows near-continuous progression without the stalls common with larger jumps. Your <strong>rep trigger</strong> is configurable in Settings. You can also set a per-exercise override in the Exercise bank.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Reading the Block Rep Curve</div>
+        <p>The Block Rep Curve panel appears in the Progress tab when you select a fixed-load accessory exercise. It shows three signals:</p>
+        <ul>
+          <li><strong>Set-by-set bars</strong> — the fatigue decay from your last session. Set 1 is shown in green, subsequent sets in orange. A healthy curve slopes downward. A flat curve means the load is too light. A red bar flags any set below 4 reps — the load may have jumped too far.</li>
+          <li><strong>Total reps trend</strong> — cumulative reps per session over time, with your trigger threshold as a dashed reference line. Green bars have hit the trigger; orange bars have not.</li>
+          <li><strong>Set 1 reps trend</strong> — your opening set performance across sessions. This is the cleanest signal for systemic fatigue. If Set 1 reps start declining session-over-session at the same load, you may be under-recovered or under-fueled. Rising or stable Set 1 reps means the adaptation is on track.</li>
+        </ul>
+        <p>If a load reset is detected (your logged load dropped from a previous peak), the Reset Arc shows where you reset from, your current load, and a progress bar back toward your previous peak.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Compound lifts — dual wave, weekly +1</div>
+        <p>Compound movements (deadlifts, squats, bench press, rows, shoulder press) use a different structure: 10–12 sets across two ascending waves, with the starting weight increasing by 1 lb each week regardless of rep performance.</p>
+        <p>Dual-wave loading alternates between two ascending load sequences within the same session. The first wave warms up the nervous system and accumulates submaximal volume. The second wave, starting slightly heavier, exploits post-activation potentiation — the CNS is already primed, so outputs are higher than they would be cold. The fixed +1 lb/week progression on the starting weight provides a simple, non-negotiable overload mechanism. Three months of consistent training adds roughly 12 lbs to the starting weight of every compound.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Timed efforts</div>
+        <p>Some exercises are trained as pure timed efforts — maximum reps in a fixed window (typically 20 minutes) with no fixed set count. Pull-up variations are a common example. As your bodyweight falls, the relative load per rep decreases automatically. Agon tracks total reps and your bodyweight so the RD calculation captures both dimensions.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Voluntary load resets</div>
+        <p>If you grind badly on an exercise — Sets 5 and 6 dropping to 3–4 reps — the right move is to reset the load and rebuild. This is calibration, not failure. Agon's load reset tracker detects this and shows the rebuild arc: where you reset from, your current load, and how close you are to your previous peak.</p>
+        <p>Global deloads from travel or time off are handled the same way — come back, reset, rebuild. The data stays and the RD trend will show the recovery arc.</p>
+      </div>
+    </div><!-- end guide-content-method -->
+
   </div>
 </div>
 
