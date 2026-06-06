@@ -1285,6 +1285,16 @@ def build_training_context(uid: int) -> str:
         lines.append(f"Current training phase: {active_phase['phase_type']} (since {active_phase['start_date']})")
         lines.append("")
 
+    if protos:
+        lines.append("Current protocols / supplements:")
+        for p in protos:
+            parts = [p["name"]]
+            if p["dose"]:      parts.append(p["dose"])
+            if p["frequency"]: parts.append(p["frequency"])
+            if p["notes"]:     parts.append(f"({p['notes']})")
+            lines.append("  - " + " | ".join(parts))
+        lines.append("")
+
     lines.append(f"Total sessions: {len(rows)}")
     lines.append(f"Date range: {rows[0]['date']} to {rows[-1]['date']}")
     lines.append("")

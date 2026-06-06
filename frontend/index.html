@@ -706,7 +706,7 @@
             <option value="custom">Custom range</option>
           </select>
         </div>
-        <div id="export-custom-range" style="display:none;display:flex;gap:6px;align-items:flex-end;">
+        <div id="export-custom-range" style="display:none;gap:6px;align-items:flex-end;">
           <div>
             <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">From</label>
             <input type="date" id="export-from" style="font-size:12px;padding:5px 8px;">
@@ -1128,7 +1128,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.1';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4598,6 +4598,11 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.1': [
+    'Fix: favicon and all icon sizes now correctly served (were missing from Docker image)',
+    'Fix: export custom date range now hidden unless "Custom range" is selected',
+    'Fix: AI Insights now correctly includes protocol list in context — was reading session notes instead',
+  ],
   '0.7.0': [
     'Progress: Block Rep Curve panel — fatigue decay bars, total reps trend, Set 1 adaptation trend, load reset arc',
     'Settings: configurable rep accumulation trigger (default 50) — applies globally, overridable per exercise',
