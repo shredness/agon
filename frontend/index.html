@@ -656,7 +656,7 @@
       </div>
       <div id="curve-load-info" style="font-size:12px;color:var(--text3);margin-bottom:12px;"></div>
       <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Last session — reps per set</div>
-      <div id="curve-set-bars" style="display:flex;gap:6px;align-items:flex-end;height:80px;margin-bottom:16px;"></div>
+      <div id="curve-set-bars" style="display:flex;gap:6px;align-items:flex-end;height:100px;margin-bottom:16px;"></div>
       <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Total reps per session <span id="curve-threshold-label" style="font-weight:400;color:var(--text3);"></span></div>
       <div style="position:relative;width:100%;height:160px;margin-bottom:16px;">
         <canvas id="curveTotalChart"></canvas>
@@ -1144,7 +1144,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.8';
+const APP_VERSION = '0.7.9';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -3241,9 +3241,9 @@ function renderRepCurve(data) {
     const rps = last.reps_per_set;
     const maxReps = Math.max(...rps, 1);
     barsEl.innerHTML = rps.map((r, i) => {
-      const h = Math.round((r / maxReps) * 72);
+      const h = Math.round((r / maxReps) * 80);
       const col = r < 4 ? '#ff6b6b' : (i === 0 ? '#4ade80' : 'var(--accent)');
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;">
+      return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;flex:1;height:100%;">
         <span style="font-size:10px;color:var(--text2);">${r}</span>
         <div style="width:100%;height:${h}px;background:${col};border-radius:3px 3px 0 0;min-height:4px;"></div>
         <span style="font-size:10px;color:var(--text3);">S${i+1}</span>
@@ -4683,6 +4683,9 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.9': [
+    'Block rep curve: bar chart label alignment fixed — all set labels now correctly positioned above their bars',
+  ],
   '0.7.8': [
     'Progress: defaults to most recently trained exercise on first load',
     'Workout: ↑↓ buttons to reorder exercises within a session',
