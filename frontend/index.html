@@ -1128,7 +1128,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.2';
+const APP_VERSION = '0.7.3';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2245,8 +2245,14 @@ async function loadBankFromAPI() {
       data.forEach(e => EXERCISE_BANK.push({
         name: e.name, alias: e.alias||e.name, tool: e.tool||'Bar',
         mult: e.mult||2.0, muscles: e.muscles||[], muscle: (e.muscles||[]).join(' / '),
-        day: e.day||'', loadHint: e.loadHint||e.load_hint||'', isBW: !!e.isBW
+        day: e.day||'', loadHint: e.loadHint||e.load_hint||'', isBW: !!e.isBW,
+        sortOrder: e.sortOrder||0, createdBy: e.createdBy||null,
+        repTriggerOverride: e.repTriggerOverride||null,
       }));
+      EXERCISE_BANK.sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      });
     } else if (Array.isArray(data) && data.length === 0) {
       await seedBankToAPI();
     }
@@ -4598,6 +4604,9 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.3': [
+    'Exercises: all dropdowns and the Exercises panel now sort alphabetically (case-insensitive)',
+  ],
   '0.7.2': [
     'AI Insights: protocols now segmented as active, past (discontinued), and upcoming — with start/end dates passed to the AI',
   ],
