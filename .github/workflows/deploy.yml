@@ -41,6 +41,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Inject version into service worker
+        run: |
+          VERSION=$(grep -o "APP_VERSION = '[^']*'" frontend/index.html | head -1 | grep -o "'[^']*'" | tr -d "'")
+          echo "Injecting SW cache version: agon-v${VERSION}"
+          sed -i "s/const CACHE = 'agon-v[^']*'/const CACHE = 'agon-v${VERSION}'/" frontend/sw.js
+
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:

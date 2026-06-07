@@ -964,7 +964,7 @@ def get_progress(exercise_name: str, user=Depends(current_user)):
 @app.get("/exercises/bank")
 def get_exercise_bank(user=Depends(current_user)):
     conn = get_db()
-    rows = conn.execute("SELECT * FROM exercises ORDER BY sort_order ASC, name COLLATE NOCASE ASC").fetchall()
+    rows = conn.execute("SELECT * FROM exercises ORDER BY name COLLATE NOCASE ASC").fetchall()
     conn.close()
     return [{"id":r["id"],"name":r["name"],"alias":r["alias"],"tool":r["tool"],
              "mult":r["mult"],"muscles":json.loads(r["muscles"]),"day":r["day"],

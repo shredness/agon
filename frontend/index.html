@@ -1128,7 +1128,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.4';
+const APP_VERSION = '0.7.5';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2251,10 +2251,7 @@ async function loadBankFromAPI() {
         sortOrder: e.sortOrder||0, createdBy: e.createdBy||null,
         repTriggerOverride: e.repTriggerOverride||null,
       }));
-      EXERCISE_BANK.sort((a, b) => {
-        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      });
+      EXERCISE_BANK.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     } else if (Array.isArray(data) && data.length === 0) {
       await seedBankToAPI();
     }
@@ -2493,11 +2490,8 @@ function renderBankTable() {
   const isAdmin = currentUser?.role === 'admin';
   const userId  = currentUser?.id;
 
-  // Always render alphabetically, within sort_order groups
-  EXERCISE_BANK.sort((a, b) => {
-    if ((a.sortOrder||0) !== (b.sortOrder||0)) return (a.sortOrder||0) - (b.sortOrder||0);
-    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-  });
+  // Always render alphabetically
+  EXERCISE_BANK.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
   const canEdit = (e) => isAdmin || (e.createdBy != null && e.createdBy === userId);
 
@@ -4613,6 +4607,9 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.5': [
+    'Exercises: sort_order ignored — all exercises now purely alphabetical everywhere',
+  ],
   '0.7.4': [
     'Exercises: sort applied at render time in all contexts — panel, workout dropdowns, edit dropdowns',
   ],
