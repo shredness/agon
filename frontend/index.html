@@ -1128,7 +1128,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.3';
+const APP_VERSION = '0.7.4';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1469,7 +1469,8 @@ function getExDef(name) {
 function addExercise() {
   const id = exCount++;
   setCounts[id] = 0;
-  const opts = '<option value="">- Select exercise -</option>' + EXERCISE_BANK.map(e=>`<option value="${e.name}">${e.name}</option>`).join('') + '<option value="__add_new__" style="color:var(--blue);font-weight:500;">+ Add new exercise…</option>';
+  const sortedBank = [...EXERCISE_BANK].sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
+  const opts = '<option value="">- Select exercise -</option>' + sortedBank.map(e=>`<option value="${e.name}">${e.name}</option>`).join('') + '<option value="__add_new__" style="color:var(--blue);font-weight:500;">+ Add new exercise…</option>';
   const div = document.createElement('div');
   div.className = 'exercise-block'; div.id = 'ex-'+id;
   div.innerHTML = `
@@ -1936,8 +1937,9 @@ function editSession(date) {
   (session.exercises || []).forEach(ex => {
     const id = exCount++;
     setCounts[id] = 0;
+    const sortedBank2 = [...EXERCISE_BANK].sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
     const opts = '<option value="">- Select exercise -</option>' +
-      EXERCISE_BANK.map(e => `<option value="${e.name}"${e.name===ex.name?' selected':''}>${escapeHtml(e.name)}</option>`).join('') +
+      sortedBank2.map(e => `<option value="${e.name}"${e.name===ex.name?' selected':''}>${escapeHtml(e.name)}</option>`).join('') +
       '<option value="__add_new__" style="color:var(--accent);font-weight:500;">+ Add new exercise…</option>';
     const div = document.createElement('div');
     div.className = 'exercise-block'; div.id = 'ex-'+id;
@@ -2398,9 +2400,10 @@ function updateBankField(idx, field, val) {
 }
 
 function rebuildExerciseDropdowns() {
+  const sorted = [...EXERCISE_BANK].sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'}));
   document.querySelectorAll('select[id^="exn-"]').forEach(sel => {
     const cur = sel.value;
-    sel.innerHTML = EXERCISE_BANK.map(e=>`<option value="${e.name}"${e.name===cur?' selected':''}>${escapeHtml(e.name)}</option>`).join('');
+    sel.innerHTML = sorted.map(e=>`<option value="${e.name}"${e.name===cur?' selected':''}>${escapeHtml(e.name)}</option>`).join('');
   });
 }
 
@@ -2489,6 +2492,12 @@ function getMuscleTagsHtml(e) {
 function renderBankTable() {
   const isAdmin = currentUser?.role === 'admin';
   const userId  = currentUser?.id;
+
+  // Always render alphabetically, within sort_order groups
+  EXERCISE_BANK.sort((a, b) => {
+    if ((a.sortOrder||0) !== (b.sortOrder||0)) return (a.sortOrder||0) - (b.sortOrder||0);
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
 
   const canEdit = (e) => isAdmin || (e.createdBy != null && e.createdBy === userId);
 
@@ -4604,6 +4613,9 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.4': [
+    'Exercises: sort applied at render time in all contexts — panel, workout dropdowns, edit dropdowns',
+  ],
   '0.7.3': [
     'Exercises: all dropdowns and the Exercises panel now sort alphabetically (case-insensitive)',
   ],
