@@ -1277,7 +1277,7 @@ def build_training_context(uid: int) -> str:
     ).fetchone()
     # Add active protocols
     protos = conn.execute(
-        "SELECT name, dose, frequency, notes FROM protocols WHERE user_id=? ORDER BY sort_order, id",
+        "SELECT name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=? ORDER BY sort_order, id",
         (uid,)
     ).fetchall()
     conn.close()
@@ -1286,14 +1286,41 @@ def build_training_context(uid: int) -> str:
         lines.append("")
 
     if protos:
-        lines.append("Current protocols / supplements:")
-        for p in protos:
+        today = _date.today().isoformat()
+        active_protos   = [p for p in protos if not p["end_date"] and (not p["start_date"] or p["start_date"] <= today)]
+        inactive_protos = [p for p in protos if p["end_date"] and p["end_date"] < today]
+        future_protos   = [p for p in protos if p["start_date"] and p["start_date"] > today]
+
+        def proto_line(p):
             parts = [p["name"]]
             if p["dose"]:      parts.append(p["dose"])
             if p["frequency"]: parts.append(p["frequency"])
             if p["notes"]:     parts.append(f"({p['notes']})")
-            lines.append("  - " + " | ".join(parts))
-        lines.append("")
+            return "  - " + " | ".join(parts)
+
+        if active_protos:
+            lines.append("Active protocols / supplements (currently in use):")
+            for p in active_protos:
+                line = proto_line(p)
+                if p["start_date"]: line += f"  [since {p['start_date']}]"
+                lines.append(line)
+            lines.append("")
+
+        if inactive_protos:
+            lines.append("Past protocols (discontinued):")
+            for p in inactive_protos:
+                line = proto_line(p)
+                line += f"  [{p['start_date'] or '?'} to {p['end_date']}]"
+                lines.append(line)
+            lines.append("")
+
+        if future_protos:
+            lines.append("Upcoming protocols (not yet started):")
+            for p in future_protos:
+                line = proto_line(p)
+                line += f"  [starts {p['start_date']}]"
+                lines.append(line)
+            lines.append("")
 
     lines.append(f"Total sessions: {len(rows)}")
     lines.append(f"Date range: {rows[0]['date']} to {rows[-1]['date']}")
