@@ -390,14 +390,19 @@
   <!-- HISTORY -->
   <div id="tab-history" class="tab-panel">
     <div class="card" style="padding:14px 16px;margin-bottom:8px;">
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-        <div class="form-group" style="margin:0;flex:1;min-width:140px;">
-          <label>From</label>
-          <input type="date" id="hist-from" style="width:100%;" oninput="renderHistory()">
-        </div>
-        <div class="form-group" style="margin:0;flex:1;min-width:140px;">
-          <label>To</label>
-          <input type="date" id="hist-to" style="width:100%;" oninput="renderHistory()">
+      <!-- Mobile-first: quick date preset + exercise on same row -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+        <div class="form-group" style="margin:0;flex:1;min-width:120px;">
+          <label>Period</label>
+          <select id="hist-preset" onchange="applyHistPreset()" style="width:100%;">
+            <option value="">Custom range</option>
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>This month</option>
+            <option value="90">Last 3 months</option>
+            <option value="180">Last 6 months</option>
+            <option value="365">Last year</option>
+            <option value="all">All time</option>
+          </select>
         </div>
         <div class="form-group" style="margin:0;flex:2;min-width:160px;">
           <label>Exercise</label>
@@ -406,6 +411,17 @@
           </select>
         </div>
         <button class="btn btn-sm" onclick="clearHistoryFilters()" style="margin-bottom:1px;">Clear</button>
+      </div>
+      <!-- Custom date range — shown only when Custom range is selected -->
+      <div id="hist-custom-range" style="display:none;gap:8px;flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;flex:1;min-width:140px;">
+          <label>From</label>
+          <input type="date" id="hist-from" style="width:100%;" oninput="renderHistory()">
+        </div>
+        <div class="form-group" style="margin:0;flex:1;min-width:140px;">
+          <label>To</label>
+          <input type="date" id="hist-to" style="width:100%;" oninput="renderHistory()">
+        </div>
       </div>
       <div id="hist-count" style="font-size:12px;color:var(--text2);margin-top:8px;"></div>
     </div>
@@ -1128,7 +1144,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.7';
+const APP_VERSION = '0.7.8';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1440,11 +1456,13 @@ function switchTab(name) {
     // Default to current month if no filter set
     const fromEl = document.getElementById('hist-from');
     if (fromEl && !fromEl.value) {
-      const now = new Date();
-      fromEl.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+      const preset = document.getElementById('hist-preset');
+      if (preset && !preset.value) preset.value = '30';
+      applyHistPreset();
+    } else {
+      populateHistoryExerciseFilter();
+      renderHistory();
     }
-    populateHistoryExerciseFilter();
-    renderHistory();
   }
   if (name==='bank') renderBankTable();
   if (name==='trend') renderTrend();
@@ -1476,7 +1494,11 @@ function addExercise() {
   div.innerHTML = `
     <div class="exercise-header">
       <div class="form-group" style="flex:1;min-width:180px;"><label>Exercise</label><select id="exn-${id}" onchange="onExChange(${id})" style="width:100%;">${opts}</select></div>
-      <button class="btn btn-danger btn-sm" onclick="removeEx(${id})" style="margin-bottom:1px;">✕</button>
+      <div style="display:flex;gap:4px;margin-bottom:1px;">
+        <button class="btn btn-sm" onclick="moveEx(${id},-1)" title="Move up" style="padding:4px 7px;">↑</button>
+        <button class="btn btn-sm" onclick="moveEx(${id},1)" title="Move down" style="padding:4px 7px;">↓</button>
+        <button class="btn btn-danger btn-sm" onclick="removeEx(${id})">✕</button>
+      </div>
     </div>
     <div id="bwopts-${id}" style="display:none;" class="bw-opts">
       <span id="bwlbl-${id}" style="font-weight:600;font-size:12px;"></span>
@@ -1619,6 +1641,19 @@ function onBarMode(id) {
     if (loadHdr) loadHdr.textContent = 'Load (lbs per side)';
     if (loadHint) loadHint.textContent = 'Bar · Vitruvian = ×2 per side · Standard = total plates + bar weight';
   }
+  calcRD();
+}
+
+function moveEx(id, dir) {
+  const container = document.getElementById('exercises-container');
+  const block = document.getElementById('ex-' + id);
+  if (!block || !container) return;
+  const blocks = [...container.querySelectorAll('.exercise-block')];
+  const idx = blocks.indexOf(block);
+  const target = blocks[idx + dir];
+  if (!target) return;
+  if (dir === -1) container.insertBefore(block, target);
+  else container.insertBefore(target, block);
   calcRD();
 }
 
@@ -1775,11 +1810,43 @@ function populateHistoryExerciseFilter() {
     names.map(n => `<option value="${escapeHtml(n)}"${n===current?' selected':''}>${escapeHtml(n)}</option>`).join('');
 }
 
+function applyHistPreset() {
+  const val  = document.getElementById('hist-preset')?.value;
+  const from = document.getElementById('hist-from');
+  const to   = document.getElementById('hist-to');
+  const cr   = document.getElementById('hist-custom-range');
+
+  if (val === '' ) {
+    // Custom — show date pickers
+    if (cr) cr.style.display = 'flex';
+    renderHistory();
+    return;
+  }
+  if (cr) cr.style.display = 'none';
+  const now  = new Date();
+  const toStr = now.toISOString().slice(0, 10);
+  if (val === 'all') {
+    if (from) from.value = '';
+    if (to)   to.value   = '';
+  } else {
+    const days = parseInt(val);
+    const past = new Date(now);
+    past.setDate(past.getDate() - days);
+    if (from) from.value = past.toISOString().slice(0, 10);
+    if (to)   to.value   = toStr;
+  }
+  renderHistory();
+}
+
 function clearHistoryFilters() {
+  const preset = document.getElementById('hist-preset');
+  if (preset) preset.value = '30';
+  const cr = document.getElementById('hist-custom-range');
+  if (cr) cr.style.display = 'none';
   document.getElementById('hist-from').value = '';
   document.getElementById('hist-to').value = '';
   document.getElementById('hist-exercise').value = '';
-  renderHistory();
+  applyHistPreset();
 }
 
 function renderHistory() {
@@ -2839,7 +2906,16 @@ function renderStrengthMaintenance() {
 }
 
 async function loadProgress() {
-  const name = document.getElementById('progress-exercise').value;
+  const sel  = document.getElementById('progress-exercise');
+  // Default to most recently trained exercise on first load
+  if (!sel.value && sessions.length) {
+    const lastSession = sessions[sessions.length - 1];
+    const lastName = (lastSession.exercises || [])[0]?.name || '';
+    if (lastName && [...sel.options].some(o => o.value === lastName)) {
+      sel.value = lastName;
+    }
+  }
+  const name = sel.value;
   renderCustomStats();
   renderStrengthMaintenance();
   loadRepCurve(name);
@@ -4607,6 +4683,15 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.7.8': [
+    'Progress: defaults to most recently trained exercise on first load',
+    'Workout: ↑↓ buttons to reorder exercises within a session',
+    'History: Period preset dropdown (7d / month / 3m / 6m / year / all time) with exercise filter on the same row',
+    'README: updated to v0.7.8 with full feature list, security model, and rate limit validation instructions',
+  ],
+  '0.7.7': [
+    'Guide: accessory block section reframed around escalating density principle — set count removed',
+  ],
   '0.7.6': [
     'CI/CD: Claude can now commit and push directly — no manual git commands needed',
   ],

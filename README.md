@@ -18,23 +18,24 @@ A rising RD means you are getting stronger per pound of bodyweight — the signa
 
 ## Features
 
-- **Workout logging** — sets, reps, load, per-set timing, bodyweight
+- **Workout logging** — sets, reps, load, per-set timing, bodyweight; exercises reorderable within a session
 - **RD calculation** — automatic, per session and weekly trend; recalculated server-side
 - **Training phases** — bulk, cut, recomp, deload, weight loss; chart shading and phase-aware macros
 - **Trend chart** — weekly RD and bodyweight on a dual-axis chart with phase band overlays
 - **Recomp score card** — at-a-glance read on whether you're building strength while losing weight
 - **Macro calculator** — BMR, TDEE, and daily macro targets based on profile and current phase
-- **AI Insights** — plain-English questions answered using your actual training data (Gemini and Claude API)
+- **Block Rep Curve** — per-exercise fatigue decay visualization, total reps trend, Set 1 adaptation trend, load reset arc; for fixed-load accessory blocks
+- **AI Insights** — plain-English questions answered using your actual training data (Gemini and Claude API); protocols with active/past/upcoming status passed as context
 - **Meal plan builder** — sends your current macro targets to AI Insights for a personalized plan
 - **Progress anatomy** — interactive body figure showing muscle group training frequency
-- **Exercise bank** — shared library with muscle tagging, multipliers, formula hints; admin exercises are protected
-- **Protocols / supplements** — log peptides, medications, and supplements; passed to AI as context
-- **Import / export** — scoped XLSX export with date and phase filters; full data import
-- **External API** — per-user read-only API key for connecting external AI tools (header-authenticated)
+- **Exercise bank** — shared library with muscle tagging, multipliers, formula hints; alphabetically sorted everywhere
+- **Protocols / supplements** — log with start/end dates; AI receives active vs discontinued vs upcoming context
+- **Import / export** — scoped XLSX export with date range presets and phase filters; full data import
+- **External API** — per-user read-only API key, header-authenticated (`Authorization: Bearer`)
 - **Multi-user** — admin, guest, and demo roles with per-user data isolation
-- **Public registration** — optional, with admin approval queue
+- **Public registration** — optional, with admin approval queue; email address as username
 - **Two-factor authentication** — TOTP-based 2FA, any authenticator app
-- **PWA** — installable on Android and iOS, runs full-screen, supports rotation
+- **PWA** — installable on Android and iOS, runs full-screen, supports rotation; auto-updates on deploy without reinstall
 
 ---
 
@@ -44,21 +45,21 @@ A rising RD means you are getting stronger per pound of bodyweight — the signa
 |---|---|
 | Backend | FastAPI, SQLite |
 | Frontend | Vanilla HTML / JS / CSS (single file) |
-| Infrastructure | Docker, nginx, OMV |
-| CI/CD | GitHub Actions to GHCR |
+| Infrastructure | Docker, nginx, OMV (kaiju) |
+| CI/CD | GitHub Actions → GHCR |
 | AI | Gemini API, Claude API |
 
 ---
 
 ## Deployment
 
-Agon is designed for self-hosted deployment via Docker. Each user runs their own instance.
+Agon is designed for self-hosted deployment via Docker.
 
 ### Quick start
 
 ```bash
 curl -O https://raw.githubusercontent.com/shredness/rd-tracker/master/docker-compose.yml
-# Edit environment variables (see below) — set a strong SECRET_KEY
+# Edit environment variables — set a strong SECRET_KEY
 docker-compose up -d
 ```
 
@@ -70,84 +71,73 @@ docker-compose up -d
 | `ADMIN_USER` | `manny` | Admin account username |
 | `ADMIN_PASS` | *(insecure default)* | Admin account password — **change this** |
 | `DB_PATH` | `/data/sessions.db` | SQLite database path |
-| `ALLOWED_ORIGINS` | `https://agon.savo.us,http://localhost,http://localhost:3800` | Comma-separated CORS origins |
-| `ALLOW_REGISTRATION` | `false` | Set `true` to enable public sign-up (guest role, pending approval) |
-| `ALLOW_DEFAULT_SECRET` | `false` | Local-dev escape hatch to run with the default `SECRET_KEY`. **Never set in production.** |
-
-> **Important:** The app will refuse to start if `SECRET_KEY` is still the known default value, unless `ALLOW_DEFAULT_SECRET=true`. Always set a strong, unique `SECRET_KEY` and `ADMIN_PASS` in production.
+| `ALLOWED_ORIGINS` | `https://agon.savo.us,...` | Comma-separated CORS origins |
+| `ALLOW_REGISTRATION` | `false` | Set `true` to enable public sign-up (pending admin approval) |
+| `ALLOW_DEFAULT_SECRET` | `false` | Local-dev only — never set in production |
 
 ---
 
 ## Security Model
 
-- **Passwords** — hashed with bcrypt; never stored or returned in plaintext
-- **Password complexity** — minimum 10 characters with uppercase, lowercase, number, and special character, enforced on every password-setting path
-- **JWT auth** — all protected endpoints gated by token validation; admin endpoints require admin role
-- **Two-factor (TOTP)** — optional per user; secret encrypted at rest with Fernet
-- **Data isolation** — every data query is scoped to the authenticated user's ID
-- **Demo account** — read-only, enforced server-side on every mutation
-- **Rate limiting** — login, registration, and external-data endpoints are throttled per IP at the nginx layer
-- **External API key** — passed via `Authorization: Bearer` header, not URL parameters
-- **AI keys** — encrypted at rest with Fernet derived from `SECRET_KEY`
-- **Parameterized queries** — throughout; no string-built SQL
+- Passwords hashed with bcrypt; complexity enforced (10+ chars, upper, lower, digit, special)
+- JWT auth on all protected endpoints; admin role enforced server-side
+- Token revocation: deleted users are rejected immediately on next request
+- TOTP 2FA optional per user; secret encrypted at rest with Fernet
+- Data isolation: every query scoped to the authenticated user's ID
+- Rate limiting at nginx: login and register capped at 10 req/min per IP
+- External API key via `Authorization: Bearer` header (not URL parameter)
+- AI keys encrypted at rest; parameterized queries throughout
+
+### Validating rate limiting
+
+```bash
+for i in {1..15}; do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://agon.savo.us/api/auth/login \
+    -H "Content-Type: application/x-www-form-urlencoded" -d "username=test&password=test"
+done
+```
+
+Expect `401` for the first ~15 requests, then `503` once the burst is exceeded.
 
 ---
 
 ## Password Requirements
 
-All passwords (admin-created, self-registered, or changed) must have:
-
 - Minimum 10 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one number
-- At least one special character
+- At least one uppercase letter, one lowercase letter, one number, one special character
+
+---
+
+## The Method
+
+Agon is built around two training approaches:
+
+**Accessory blocks — escalating density, fixed time, cumulative reps**
+Fixed load across multiple sets, AMRAP each set, fixed rest interval. The goal is to accumulate a target number of total reps (default 50, configurable per user and per exercise) before increasing the load. Load increments are small — 1 lb for smaller muscle groups, up to 1.5 lb for larger ones. Based on Schoenfeld's work on rep ranges and fatigue-based progressive overload.
+
+**Compound lifts — dual wave, weekly +1**
+10–12 sets across two ascending load waves, starting weight increasing +1 lb per week. Wave 2 exploits post-activation potentiation from Wave 1.
+
+**Timed efforts**
+Max reps in a fixed time window (e.g. 20 minutes pull-ups). No fixed set count.
+
+The **Block Rep Curve** in the Progress tab shows set-by-set fatigue decay, cumulative reps trend vs threshold, Set 1 adaptation over time, and a load reset arc. See The Method tab in the in-app guide for full methodology and references.
 
 ---
 
 ## Registration & Approval
 
-When `ALLOW_REGISTRATION=true`:
-
-1. A "Create an account" link appears on the login screen
-2. New users register with an **email address** as their username
-3. Their account is created with `status = pending` — they cannot log in yet
-4. The admin sees a **Pending approval** queue at the top of the Admin panel
-5. Admin approves (activates the account) or rejects (deletes it)
-
-To close registrations, set `ALLOW_REGISTRATION=false` and redeploy. Existing accounts are unaffected.
-
----
-
-## Two-Factor Authentication
-
-Any user can enable TOTP-based 2FA from **Settings to Two-factor authentication**:
-
-1. Click **Enable two-factor authentication**
-2. Scan the QR code with Google Authenticator, Authy, or any TOTP app
-3. Enter the 6-digit confirmation code
-
-Once enabled, every login requires password plus authenticator code. Admins can disable 2FA for any user via the Admin panel (for recovery if a device is lost).
+When `ALLOW_REGISTRATION=true`, new users register with an email address and land in `pending` status. The Admin panel shows a pending queue with Approve / Reject controls.
 
 ---
 
 ## External API
 
-Each user can generate a read-only API key from **Settings to External API**. The key authenticates a single read-only endpoint that returns the user's full training data as JSON.
-
 ```bash
 curl -H "Authorization: Bearer agon_YOUR_KEY" https://your-server/api/external/data
 ```
 
-`X-API-Key: agon_YOUR_KEY` is also accepted. The legacy `?key=` query parameter still works but is deprecated — it leaks the key into server logs and browser history. Revoke a key at any time from the same panel.
-
----
-
-## Accessing the App
-
-After deployment, visit `http://your-server:3800` (or your configured domain/reverse proxy URL).
-
-The app is a PWA — on Android, Chrome will prompt to install it. On iOS, use Safari, Share, Add to Home Screen. It runs full-screen and supports both orientations.
+`X-API-Key: agon_YOUR_KEY` also accepted. The legacy `?key=` query param still works but is deprecated.
 
 ---
 
@@ -156,34 +146,17 @@ The app is a PWA — on Android, Chrome will prompt to install it. On iOS, use S
 ```bash
 git clone https://github.com/shredness/rd-tracker.git
 cd rd-tracker
-
-# Backend
-cd backend
-pip install -r requirements.txt
+cd backend && pip install -r requirements.txt
 ALLOW_DEFAULT_SECRET=true uvicorn main:app --reload
-
-# Frontend — open frontend/index.html directly, or serve via any static server
 ```
 
-### Versioning
-
-- Patch bump (`0.x.y`) — fixes and small tweaks
-- Minor bump (`0.x.0`) — new user-facing feature or security release
-- Tracked in the `APP_VERSION` constant in `frontend/index.html`
-- Changelog maintained in the `CHANGELOG` JS object, surfaced via the What's New modal
-
-### CI/CD
-
-Pushes to `master` trigger GitHub Actions workflows that build and push Docker images to GHCR:
-
-- `ghcr.io/shredness/rd-tracker-backend:latest`
-- `ghcr.io/shredness/rd-tracker-frontend:latest`
+CI/CD: pushes to `master` build and push Docker images to GHCR. The service worker cache version is injected automatically from `APP_VERSION` on each build, so PWA users get updates without reinstalling.
 
 ---
 
 ## Current Version
 
-**v0.6.0**
+**v0.7.7**
 
 See the in-app What's New modal for the full changelog.
 
