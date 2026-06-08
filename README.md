@@ -45,7 +45,7 @@ A rising RD means you are getting stronger per pound of bodyweight — the signa
 |---|---|
 | Backend | FastAPI, SQLite |
 | Frontend | Vanilla HTML / JS / CSS (single file) |
-| Infrastructure | Docker, nginx, OMV (kaiju) |
+| Infrastructure | Docker, nginx |
 | CI/CD | GitHub Actions → GHCR |
 | AI | Gemini API, Claude API |
 
@@ -68,10 +68,10 @@ docker-compose up -d
 | Variable | Default | Description |
 |---|---|---|
 | `SECRET_KEY` | *(insecure default)* | JWT signing key — **must be changed**; app refuses to start with the default |
-| `ADMIN_USER` | `manny` | Admin account username |
+| `ADMIN_USER` | `admin` | Admin account username |
 | `ADMIN_PASS` | *(insecure default)* | Admin account password — **change this** |
 | `DB_PATH` | `/data/sessions.db` | SQLite database path |
-| `ALLOWED_ORIGINS` | `https://agon.savo.us,...` | Comma-separated CORS origins |
+| `ALLOWED_ORIGINS` | `https://your-domain.com,...` | Comma-separated CORS origins |
 | `ALLOW_REGISTRATION` | `false` | Set `true` to enable public sign-up (pending admin approval) |
 | `ALLOW_DEFAULT_SECRET` | `false` | Local-dev only — never set in production |
 
@@ -92,7 +92,7 @@ docker-compose up -d
 
 ```bash
 for i in {1..15}; do
-  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://agon.savo.us/api/auth/login \
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST https://your-domain.com/api/auth/login \
     -H "Content-Type: application/x-www-form-urlencoded" -d "username=test&password=test"
 done
 ```
@@ -134,7 +134,7 @@ When `ALLOW_REGISTRATION=true`, new users register with an email address and lan
 ## External API
 
 ```bash
-curl -H "Authorization: Bearer agon_YOUR_KEY" https://your-server/api/external/data
+curl -H "Authorization: Bearer agon_YOUR_KEY" https://your-domain.com/api/external/data
 ```
 
 `X-API-Key: agon_YOUR_KEY` also accepted. The legacy `?key=` query param still works but is deprecated.
@@ -156,7 +156,7 @@ CI/CD: pushes to `master` build and push Docker images to GHCR. The service work
 
 ## Current Version
 
-**v0.7.7**
+**v0.7.9**
 
 See the in-app What's New modal for the full changelog.
 
