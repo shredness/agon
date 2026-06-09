@@ -1144,7 +1144,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.7.9';
+const APP_VERSION = '0.8.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4683,6 +4683,9 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.8.0': [
+    'Fix: new users could not save profile — INSERT was missing columns added in v0.7.x (last_seen_version, rep_trigger)',
+  ],
   '0.7.9': [
     'Block rep curve: bar chart label alignment fixed — all set labels now correctly positioned above their bars',
   ],

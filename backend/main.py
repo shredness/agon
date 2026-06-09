@@ -1165,11 +1165,12 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
                 body.last_seen_version, body.rep_trigger, user["id"]))
     else:
         conn.execute("""
-            INSERT INTO user_settings (user_id, first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO user_settings (user_id, first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, rep_trigger)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         """, (user["id"], body.first_name, body.last_name, body.dob, body.gender,
                 body.week_start or "Saturday", body.height_in, body.target_bw,
-                body.activity_level or "1.55", body.onboarded or "0", body.last_seen_version or "0.0.0"))
+                body.activity_level or "1.55", body.onboarded or "0",
+                body.last_seen_version or "0.0.0", body.rep_trigger or 50))
     conn.commit()
     conn.close()
     return {"status": "saved"}
