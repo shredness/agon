@@ -1144,7 +1144,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.8.1';
+const APP_VERSION = '0.8.2';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4694,6 +4694,10 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.8.2': [
+    'Anatomy heatmap: now shows RD delta per muscle group (primary muscle only) instead of load delta — green = RD improving, blue = stable, red = declining',
+    'Heatmap tooltip updated: shows RD improving / stable / declining label with magnitude',
+  ],
   '0.8.1': [
     'Protocols: active entries shown first, discontinued grouped below with a separator; sorted by end date within each group',
   ],
@@ -5020,66 +5024,71 @@ const ANATOMY_MUSCLES = [
 ];
 
 function getStrengthDelta(muscleGroup, days, phaseId) {
-
+  const now = new Date();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
-  
-  // Determine phase date range if phaseId is specified
+
+  // Phase date range
   let phaseStart = null, phaseEnd = null;
   if (phaseId && _allPhases) {
     const phase = _allPhases.find(p => p.id == phaseId);
-    if (phase) {
-      phaseStart = phase.start_date;
-      phaseEnd = phase.end_date || '9999-12-31';
-    }
+    if (phase) { phaseStart = phase.start_date; phaseEnd = phase.end_date || '9999-12-31'; }
   }
-  
-  // Find exercises tagged with this muscle
+
+  // Primary muscle only (option 1) — first tag on the exercise
   const muscleExercises = EXERCISE_BANK
-    .filter(ex => { if (!ex.muscles) return false; if (Array.isArray(ex.muscles)) return ex.muscles.includes(muscleGroup); if (typeof ex.muscles === 'string') return ex.muscles.split(',').map(m=>m.trim()).includes(muscleGroup); return false; })
+    .filter(ex => {
+      const muscles = Array.isArray(ex.muscles) ? ex.muscles
+        : (typeof ex.muscles === 'string' ? ex.muscles.split(',').map(m => m.trim()) : []);
+      return muscles[0] === muscleGroup;
+    })
     .map(ex => ex.name);
-  
+
   if (!muscleExercises.length) return { pct: 0 };
-  
-  // Get all sets from this muscle in the period
-  const periodSets = [];
+
+  // Build per-session RD contribution for this muscle group
+  // RD = sum(trueLbs × reps) / (sum(set.time) × session.bw)
+  const sessionRDs = [];
   sessions.forEach(s => {
     if (s.date < cutoffStr) return;
-    // Filter by phase if specified
     if (phaseId && phaseStart && phaseEnd) {
       if (s.date < phaseStart || s.date > phaseEnd) return;
     }
+    const bw = parseFloat(s.bw || 0);
+    if (!bw) return;
     if (!s.exercises || !Array.isArray(s.exercises)) return;
+
+    let vol = 0, time = 0;
     s.exercises.forEach(ex => {
       if (!muscleExercises.includes(ex.name)) return;
-      if (!ex.sets || !Array.isArray(ex.sets)) return;
-      ex.sets.forEach(set => {
-        periodSets.push({
-          date: s.date,
-          load: parseFloat(set.load || set.rawLoad || 0),
-          weight: parseFloat(set.weight || 0)
-        });
+      (ex.sets || []).forEach(set => {
+        const load = parseFloat(set.trueLbs || set.rawLoad || 0);
+        const reps = parseFloat(set.reps || 0);
+        const t    = parseFloat(set.time || 1.5);
+        vol  += load * reps;
+        time += t;
       });
     });
+
+    if (vol > 0 && time > 0) {
+      sessionRDs.push({ date: s.date, rd: vol / (time * bw) });
+    }
   });
-  if (periodSets.length) console.log(`  loads: ${periodSets.map(s => s.load).join(', ')}`);
-  
-  if (!periodSets.length) return { pct: 0 };
-  
-  // Split by date
-  periodSets.sort((a, b) => a.date.localeCompare(b.date));
-  const midPoint = Math.floor(periodSets.length / 2);
-  const firstHalf = periodSets.slice(0, midPoint);
-  const secondHalf = periodSets.slice(midPoint);
-  
-  const startLoad = Math.max(...firstHalf.map(s => s.load || 0), 0);
-  const endLoad = Math.max(...secondHalf.map(s => s.load || 0), 0);
-  
-  if (startLoad === 0 && endLoad === 0) return { pct: 0 };
-  if (startLoad === 0) return { pct: 100 };
-  
-  const pct = Math.round(((endLoad - startLoad) / startLoad) * 100);
+
+  if (sessionRDs.length < 2) return { pct: 0 };
+
+  sessionRDs.sort((a, b) => a.date.localeCompare(b.date));
+  const mid    = Math.floor(sessionRDs.length / 2);
+  const first  = sessionRDs.slice(0, mid);
+  const second = sessionRDs.slice(mid);
+
+  const avg = arr => arr.reduce((s, x) => s + x.rd, 0) / arr.length;
+  const rdFirst  = avg(first);
+  const rdSecond = avg(second);
+
+  if (rdFirst === 0) return { pct: rdSecond > 0 ? 100 : 0 };
+  const pct = Math.round(((rdSecond - rdFirst) / rdFirst) * 100);
   return { pct };
 }
 
@@ -5115,7 +5124,8 @@ function showAnatomyTooltip(e, muscle, pct) {
   }
   const sign = pct > 0 ? '+' : '';
   const color = pct > 3 ? '#4ade80' : pct < -3 ? '#ff6b6b' : '#3b82f6';
-  tip.innerHTML = `<div style="font-weight:600;color:var(--text);margin-bottom:2px;">${muscle}</div><div style="font-size:15px;font-weight:700;color:${color};">${sign}${pct}%</div>`;
+  const label = pct > 3 ? 'RD improving' : pct < -3 ? 'RD declining' : 'RD stable';
+  tip.innerHTML = `<div style="font-weight:600;color:var(--text);margin-bottom:2px;">${muscle}</div><div style="font-size:15px;font-weight:700;color:${color};">${sign}${pct}%</div><div style="font-size:11px;color:var(--text3);">${label}</div>`;
   tip.style.display = 'block';
   tip.style.left = (e.clientX + 14) + 'px';
   tip.style.top = (e.clientY - 10) + 'px';
