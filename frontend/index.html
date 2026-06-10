@@ -567,7 +567,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
         <div>
           <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Strength Progress by Muscle</div>
-          <div style="font-size:13px;color:var(--text2);">% change in max load per muscle group</div>
+          <div style="font-size:13px;color:var(--text2);">% change in relative density (RD) per muscle group — needs 4+ sessions to show signal</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <label style="font-size:12px;color:var(--text2);">Period</label>
@@ -1144,7 +1144,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.8.2';
+const APP_VERSION = '0.8.3';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4694,6 +4694,12 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.8.3': [
+    'Heatmap: minimum 4 sessions required before showing signal — short windows no longer show misleading colors',
+    'Heatmap: subtitle corrected to "% change in relative density (RD) per muscle group"',
+    'Heatmap: tooltip shows "Not enough data" when session count is below threshold',
+    'Heatmap: insufficient flag correctly passed through tooltip call chain',
+  ],
   '0.8.2': [
     'Anatomy heatmap: now shows RD delta per muscle group (primary muscle only) instead of load delta — green = RD improving, blue = stable, red = declining',
     'Heatmap tooltip updated: shows RD improving / stable / declining label with magnitude',
@@ -5076,7 +5082,7 @@ function getStrengthDelta(muscleGroup, days, phaseId) {
     }
   });
 
-  if (sessionRDs.length < 2) return { pct: 0 };
+  if (sessionRDs.length < 4) return { pct: 0, insufficient: true };
 
   sessionRDs.sort((a, b) => a.date.localeCompare(b.date));
   const mid    = Math.floor(sessionRDs.length / 2);
@@ -5114,7 +5120,7 @@ function getMuscleColor(pct) {
 }
 
 
-function showAnatomyTooltip(e, muscle, pct) {
+function showAnatomyTooltip(e, muscle, pct, insufficient) {
   let tip = document.getElementById('anatomy-tooltip');
   if (!tip) {
     tip = document.createElement('div');
@@ -5124,8 +5130,9 @@ function showAnatomyTooltip(e, muscle, pct) {
   }
   const sign = pct > 0 ? '+' : '';
   const color = pct > 3 ? '#4ade80' : pct < -3 ? '#ff6b6b' : '#3b82f6';
-  const label = pct > 3 ? 'RD improving' : pct < -3 ? 'RD declining' : 'RD stable';
-  tip.innerHTML = `<div style="font-weight:600;color:var(--text);margin-bottom:2px;">${muscle}</div><div style="font-size:15px;font-weight:700;color:${color};">${sign}${pct}%</div><div style="font-size:11px;color:var(--text3);">${label}</div>`;
+  const label = insufficient ? 'Not enough data for this period'
+    : pct > 3 ? 'RD improving' : pct < -3 ? 'RD declining' : 'RD stable';
+  tip.innerHTML = `<div style="font-weight:600;color:var(--text);margin-bottom:2px;">${muscle}</div><div style="font-size:15px;font-weight:700;color:${color};">${insufficient ? '—' : sign + pct + '%'}</div><div style="font-size:11px;color:var(--text3);">${label}</div>`;
   tip.style.display = 'block';
   tip.style.left = (e.clientX + 14) + 'px';
   tip.style.top = (e.clientY - 10) + 'px';
@@ -5137,7 +5144,7 @@ function hideAnatomyTooltip() {
 }
 
 // Keep old names as aliases in case called from SVG inline
-function showMuscleTooltip(e, muscle) { showAnatomyTooltip(e, muscle, getStrengthDelta(muscle, 30).pct); }
+function showMuscleTooltip(e, muscle) { const d = getStrengthDelta(muscle, 30); showAnatomyTooltip(e, muscle, d.pct, d.insufficient); }
 function hideTooltip() { hideAnatomyTooltip(); }
 
 function populateAnatomyPhases() {
@@ -5203,7 +5210,7 @@ function renderAnatomyHeatmap() {
   Object.entries(muscleMap).forEach(([muscle, ids]) => {
     if (!ids || !ids.length) return;
     const delta = getStrengthDelta(muscle, days, phaseId);
-    muscleDeltas[muscle] = delta.pct;
+    muscleDeltas[muscle] = { pct: delta.pct, insufficient: !!delta.insufficient };
   });
 
   // Attach hover events and apply colors
@@ -5211,7 +5218,9 @@ function renderAnatomyHeatmap() {
   hiRegions.forEach(el => {
     const mapKey = Object.keys(muscleMap).find(k => muscleMap[k].includes(el.id));
     if (!mapKey) return;
-    const pct = muscleDeltas[mapKey] || 0;
+    const deltaObj = muscleDeltas[mapKey] || { pct: 0, insufficient: true };
+    const pct = deltaObj.pct;
+    const insufficient = deltaObj.insufficient;
     const color = getMuscleColor(pct);
     const muscle = mapKey;
 
@@ -5223,7 +5232,7 @@ function renderAnatomyHeatmap() {
     el.setAttribute('style', `fill:${color};fill-opacity:0.72;`);
 
     el.addEventListener('mouseenter', function(e) {
-      showAnatomyTooltip(e, muscle, pct);
+      showAnatomyTooltip(e, muscle, pct, insufficient);
     });
     el.addEventListener('mouseleave', hideAnatomyTooltip);
     el.addEventListener('mousemove', function(e) {
