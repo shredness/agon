@@ -259,10 +259,17 @@ def init_db():
             start_date TEXT NOT NULL,
             end_date   TEXT,
             notes      TEXT,
+            label      TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+    # Migrate: add label to phases
+    try:
+        conn.execute("ALTER TABLE phases ADD COLUMN label TEXT")
+        conn.commit()
+    except Exception:
+        pass
 
     # Persisted Insights conversation history (one row per message)
     conn.execute("""
@@ -465,6 +472,7 @@ class PhaseIn(BaseModel):
     start_date: str
     end_date:   Optional[str] = None
     notes:      Optional[str] = None
+    label:      Optional[str] = None
 
 class AISettingsIn(BaseModel):
     ai_key: Optional[str] = None      # plaintext key from user; None = don't change
@@ -1273,7 +1281,7 @@ def build_training_context(uid: int) -> str:
 
     # Add active phase
     active_phase = conn.execute(
-        "SELECT phase_type, start_date FROM phases WHERE user_id=? AND end_date IS NULL ORDER BY start_date DESC LIMIT 1",
+        "SELECT phase_type, start_date, label FROM phases WHERE user_id=? AND end_date IS NULL ORDER BY start_date DESC LIMIT 1",
         (uid,)
     ).fetchone()
     # Add active protocols
@@ -1283,7 +1291,10 @@ def build_training_context(uid: int) -> str:
     ).fetchall()
     conn.close()
     if active_phase:
-        lines.append(f"Current training phase: {active_phase['phase_type']} (since {active_phase['start_date']})")
+        phase_display = active_phase['phase_type']
+        if active_phase.get('label'):
+            phase_display += f" ({active_phase['label']})"
+        lines.append(f"Current training phase: {phase_display} (since {active_phase['start_date']})")
         lines.append("")
 
     if protos:
@@ -1915,7 +1926,7 @@ def get_phases(user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, phase_type, start_date, end_date, notes FROM phases WHERE user_id=? ORDER BY start_date DESC",
+        "SELECT id, phase_type, start_date, end_date, notes, label FROM phases WHERE user_id=? ORDER BY start_date DESC",
         (uid,)
     ).fetchall()
     conn.close()
@@ -1936,8 +1947,8 @@ def create_phase(body: PhaseIn, user=Depends(current_user)):
             (body.start_date, user["id"])
         )
     conn.execute(
-        "INSERT INTO phases (user_id, phase_type, start_date, end_date, notes) VALUES (?,?,?,?,?)",
-        (user["id"], body.phase_type, body.start_date, body.end_date or None, body.notes or None)
+        "INSERT INTO phases (user_id, phase_type, start_date, end_date, notes, label) VALUES (?,?,?,?,?,?)",
+        (user["id"], body.phase_type, body.start_date, body.end_date or None, body.notes or None, body.label or None)
     )
     conn.commit()
     conn.close()

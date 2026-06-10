@@ -513,6 +513,10 @@
         </select>
       </div>
       <div class="form-group" style="margin-bottom:10px;">
+        <label>Label <span style="color:var(--text3);font-weight:400;">(optional — e.g. "GLP-1 Phase 2", "Pre-contest")</span></label>
+        <input type="text" id="phase-label" style="width:100%;" placeholder="Short custom name for this phase">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
         <label>Start date</label>
         <input type="date" id="phase-start" style="width:100%;">
       </div>
@@ -1144,7 +1148,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.8.4';
+const APP_VERSION = '0.8.5';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4551,13 +4555,18 @@ async function loadPhases() {
       return;
     }
     list.innerHTML = phases.map(p => {
-      const color = PHASE_COLORS[p.phase_type] || 'var(--text2)';
+      const color  = PHASE_COLORS[p.phase_type] || 'var(--text2)';
       const endStr = p.end_date || '<span style="color:#10B981;">Ongoing</span>';
+      const labelBadge = p.label ? `<span style="font-size:11px;color:var(--text3);font-style:italic;">${escapeHtml(p.label)}</span>` : '';
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border);">
         <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;"></span>
-        <span style="font-weight:600;color:${color};min-width:80px;">${escapeHtml(p.phase_type)}</span>
-        <span style="color:var(--text2);font-size:12px;">${p.start_date} - ${endStr}</span>
-        ${p.notes ? `<span style="color:var(--text3);font-size:12px;flex:1;">${escapeHtml(p.notes)}</span>` : '<span style="flex:1;"></span>'}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-weight:600;color:${color};">${escapeHtml(p.phase_type)}</span>
+            ${labelBadge}
+          </div>
+          <div style="font-size:12px;color:var(--text2);">${p.start_date} – ${endStr}${p.notes ? ' · ' + escapeHtml(p.notes) : ''}</div>
+        </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           ${!p.end_date ? `<button class="btn btn-sm" onclick="closePhase(${p.id})" style="font-size:11px;">Close</button>` : ''}
           <button class="btn btn-sm btn-danger" onclick="deletePhase(${p.id})" style="font-size:11px;">✕</button>
@@ -4574,6 +4583,7 @@ function openNewPhaseModal() {
   document.getElementById('phase-start').value = new Date().toISOString().slice(0,10);
   document.getElementById('phase-end').value = '';
   document.getElementById('phase-notes').value = '';
+  document.getElementById('phase-label').value = '';
 }
 
 function closePhaseModal() {
@@ -4586,6 +4596,7 @@ async function savePhase() {
     start_date: document.getElementById('phase-start').value,
     end_date:   document.getElementById('phase-end').value   || null,
     notes:      document.getElementById('phase-notes').value || null,
+    label:      document.getElementById('phase-label').value || null,
   };
   if (!body.start_date) { showToast('Start date is required'); return; }
   try {
@@ -4694,6 +4705,12 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.8.5': [
+    'Phases: optional Label field added — name phases "GLP-1 Phase 2", "Pre-contest", etc.',
+    'Phase dropdown (heatmap): now shows type + label + date range — disambiguates same-type phases',
+    'Phase list: label shown as italic badge, dates and notes on second line',
+    'AI context: active phase label passed through when present',
+  ],
   '0.8.4': [
     'Heatmap: period options changed to weeks (4w / 6w / 3m / 6m / 1y) — 7-day option removed',
   ],
@@ -5158,10 +5175,15 @@ function populateAnatomyPhases() {
   _allPhases.forEach(ph => {
     const opt = document.createElement('option');
     opt.value = ph.id;
-    opt.textContent = ph.phase_type + (ph.end_date ? '' : ' (current)');
+    // Build a unique, readable label: type + optional custom label + date range
+    const dateRange = ph.start_date.slice(0, 7) + ' – ' + (ph.end_date ? ph.end_date.slice(0, 7) : 'ongoing');
+    const display = ph.label
+      ? `${ph.phase_type} · ${ph.label} (${dateRange})`
+      : `${ph.phase_type} (${dateRange})`;
+    opt.textContent = display;
     sel.appendChild(opt);
   });
-  sel.value = current;
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
 }
 
 function renderAnatomyHeatmap() {
