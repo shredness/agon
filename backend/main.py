@@ -2038,7 +2038,7 @@ def get_recomp(user=Depends(current_user)):
 def get_protocols(user=Depends(current_user)):
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=? ORDER BY sort_order, id",
+        "SELECT id, name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=? ORDER BY CASE WHEN end_date IS NULL THEN 0 ELSE 1 END ASC, end_date DESC, start_date DESC",
         (user["id"],)
     ).fetchall()
     conn.close()
