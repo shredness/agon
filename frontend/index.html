@@ -572,9 +572,9 @@
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <label style="font-size:12px;color:var(--text2);">Period</label>
           <select id="anatomy-period" style="font-size:12px;padding:5px 8px;" onchange="renderAnatomyHeatmap()">
-            <option value="7">Last 7 days</option>
-            <option value="30" selected>Last 30 days</option>
-            <option value="90">Last 90 days</option>
+            <option value="28" selected>Last 4 weeks</option>
+            <option value="42">Last 6 weeks</option>
+            <option value="90">Last 3 months</option>
             <option value="180">Last 6 months</option>
             <option value="365">Last year</option>
           </select>
@@ -1144,7 +1144,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.8.3';
+const APP_VERSION = '0.8.4';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4694,6 +4694,9 @@ function switchGuideTab(tab) {
 
 // ── Changelog ─────────────────────────────────────────────────
 const CHANGELOG = {
+  '0.8.4': [
+    'Heatmap: period options changed to weeks (4w / 6w / 3m / 6m / 1y) — 7-day option removed',
+  ],
   '0.8.3': [
     'Heatmap: minimum 4 sessions required before showing signal — short windows no longer show misleading colors',
     'Heatmap: subtitle corrected to "% change in relative density (RD) per muscle group"',
