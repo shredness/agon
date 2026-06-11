@@ -1081,7 +1081,7 @@ def get_set_curve(ex_name: str, user=Depends(current_user)):
             if ex.get("name", "").lower() != ex_name.lower():
                 continue
             sets = ex.get("sets", [])
-            if len(sets) < 2 or len(sets) >= 10:
+            if len(sets) < 2 or len(sets) > 10:
                 continue
             loads = [s.get("trueLbs") or s.get("rawLoad") or 0 for s in sets]
             if not all(abs(l - loads[0]) < 0.5 for l in loads):
