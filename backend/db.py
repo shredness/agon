@@ -54,7 +54,7 @@ def get_db():
 
 class _ConnectionWrapper:
     """Wrapper for psycopg2 connections from the pool that ensures proper cleanup.
-    Mimics sqlite3 connection API (execute directly on connection)."""
+    Mimics sqlite3 connection API (execute directly on connection, ? -> %s conversion)."""
     def __init__(self, conn):
         self._conn = conn
         self._cursor = None
@@ -63,11 +63,14 @@ class _ConnectionWrapper:
         """Get a cursor from the connection."""
         return self._conn.cursor(*args, **kwargs)
     
-    def execute(self, *args, **kwargs):
-        """Execute SQL directly (like sqlite3). Creates an auto-returning cursor."""
+    def execute(self, sql, params=None):
+        """Execute SQL directly (like sqlite3). Converts ? to %s for psycopg2."""
         if not self._cursor:
             self._cursor = self._conn.cursor()
-        return self._cursor.execute(*args, **kwargs)
+        # Convert SQLite ? placeholders to psycopg2 %s
+        if params and '?' in sql:
+            sql = sql.replace('?', '%s')
+        return self._cursor.execute(sql, params)
     
     def fetchone(self):
         """Fetch one row from the last execute."""
