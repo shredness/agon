@@ -759,7 +759,7 @@ def add_exercise(body: ExerciseIn, user=Depends(current_user)):
                 is_bw=excluded.is_bw, sort_order=excluded.sort_order,
                 rep_trigger_override=excluded.rep_trigger_override
         """, (body.name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
-              body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"],
+              body.day, body.load_hint, body.is_bw, body.sort_order, user["id"],
               body.rep_trigger_override))
         conn.commit()
     except Exception as e:
@@ -782,14 +782,14 @@ def update_exercise(ex_name: str, body: ExerciseIn, user=Depends(current_user)):
         result = conn.execute(
             "UPDATE exercises SET alias=?, tool=?, mult=?, muscles=?, day=?, load_hint=?, is_bw=?, sort_order=?, rep_trigger_override=? WHERE name=?",
             (body.alias, body.tool, body.mult, json.dumps(body.muscles),
-             body.day, body.load_hint, int(body.is_bw), body.sort_order,
+             body.day, body.load_hint, body.is_bw, body.sort_order,
              body.rep_trigger_override, ex_name))
     else:
         # New exercise — insert with ownership
         conn.execute(
             "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by, rep_trigger_override) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (ex_name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
-             body.day, body.load_hint, int(body.is_bw), body.sort_order, user["id"],
+             body.day, body.load_hint, body.is_bw, body.sort_order, user["id"],
              body.rep_trigger_override))
     conn.commit()
     conn.close()
