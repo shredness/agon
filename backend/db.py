@@ -53,15 +53,33 @@ def get_db():
 
 
 class _ConnectionWrapper:
-    """Wrapper for connections from the pool that ensures proper cleanup."""
+    """Wrapper for psycopg2 connections from the pool that ensures proper cleanup.
+    Mimics sqlite3 connection API (execute directly on connection)."""
     def __init__(self, conn):
         self._conn = conn
+        self._cursor = None
     
     def cursor(self, *args, **kwargs):
+        """Get a cursor from the connection."""
         return self._conn.cursor(*args, **kwargs)
     
     def execute(self, *args, **kwargs):
-        return self._conn.execute(*args, **kwargs)
+        """Execute SQL directly (like sqlite3). Creates an auto-returning cursor."""
+        if not self._cursor:
+            self._cursor = self._conn.cursor()
+        return self._cursor.execute(*args, **kwargs)
+    
+    def fetchone(self):
+        """Fetch one row from the last execute."""
+        if self._cursor:
+            return self._cursor.fetchone()
+        return None
+    
+    def fetchall(self):
+        """Fetch all rows from the last execute."""
+        if self._cursor:
+            return self._cursor.fetchall()
+        return []
     
     def commit(self):
         return self._conn.commit()
@@ -71,13 +89,12 @@ class _ConnectionWrapper:
     
     def close(self):
         """Return connection to pool instead of closing it."""
+        if self._cursor:
+            self._cursor.close()
+            self._cursor = None
         if self._conn:
             _pg_pool.putconn(self._conn)
             self._conn = None
-    
-    def __getitem__(self, key):
-        """Support row["field"] syntax for DictCursor rows."""
-        return self._conn[key]
     
     def __enter__(self):
         return self
