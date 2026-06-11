@@ -70,7 +70,8 @@ class _ConnectionWrapper:
         # Convert SQLite ? placeholders to psycopg2 %s
         if params and '?' in sql:
             sql = sql.replace('?', '%s')
-        return self._cursor.execute(sql, params)
+        self._cursor.execute(sql, params)
+        return self  # Return self to support chaining: conn.execute().fetchone()
     
     def fetchone(self):
         """Fetch one row from the last execute."""
