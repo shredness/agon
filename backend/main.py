@@ -1073,10 +1073,7 @@ def get_set_curve(ex_name: str, user=Depends(current_user)):
     load_history   = []
 
     for row in rows:
-        try:
-            exs = json.loads(row["exercises"])
-        except Exception:
-            continue
+        exs = row["exercises"] if isinstance(row["exercises"], list) else json.loads(row["exercises"])
         for ex in exs:
             if ex.get("name", "").lower() != ex_name.lower():
                 continue
@@ -2212,10 +2209,7 @@ def get_external_data(request: Request, key: Optional[str] = None,
     # Build structured response
     session_list = []
     for s in sessions:
-        try:
-            exs = json.loads(s["exercises"])
-        except Exception:
-            exs = []
+        exs = s["exercises"] if isinstance(s["exercises"], list) else json.loads(s["exercises"])
         session_list.append({
             "date": s["date"],
             "bw":   s["bw"],
