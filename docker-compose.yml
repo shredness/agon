@@ -16,7 +16,7 @@ services:
       - PGDATA=/data/postgres
       - POSTGRES_DB=agon
       - POSTGRES_USER=agon
-      - POSTGRES_PASSWORD=agon_prod_password_change_me
+      - POSTGRES_PASSWORD=PgAg0n_K7xM2pV9qW3rS_t5uL8nBc
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agon -d agon"]
       interval: 10s
@@ -32,7 +32,7 @@ services:
     volumes:
       - rdtracker:/data
     environment:
-      - DATABASE_URL=postgresql://agon:agon_prod_password_change_me@agon-postgres:5432/agon
+      - DATABASE_URL=postgresql://agon:PgAg0n_K7xM2pV9qW3rS_t5uL8nBc@agon-postgres:5432/agon
       - DB_PATH=/data/sessions.db
       - SECRET_KEY=f7K#mP2$nX9qRvL4wZ8jYtB6cHsE3uA5dGiNpW1oF0yCkVbMeQhTxJlUzDrS
       - ALLOWED_ORIGINS=https://agon.savo.us,http://localhost,http://localhost:3800
