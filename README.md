@@ -43,7 +43,7 @@ A rising RD means you are getting stronger per pound of bodyweight — the signa
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI, SQLite |
+| Backend | FastAPI, PostgreSQL |
 | Frontend | Vanilla HTML / JS / CSS (single file) |
 | Infrastructure | Docker, nginx |
 | CI/CD | GitHub Actions → GHCR |
@@ -67,10 +67,10 @@ docker-compose up -d
 
 | Variable | Default | Description |
 |---|---|---|
+| `DATABASE_URL` | *(required)* | PostgreSQL connection string: `postgresql://user:password@host:5432/dbname` |
 | `SECRET_KEY` | *(insecure default)* | JWT signing key — **must be changed**; app refuses to start with the default |
 | `ADMIN_USER` | `admin` | Admin account username |
 | `ADMIN_PASS` | *(insecure default)* | Admin account password — **change this** |
-| `DB_PATH` | `/data/sessions.db` | SQLite database path |
 | `ALLOWED_ORIGINS` | `https://your-domain.com,...` | Comma-separated CORS origins |
 | `ALLOW_REGISTRATION` | `false` | Set `true` to enable public sign-up (pending admin approval) |
 | `ALLOW_DEFAULT_SECRET` | `false` | Local-dev only — never set in production |
@@ -78,6 +78,18 @@ docker-compose up -d
 ---
 
 ## Security Model
+
+### Why PostgreSQL?
+
+As of v0.9.0, Agon uses PostgreSQL instead of SQLite. This migration improves **stability** and **security** in three critical ways:
+
+1. **Concurrent access** — SQLite's file-level locking prevents simultaneous write operations. PostgreSQL supports true concurrent transactions, eliminating lock contention and enabling safe multi-user workloads.
+2. **Data integrity** — ACID guarantees with proper isolation levels. PostgreSQL enforces referential integrity and multi-row transactions atomically; SQLite's journal mode is less robust under edge conditions.
+3. **Attack surface reduction** — No file-based database on disk. SQLite stores all data in a single file that must be readable by the app process; Postgres uses a separate service with credential-based authentication and network-level isolation. Credentials are managed through environment variables, never committed to source.
+
+The Docker Compose file includes a dedicated Postgres service (`agon-postgres`) running as a separate container with encrypted passwords and internal networking.
+
+### Security features
 
 - Passwords hashed with bcrypt; complexity enforced (10+ chars, upper, lower, digit, special)
 - JWT auth on all protected endpoints; admin role enforced server-side
@@ -156,7 +168,7 @@ CI/CD: pushes to `master` build and push Docker images to GHCR. The service work
 
 ## Current Version
 
-**v0.7.9**
+**v0.9.0** — Major milestone: migrated from SQLite to PostgreSQL for enhanced stability and security.
 
 See the in-app What's New modal for the full changelog.
 
