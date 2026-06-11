@@ -982,7 +982,7 @@ def get_exercise_bank(user=Depends(current_user)):
     rows = conn.execute("SELECT * FROM exercises ORDER BY name ASC").fetchall()
     conn.close()
     return [{"id":r["id"],"name":r["name"],"alias":r["alias"],"tool":r["tool"],
-             "mult":r["mult"],"muscles":json.loads(r["muscles"]),"day":r["day"],
+             "mult":r["mult"],"muscles":r["muscles"] if isinstance(r["muscles"], list) else json.loads(r["muscles"]),"day":r["day"],
              "loadHint":r["load_hint"],"isBW":bool(r["is_bw"]),"sortOrder":r["sort_order"],
              "createdBy":r["created_by"],
              "repTriggerOverride": r["rep_trigger_override"] if r["rep_trigger_override"] else None
