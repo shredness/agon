@@ -12,8 +12,16 @@ import bcrypt as _bcrypt
 
 # Import new dual-database module
 import db as database_module
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Agon API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize database
+    database_module.init_db()
+    yield
+    # Shutdown: (connection pool cleanup handled by db module)
+
+app = FastAPI(title="Agon API", lifespan=lifespan)
 
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS",
@@ -28,7 +36,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_PATH           = os.environ.get("DB_PATH", "/data/sessions.db")
 SECRET_KEY        = os.environ.get("SECRET_KEY", "agon-change-this-in-production")
 ALGORITHM         = "HS256"
 TOKEN_EXPIRE_DAYS = 30
@@ -50,261 +57,8 @@ ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "false").lower() == "t
 
 # ── DB ────────────────────────────────────────────────────────
 def get_db():
-    """Backwards-compatible wrapper: delegates to new database module."""
+    """Get a Postgres connection from the pool."""
     return database_module.get_db_sync()
-
-
-def migrate_sessions_to_per_set_time(conn):
-    """
-    One-time migration: move ex.time down to each set as set.time.
-    After migration, ex.time is removed (density recalculated from sets).
-    Idempotent — skips sets that already have a time field.
-    """
-    rows = conn.execute("SELECT id, exercises FROM sessions").fetchall()
-    updated = 0
-    for r in rows:
-        exercises = r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])
-        changed = False
-        for ex in exercises:
-            ex_time = ex.get("time", 10)
-            new_sets = []
-            for s in ex.get("sets", []):
-                if "time" not in s:
-                    s["time"] = ex_time
-                    changed = True
-                new_sets.append(s)
-            ex["sets"] = new_sets
-            # Recalculate density from per-set data
-            if changed:
-                total_density = sum(
-                    (s.get("vol", 0) / s.get("time", 1))
-                    for s in new_sets if s.get("time", 0) > 0
-                )
-                ex["density"] = round(total_density, 2)
-                ex["totalVol"] = round(sum(s.get("vol", 0) for s in new_sets), 1)
-        if changed:
-            # Recalculate session RD
-            bw = conn.execute("SELECT bw FROM sessions WHERE id=?", (r["id"],)).fetchone()["bw"]
-            total_vol  = sum(s.get("vol", 0)  for ex in exercises for s in ex.get("sets", []))
-            total_time = sum(s.get("time", 0) for ex in exercises for s in ex.get("sets", []) if s.get("time", 0) > 0)
-            total_density = round(total_vol / total_time, 2) if total_time > 0 else 0
-            rd = round(total_vol / (total_time * bw), 2) if (total_time > 0 and bw) else 0
-            conn.execute(
-                "UPDATE sessions SET exercises=?, rd=?, total_density=? WHERE id=?",
-                (json.dumps(exercises), rd, total_density, r["id"])
-            )
-            updated += 1
-    if updated:
-        conn.commit()
-        print(f"Migrated {updated} sessions to per-set time model")
-
-
-def init_db():
-    conn = get_db()
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            username   TEXT NOT NULL UNIQUE,
-            hashed_pw  TEXT NOT NULL,
-            role       TEXT NOT NULL DEFAULT 'guest',
-            status     TEXT NOT NULL DEFAULT 'active',
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id       INTEGER NOT NULL DEFAULT 1,
-            date          TEXT NOT NULL,
-            bw            REAL NOT NULL,
-            rd            REAL NOT NULL,
-            total_density REAL NOT NULL,
-            exercises     TEXT NOT NULL,
-            created_at    TEXT DEFAULT (datetime('now')),
-            UNIQUE(user_id, date)
-        )
-    """)
-
-    cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
-    if "user_id" not in cols:
-        conn.execute("ALTER TABLE sessions ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1")
-    if "notes" not in cols:
-        conn.execute("ALTER TABLE sessions ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
-
-    # Migrate users table
-    user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
-    if "status" not in user_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
-        conn.commit()
-    conn.commit()
-
-    # Seed admin
-    if not conn.execute("SELECT id FROM users WHERE username=?", (ADMIN_USER,)).fetchone():
-        conn.execute(
-            "INSERT INTO users (username, hashed_pw, role) VALUES (?,?,?)",
-            (ADMIN_USER, _bcrypt.hashpw(ADMIN_PASS.encode(), _bcrypt.gensalt()).decode(), "admin")
-        )
-    # Seed demo
-    if not conn.execute("SELECT id FROM users WHERE username=?", ("demo",)).fetchone():
-        conn.execute(
-            "INSERT INTO users (username, hashed_pw, role) VALUES (?,?,?)",
-            ("demo", _bcrypt.hashpw(b"demo", _bcrypt.gensalt()).decode(), "demo")
-        )
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS exercises (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            name       TEXT NOT NULL UNIQUE,
-            alias      TEXT,
-            tool       TEXT NOT NULL DEFAULT 'Bar',
-            mult       REAL NOT NULL DEFAULT 2.0,
-            muscles    TEXT NOT NULL DEFAULT '[]',
-            day        TEXT,
-            load_hint  TEXT,
-            is_bw      INTEGER NOT NULL DEFAULT 0,
-            sort_order INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now')),
-            created_by INTEGER DEFAULT NULL
-        )
-    """)
-    # Migrate: add created_by if not exists
-    try:
-        conn.execute("ALTER TABLE exercises ADD COLUMN created_by INTEGER DEFAULT NULL")
-        conn.commit()
-    except Exception:
-        pass
-    # Migrate: add rep_trigger_override to exercises
-    try:
-        conn.execute("ALTER TABLE exercises ADD COLUMN rep_trigger_override INTEGER DEFAULT NULL")
-        conn.commit()
-    except Exception:
-        pass
-
-    # Per-user AI settings, profile info, and preferences
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS user_settings (
-            user_id      INTEGER PRIMARY KEY,
-            ai_key_enc   TEXT,
-            ai_model     TEXT DEFAULT 'gemini-2.5-flash',
-            first_name   TEXT,
-            last_name    TEXT,
-            dob          TEXT,
-            gender       TEXT,
-            week_start   TEXT DEFAULT 'Saturday',
-            height_in    REAL,
-            target_bw    REAL,
-            updated_at   TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    # Migrate existing rows to add new profile columns if they don't exist
-    for col, default in [('first_name','NULL'),('last_name','NULL'),('dob','NULL'),
-                         ('gender','NULL'),('week_start',"'Saturday'"),
-                         ('height_in','NULL'),('target_bw','NULL'),
-                         ('activity_level',"'1.55'"),
-                         ('onboarded',"'0'"),
-                         ('external_api_key','NULL'),
-                         ('last_seen_version',"'0.0.0'"),
-                         ('totp_secret','NULL'),
-                         ('totp_enabled',"'0'"),
-                         ('rep_trigger',"'50'")]:
-        try:
-            conn.execute(f"ALTER TABLE user_settings ADD COLUMN {col} TEXT DEFAULT {default}")
-            conn.commit()
-        except Exception:
-            pass
-
-    # Supplement/peptide protocols table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS protocols (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            name       TEXT NOT NULL,
-            dose       TEXT,
-            frequency  TEXT,
-            notes      TEXT,
-            sort_order INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    # Migrate: add start_date / end_date if not present
-    existing_cols = [r[1] for r in conn.execute("PRAGMA table_info(protocols)").fetchall()]
-    if 'start_date' not in existing_cols:
-        conn.execute("ALTER TABLE protocols ADD COLUMN start_date TEXT")
-    if 'end_date' not in existing_cols:
-        conn.execute("ALTER TABLE protocols ADD COLUMN end_date TEXT")
-    conn.commit()
-
-    # Application event log
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER,
-            username   TEXT,
-            event_type TEXT NOT NULL,
-            detail     TEXT,
-            ip         TEXT,
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-
-    # Training phases table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS phases (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            phase_type TEXT NOT NULL,
-            start_date TEXT NOT NULL,
-            end_date   TEXT,
-            notes      TEXT,
-            label      TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    # Migrate: add label to phases
-    try:
-        conn.execute("ALTER TABLE phases ADD COLUMN label TEXT")
-        conn.commit()
-    except Exception:
-        pass
-
-    # Persisted Insights conversation history (one row per message)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS insights_messages (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            role       TEXT NOT NULL,
-            content    TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-
-    conn.commit()
-
-    # Run per-set time migration (only once, gated by a flag in meta table)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS meta (
-            key   TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    flag = conn.execute("SELECT value FROM meta WHERE key='per_set_time_migration_done'").fetchone()
-    if not flag:
-        migrate_sessions_to_per_set_time(conn)
-        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
-                     ('per_set_time_migration_done', '1'))
-        conn.commit()
-    conn.close()
-
-
-# Initialize database (Postgres with fallback to SQLite)
-database_module.init_db()
 
 
 # ── Event logging ────────────────────────────────────────────────
