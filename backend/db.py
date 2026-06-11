@@ -75,8 +75,8 @@ def get_db_sync():
         if conn:
             # Set default cursor factory to DictCursor for row compatibility
             conn.cursor_factory = DictCursor
-            # Wrap to convert ? to %s for parameter binding
-            return _PostgresConnectionWrapper(conn)
+            # Wrap to convert ? to %s for parameter binding, mark as pool connection
+            return _PostgresConnectionWrapper(conn, is_pool_conn=True)
         return None
     else:
         return sqlite_connection()
@@ -95,8 +95,9 @@ def put_db_sync(conn):
 class _PostgresConnectionWrapper:
     """Wrapper to convert SQLite-style ? parameters to Postgres %s."""
     
-    def __init__(self, conn):
+    def __init__(self, conn, is_pool_conn=False):
         self._conn = conn
+        self._is_pool_conn = is_pool_conn
     
     def execute(self, query, params=None):
         """Execute, converting ? to %s."""
@@ -119,7 +120,11 @@ class _PostgresConnectionWrapper:
         self._conn.rollback()
     
     def close(self):
-        pass  # Don't close; let pool manage it
+        """Close or return to pool."""
+        if self._is_pool_conn and _pg_pool:
+            _pg_pool.putconn(self._conn)
+        else:
+            self._conn.close()
     
     def __getattr__(self, name):
         return getattr(self._conn, name)
@@ -443,9 +448,14 @@ def migrate_sqlite_to_postgres():
         with pg_connection() as pg_conn:
             pg_cur = pg_conn.cursor()
             
-            # Migrate users
+            # Disable FK constraints during migration
+            pg_cur.execute("SET CONSTRAINTS ALL DEFERRED")
+            
+            # Migrate users first
             sqlite_cur.execute("SELECT id, username, hashed_pw, role, status, created_at FROM users")
+            user_ids = set()
             for row in sqlite_cur.fetchall():
+                user_ids.add(row[0])
                 try:
                     pg_cur.execute("""
                         INSERT INTO users (id, username, hashed_pw, role, status, created_at)
@@ -455,14 +465,18 @@ def migrate_sqlite_to_postgres():
                 except Exception as e:
                     logger.warning(f"User insert failed: {e}")
             pg_conn.commit()
-            logger.info("✓ Users migrated")
+            logger.info(f"✓ Users migrated ({len(user_ids)} users)")
             
-            # Migrate sessions
+            # Migrate sessions (only those with valid user_id)
             sqlite_cur.execute("""
                 SELECT id, user_id, date, bw, rd, total_density, exercises, created_at, notes
                 FROM sessions
             """)
+            session_count = 0
             for row in sqlite_cur.fetchall():
+                if row[1] not in user_ids:
+                    logger.warning(f"Skipping session {row[0]}: user_id {row[1]} does not exist")
+                    continue
                 try:
                     pg_cur.execute("""
                         INSERT INTO sessions
@@ -470,24 +484,44 @@ def migrate_sqlite_to_postgres():
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT DO NOTHING
                     """, row)
+                    session_count += 1
                 except Exception as e:
                     logger.warning(f"Session insert failed: {e}")
             pg_conn.commit()
-            logger.info("✓ Sessions migrated")
+            logger.info(f"✓ Sessions migrated ({session_count} sessions)")
             
             # Migrate user_settings, exercises, protocols, events, phases, insights_messages
             for table in ["user_settings", "exercises", "protocols", "events", "phases", "insights_messages"]:
                 try:
                     sqlite_cur.execute(f"SELECT * FROM {table}")
                     cols = [d[0] for d in sqlite_cur.description]
+                    migrated = 0
                     for row in sqlite_cur.fetchall():
+                        # For tables with user_id, check if user exists
+                        if "user_id" in cols:
+                            user_id_idx = cols.index("user_id")
+                            if row[user_id_idx] not in user_ids:
+                                logger.warning(f"Skipping {table} record: user_id {row[user_id_idx]} does not exist")
+                                continue
                         placeholders = ", ".join(["%s"] * len(cols))
                         col_str = ", ".join(cols)
-                        pg_cur.execute(f"INSERT INTO {table} ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING", row)
+                        try:
+                            pg_cur.execute(f"INSERT INTO {table} ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING", row)
+                            migrated += 1
+                        except Exception as e:
+                            logger.warning(f"{table} insert failed: {e}")
                     pg_conn.commit()
-                    logger.info(f"✓ {table} migrated")
+                    logger.info(f"✓ {table} migrated ({migrated} records)")
                 except Exception as e:
                     logger.warning(f"{table} migration: {e}")
+            
+            pg_cur.close()
+            logger.info("✓ Migration complete")
+            
+    except Exception as e:
+        logger.error(f"Postgres migration failed: {e}")
+    finally:
+        sqlite_conn.close()
             
             pg_cur.close()
             logger.info("✓ Migration complete")
