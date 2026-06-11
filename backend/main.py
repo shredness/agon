@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Optional
-import sqlite3, json, os, re
+import json, os, re
 import httpx
 import pyotp, qrcode, io, base64
 from datetime import datetime, timedelta, date as _date
