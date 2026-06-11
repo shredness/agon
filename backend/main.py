@@ -1113,7 +1113,8 @@ def get_logged_exercises(user=Depends(current_user)):
     conn.close()
     names = set()
     for r in rows:
-        for ex in json.loads(r["exercises"]):
+        exercises = r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])
+        for ex in exercises:
             if ex.get("name"):
                 names.add(ex["name"])
     return sorted(names)
