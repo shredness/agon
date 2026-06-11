@@ -3199,7 +3199,7 @@ async function loadRepCurve(exerciseName) {
     (s.exercises || []).some(ex => {
       if (ex.name !== exerciseName) return false;
       const sets = ex.sets || [];
-      if (sets.length < 2 || sets.length >= 10) return false;
+      if (sets.length < 2 || sets.length > 10) return false;
       const loads = sets.map(s => s.trueLbs || s.rawLoad || 0);
       return loads.every(l => Math.abs(l - loads[0]) < 0.5);
     })
