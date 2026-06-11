@@ -837,7 +837,7 @@ def get_sessions(user=Depends(current_user)):
     conn.close()
     return [{"id": r["id"], "date": r["date"], "bw": r["bw"], "rd": r["rd"],
              "total_density": r["total_density"], "notes": r["notes"] or "",
-             "exercises": json.loads(r["exercises"])} for r in rows]
+             "exercises": r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])} for r in rows]
 
 @app.post("/sessions")
 def save_session(session: SessionIn, user=Depends(current_user)):
@@ -915,8 +915,13 @@ def get_trend(user=Depends(current_user)):
     by_week: dict = {}
     for r in rows:
         try:
-            d = datetime.strptime(r["date"], "%Y-%m-%d")
-        except ValueError:
+            # Handle both Postgres (datetime.date) and SQLite (string) date formats
+            if isinstance(r["date"], str):
+                d = datetime.strptime(r["date"], "%Y-%m-%d")
+            else:
+                # r["date"] is already a datetime.date object from Postgres
+                d = datetime.combine(r["date"], datetime.min.time())
+        except (ValueError, TypeError):
             continue
         delta = (end_wd - d.weekday()) % 7
         week_end = d + timedelta(days=delta)
