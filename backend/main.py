@@ -10,6 +10,9 @@ from datetime import datetime, timedelta, date as _date
 from jose import JWTError, jwt
 import bcrypt as _bcrypt
 
+# Import new dual-database module
+import db as database_module
+
 app = FastAPI(title="Agon API")
 
 ALLOWED_ORIGINS = os.environ.get(
@@ -47,10 +50,8 @@ ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "false").lower() == "t
 
 # ── DB ────────────────────────────────────────────────────────
 def get_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Backwards-compatible wrapper: delegates to new database module."""
+    return database_module.get_db_sync()
 
 
 def migrate_sessions_to_per_set_time(conn):
@@ -302,7 +303,8 @@ def init_db():
     conn.close()
 
 
-init_db()
+# Initialize database (Postgres with fallback to SQLite)
+database_module.init_db()
 
 
 # ── Event logging ────────────────────────────────────────────────

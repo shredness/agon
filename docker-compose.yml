@@ -4,6 +4,25 @@ networks:
     name: "internal"
 
 services:
+  database:
+    container_name: agon-postgres
+    image: postgres:15-alpine
+    restart: unless-stopped
+    networks:
+      - "internal"
+    volumes:
+      - rdtracker:/data
+    environment:
+      - PGDATA=/data/postgres
+      - POSTGRES_DB=agon
+      - POSTGRES_USER=agon
+      - POSTGRES_PASSWORD=agon_prod_password_change_me
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agon -d agon"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   backend:
     container_name: agon-data
     image: ghcr.io/shredness/rd-tracker-backend:latest
@@ -13,12 +32,14 @@ services:
     volumes:
       - rdtracker:/data
     environment:
+      - DATABASE_URL=postgresql://agon:agon_prod_password_change_me@agon-postgres:5432/agon
       - DB_PATH=/data/sessions.db
       - SECRET_KEY=f7K#mP2$nX9qRvL4wZ8jYtB6cHsE3uA5dGiNpW1oF0yCkVbMeQhTxJlUzDrS
-      # Comma-separated list of allowed CORS origins
       - ALLOWED_ORIGINS=https://agon.savo.us,http://localhost,http://localhost:3800
-      # Set to "true" to allow public self-registration (guest role, pending admin approval)
       - ALLOW_REGISTRATION=false
+    depends_on:
+      database:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
