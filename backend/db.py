@@ -522,11 +522,3 @@ def migrate_sqlite_to_postgres():
         logger.error(f"Postgres migration failed: {e}")
     finally:
         sqlite_conn.close()
-            
-            pg_cur.close()
-            logger.info("✓ Migration complete")
-            
-    except Exception as e:
-        logger.error(f"Migration failed: {e}")
-    finally:
-        sqlite_conn.close()
