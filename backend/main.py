@@ -63,7 +63,7 @@ def migrate_sessions_to_per_set_time(conn):
     rows = conn.execute("SELECT id, exercises FROM sessions").fetchall()
     updated = 0
     for r in rows:
-        exercises = json.loads(r["exercises"])
+        exercises = r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])
         changed = False
         for ex in exercises:
             ex_time = ex.get("time", 10)
@@ -953,7 +953,7 @@ def get_progress(exercise_name: str, user=Depends(current_user)):
 
     result = []
     for r in rows:
-        exercises = json.loads(r["exercises"])
+        exercises = r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])
         match = next((e for e in exercises
                       if e.get("name","").lower() == exercise_name.lower()), None)
         if not match:
@@ -1352,7 +1352,7 @@ def build_training_context(uid: int) -> str:
 
     for r in rows:
         try:
-            exs = json.loads(r["exercises"])
+            exs = r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])
         except Exception:
             exs = []
         ex_parts = []
