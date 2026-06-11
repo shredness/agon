@@ -172,9 +172,14 @@ def _init_schema(conn):
         CREATE TABLE IF NOT EXISTS exercises (
             id SERIAL PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
-            muscles JSONB DEFAULT '[]'::jsonb,
+            alias VARCHAR(100),
+            tool VARCHAR(50),
             mult NUMERIC(3,1),
+            muscles JSONB DEFAULT '[]'::jsonb,
             day VARCHAR(20),
+            load_hint VARCHAR(100),
+            is_bw BOOLEAN DEFAULT FALSE,
+            sort_order INTEGER DEFAULT 0,
             rep_trigger_override INTEGER,
             created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -199,6 +204,16 @@ def _init_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_protocols_user_id ON protocols(user_id)")
+    
+    # Migrate existing exercises table - add missing columns if they don't exist
+    cursor.execute("""
+        ALTER TABLE exercises
+        ADD COLUMN IF NOT EXISTS alias VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS tool VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS load_hint VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS is_bw BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0
+    """)
     
     conn.commit()
     cursor.close()
