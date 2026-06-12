@@ -1062,6 +1062,9 @@
           <option value="claude-haiku-4-5">Claude Haiku 4.5 (fast)</option>
           <option value="claude-opus-4-5">Claude Opus 4.5 (most capable)</option>
         </optgroup>
+        <optgroup label="Self-hosted">
+          <option value="ollama:mistral">Ollama (Self-hosted)</option>
+        </optgroup>
       </select>
     </div>
     <div class="form-group" style="margin-bottom:8px;">
@@ -1070,6 +1073,13 @@
       <div id="ai-key-status" style="font-size:11px;color:var(--text3);margin-top:4px;"></div>
     </div>
     <div id="ai-key-help" style="font-size:11px;color:var(--text3);margin-bottom:8px;">Gemini: free key at <span style="color:var(--accent);">aistudio.google.com</span> · Claude: <span style="color:var(--accent);">console.anthropic.com</span></div>
+    <div id="ollama-url-section" style="display:none;margin-bottom:12px;">
+      <div class="form-group">
+        <label>Ollama base URL</label>
+        <input type="text" id="ollama-url" placeholder="http://localhost:11434" style="width:100%;">
+      </div>
+      <div style="font-size:12px;color:var(--text3);">Local Ollama instance URL. Leave blank if running locally on default port.</div>
+    </div>
     <div id="settings-msg" style="display:none;font-size:13px;margin-bottom:10px;"></div>
     <div class="modal-footer" style="justify-content:space-between;padding-top:0;margin-top:4px;">
       <button class="btn btn-sm btn-danger" onclick="removeAiKey()" id="settings-remove-btn" style="display:none;">Remove key</button>
@@ -3707,12 +3717,14 @@ function updateKeyPlaceholder() {
   const input = document.getElementById('ai-key');
   const keySection = document.getElementById('ai-key-section');
   const ollamaSection = document.getElementById('ollama-url-section');
+  const helpText = document.getElementById('ai-key-help');
   
   if (isOllama) {
     if (label) label.textContent = '';
     if (input) input.style.display = 'none';
     if (keySection) keySection.style.display = 'none';
     if (ollamaSection) ollamaSection.style.display = 'block';
+    if (helpText) helpText.innerHTML = 'Ollama: self-hosted LLM at <a href="https://ollama.com" target="_blank" style="color:var(--accent);text-decoration:none;cursor:pointer;">ollama.com</a>';
   } else {
     if (keySection) keySection.style.display = 'block';
     if (ollamaSection) ollamaSection.style.display = 'none';
@@ -3721,6 +3733,7 @@ function updateKeyPlaceholder() {
     if (input && !input.value) {
       input.placeholder = isClaude ? 'Paste your Anthropic API key' : 'Paste your Gemini API key';
     }
+    if (helpText) helpText.innerHTML = 'Gemini: free key at <a href="https://aistudio.google.com" target="_blank" style="color:var(--accent);text-decoration:none;cursor:pointer;">aistudio.google.com</a> · Claude: <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent);text-decoration:none;cursor:pointer;">console.anthropic.com</a>';
   }
 }
 
