@@ -939,7 +939,7 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
                 params.append(value)
         
         if updates:
-            updates.append("updated_at=datetime('now')")
+            updates.append("updated_at=CURRENT_TIMESTAMP")
             sql = f"UPDATE user_settings SET {', '.join(updates)} WHERE user_id=?"
             params.append(user["id"])
             conn.execute(sql, params)
@@ -998,7 +998,7 @@ def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
         final_model      = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.5-flash")
         final_ollama_url = body.ollama_base_url if body.ollama_base_url is not None else cur["ollama_base_url"]
         conn.execute(
-            "UPDATE user_settings SET ai_key_enc=?, ai_model=?, ollama_base_url=?, updated_at=datetime('now') WHERE user_id=?",
+            "UPDATE user_settings SET ai_key_enc=?, ai_model=?, ollama_base_url=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
             (final_key, final_model, final_ollama_url, user["id"])
         )
     else:
@@ -1013,7 +1013,7 @@ def delete_ai_settings(user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts have no stored key")
     conn = get_db()
-    conn.execute("UPDATE user_settings SET ai_key_enc=NULL, updated_at=datetime('now') WHERE user_id=?",
+    conn.execute("UPDATE user_settings SET ai_key_enc=NULL, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
                  (user["id"],))
     conn.commit()
     conn.close()
