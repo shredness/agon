@@ -4631,10 +4631,62 @@ function obShow() {
 }
 
 function obNext(step) {
-  [1,2,3].forEach(n => {
+  [1,2,3,4].forEach(n => {
     const el = document.getElementById('ob-step-' + n);
     if (el) el.style.display = n === step ? 'block' : 'none';
   });
+}
+
+async function obSaveDemographics() {
+  const msg = document.getElementById('ob-demo-msg');
+  msg.style.display = 'none';
+  const firstName = document.getElementById('ob-first').value.trim();
+  const lastName = document.getElementById('ob-last').value.trim();
+  const genderVal = document.getElementById('ob-gender').value;
+  const dobText = document.getElementById('ob-dob-text').value.trim();
+  
+  // Validate gender and DOB are required
+  if (!genderVal) {
+    msg.textContent = 'Gender is required';
+    msg.style.display = 'block';
+    return;
+  }
+  if (!dobText) {
+    msg.textContent = 'Birth date is required';
+    msg.style.display = 'block';
+    return;
+  }
+  
+  // Parse MM/DD/YYYY to YYYY-MM-DD
+  const dobParts = dobText.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!dobParts) {
+    msg.textContent = 'Birth date must be in MM/DD/YYYY format';
+    msg.style.display = 'block';
+    return;
+  }
+  const mm = parseInt(dobParts[1]), dd = parseInt(dobParts[2]), yyyy = parseInt(dobParts[3]);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) {
+    msg.textContent = 'Invalid birth date';
+    msg.style.display = 'block';
+    return;
+  }
+  const dobISO = yyyy + '-' + String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+  
+  try {
+    await aiFetch('/profile', {
+      method: 'POST',
+      body: JSON.stringify({
+        first_name:  firstName || null,
+        last_name:   lastName || null,
+        gender:      genderVal,
+        dob:         dobISO,
+      })
+    });
+    obNext(2);
+  } catch(e) {
+    msg.textContent = 'Could not save profile: ' + e.message;
+    msg.style.display = 'block';
+  }
 }
 
 async function obSaveProfile() {
@@ -4647,17 +4699,13 @@ async function obSaveProfile() {
     await aiFetch('/profile', {
       method: 'POST',
       body: JSON.stringify({
-        first_name:     document.getElementById('ob-first').value.trim()     || null,
-        last_name:      document.getElementById('ob-last').value.trim()      || null,
-        dob:            document.getElementById('ob-dob').value              || null,
-        gender:         document.getElementById('ob-gender').value           || null,
         week_start:     document.getElementById('ob-week-start').value       || 'Saturday',
         height_in:      heightIn,
         target_bw:      parseFloat(document.getElementById('ob-target-bw').value) || null,
         activity_level: document.getElementById('ob-activity').value         || '1.55',
       })
     });
-    obNext(3);
+    obNext(4);
   } catch(e) {
     msg.textContent = 'Could not save profile: ' + e.message;
     msg.style.display = 'block';
@@ -5441,8 +5489,50 @@ function parseMarkdown(text) {
 <div class="modal-overlay" id="onboarding-modal" style="display:none;">
   <div class="modal" style="max-width:540px;max-height:90vh;overflow-y:auto;">
 
-    <!-- Step 1: Welcome -->
-    <div id="ob-step-1">
+    <!-- Step 1: Gender & DOB (required for AI context) -->
+    <div id="ob-step-1" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;">Profile Info</h3>
+        <span style="font-size:11px;color:var(--text3);">Step 1 of 4</span>
+      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.5;">Gender and age help us tailor AI insights to your training stage and recovery capacity. This stays private.</div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div class="form-group">
+          <label>First name</label>
+          <input type="text" id="ob-first" style="width:100%;" placeholder="First name">
+        </div>
+        <div class="form-group">
+          <label>Last name</label>
+          <input type="text" id="ob-last" style="width:100%;" placeholder="Last name">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="ob-gender" style="width:100%;">
+            <option value="">- Select -</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="O">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Birth date (MM/DD/YYYY)</label>
+          <input type="text" id="ob-dob-text" style="width:100%;" placeholder="MM/DD/YYYY">
+        </div>
+      </div>
+
+      <div id="ob-demo-msg" style="font-size:12px;color:var(--red-text);margin-bottom:10px;display:none;"></div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button class="btn btn-primary btn-sm" onclick="obSaveDemographics()">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Welcome -->
+    <div id="ob-step-2">
       <div style="text-align:center;padding:16px 0 24px;">
         <div style="font-size:36px;font-weight:800;color:var(--accent);letter-spacing:-1px;margin-bottom:6px;">Agon</div>
         <div style="font-size:15px;color:var(--text2);font-style:italic;margin-bottom:24px;">strength through loss</div>
@@ -5455,46 +5545,21 @@ function parseMarkdown(text) {
         <div style="font-size:12px;color:var(--text3);margin-bottom:28px;">
           Built for athletes who care about <em>relative</em> strength, not just numbers on a bar.
         </div>
-        <button class="btn btn-primary" onclick="obNext(2)" style="width:200px;padding:12px;">Get started →</button>
+        <button class="btn btn-primary" onclick="obNext(3)" style="width:200px;padding:12px;">Get started →</button>
         <div style="margin-top:12px;">
           <button onclick="obSkip()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline;">Skip onboarding</button>
         </div>
       </div>
     </div>
 
-    <!-- Step 2: Profile setup -->
-    <div id="ob-step-2" style="display:none;">
+    <!-- Step 3: Profile setup (height, weight, week start, activity) -->
+    <div id="ob-step-3" style="display:none;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <h3 style="margin:0;">Set up your profile</h3>
-        <span style="font-size:11px;color:var(--text3);">Step 2 of 3</span>
+        <h3 style="margin:0;">Optional profile details</h3>
+        <span style="font-size:11px;color:var(--text3);">Step 3 of 4</span>
       </div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.5;">Your profile powers the macro calculator and gives the AI context about your training. You can always update it later in Settings.</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.5;">These help with macro calculations and the macro calculator. You can always update them later in Settings.</div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="form-group">
-          <label>First name</label>
-          <input type="text" id="ob-first" style="width:100%;" placeholder="First name">
-        </div>
-        <div class="form-group">
-          <label>Last name</label>
-          <input type="text" id="ob-last" style="width:100%;" placeholder="Last name">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div class="form-group">
-          <label>Date of birth</label>
-          <input type="date" id="ob-dob" style="width:100%;">
-        </div>
-        <div class="form-group">
-          <label>Gender</label>
-          <select id="ob-gender" style="width:100%;">
-            <option value="">Prefer not to say</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
         <div class="form-group">
           <label>Height</label>
@@ -5538,17 +5603,17 @@ function parseMarkdown(text) {
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <button onclick="obSkip()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline;">Skip for now</button>
         <div style="display:flex;gap:10px;">
-          <button class="btn btn-sm" onclick="obNext(1)">← Back</button>
+          <button class="btn btn-sm" onclick="obNext(2)">← Back</button>
           <button class="btn btn-primary btn-sm" onclick="obSaveProfile()">Save & continue →</button>
         </div>
       </div>
     </div>
 
-    <!-- Step 3: App tour -->
-    <div id="ob-step-3" style="display:none;">
+    <!-- Step 4: App tour -->
+    <div id="ob-step-4" style="display:none;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h3 style="margin:0;">How Agon works</h3>
-        <span style="font-size:11px;color:var(--text3);">Step 3 of 3</span>
+        <span style="font-size:11px;color:var(--text3);">Step 4 of 4</span>
       </div>
       <div class="guide-section">
         <div class="guide-tab-label"><i class="ti ti-barbell"></i> Workout</div>
