@@ -5440,14 +5440,18 @@ function parseMarkdown(text) {
       <div class="guide-section">
         <div class="guide-tab-label"><i class="ti ti-target"></i> Progress</div>
         <p>Per-exercise analysis. Select any logged exercise to see top-set load over time, estimated 1RM (Epley formula), PR table by rep count, and session volume trend. For fixed-load accessory exercises, the <strong>Block Rep Curve</strong> panel appears showing the fatigue decay, total reps trend, Set 1 adaptation trend, and load reset arc. See The Method tab for an explanation of this system.</p>
+        <ul>
+          <li><strong>Block Rep Curve</strong> - only appears for exercises with fewer than 10 sets per session. Exercises with 10+ sets are treated as wave/varied protocols and are exempt from Block Rep Curve analysis and rep trigger accumulation</li>
+        </ul>
       </div>
 
       <div class="guide-section">
         <div class="guide-tab-label"><i class="ti ti-sparkles"></i> Insights</div>
-        <p>AI-powered analysis of your training data. Ask plain-English questions and get answers grounded in your actual session history, profile, active phase, and protocols. Requires a Gemini or Claude API key set in Settings.</p>
+        <p>AI-powered analysis of your training data. Ask plain-English questions and get answers grounded in your actual session history, profile, active phase, and protocols. Set up one of three AI providers in Settings: <strong>Google Gemini</strong> (free tier available), <strong>Anthropic Claude</strong> (API key required), or <strong>Ollama</strong> (fully self-hosted, no external API calls).</p>
         <ul>
           <li>Example questions: "Am I losing strength on my pulls?", "Which sessions had the best RD?", "How does my RD compare between my Weight Loss and Recomp phases?"</li>
           <li>The "Build a meal plan with AI" button on the Trend tab sends your macro targets directly here</li>
+          <li><strong>Privacy tip:</strong> Choose Ollama for fully private analysis with zero data sent to external servers</li>
         </ul>
       </div>
 
@@ -5474,7 +5478,7 @@ function parseMarkdown(text) {
           <li><strong>Account</strong> - change your password</li>
           <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA. Scan the QR code with any authenticator app. Admins can reset it via the Admin panel if you lose your device</li>
           <li><strong>External API</strong> - generate a read-only API key for your data for use with external AI tools</li>
-          <li><strong>AI Insights</strong> - connect a Gemini or Claude API key. Keys are encrypted and stored on your server</li>
+          <li><strong>AI Insights</strong> - choose your AI provider: Gemini (free tier available), Claude (API key required), or Ollama (self-hosted, fully private). Keys are encrypted and stored on your server. Ollama requires a local or remote instance running an OpenAI-compatible API</li>
         </ul>
       </div>
     </div><!-- end guide-content-howto -->
@@ -5530,6 +5534,65 @@ function parseMarkdown(text) {
         <div class="guide-tab-label">Voluntary load resets</div>
         <p>If you grind badly on an exercise — Sets 5 and 6 dropping to 3–4 reps — the right move is to reset the load and rebuild. This is calibration, not failure. Agon's load reset tracker detects this and shows the rebuild arc: where you reset from, your current load, and how close you are to your previous peak.</p>
         <p>Global deloads from travel or time off are handled the same way — come back, reset, rebuild. The data stays and the RD trend will show the recovery arc.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Exemptions: Wave protocols and kettlebells</div>
+        <p>Two exercise patterns are exempt from Block Rep Curve tracking and rep trigger accumulation:</p>
+        <ul>
+          <li><strong>Wave and varied protocols (10+ sets per session)</strong> — exercises trained with 10 or more sets in a single session are assumed to be undulating periodization or wave loading. These don't follow fixed-load density escalation. Block Rep Curve won't appear for these exercises, and they won't trigger rep accumulation signals. Track them separately via your session notes or the Progress tab's overall trend chart.</li>
+          <li><strong>Kettlebell exercises</strong> — kettlebells are exempt from rep triggers entirely. The asymmetric load, inherent instability, and technique sensitivity make rep-count based progressions less reliable than fixed barbells or dumbbells. Progress kettlebells by feel, technique quality, or load when it suits the session.</li>
+        </ul>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Rep trigger mechanics: Load increments and muscle-dependent thresholds</div>
+        <p>The rep accumulation system is sensitive to muscle group size. Smaller muscles (biceps, triceps, shoulders) recover and adapt faster, so their load increments are smaller. Larger muscle groups (chest, back, legs, glutes) need bigger jumps to remain challenging as they adapt.</p>
+        <ul>
+          <li><strong>Small muscles</strong> — 1 lb increments (biceps, triceps, shoulders, calves)</li>
+          <li><strong>Large muscles</strong> — 1.5 lb increments (chest, back, legs, glutes)</li>
+        </ul>
+        <p><strong>Default rep trigger: 50 reps</strong> per block. This is total reps across all sets at the same load. Once you hit 50 (or your custom threshold), the next session moves up by the increment above.</p>
+        <p><strong>Bodyweight exercises have a separate trigger: 100 reps.</strong> Bodyweight movements accumulate reps faster due to reduced neural demand per rep, so the threshold is doubled to keep stimulus progression reasonable.</p>
+        <p><strong>Per-exercise overrides:</strong> You can set a custom rep trigger for any individual exercise in the Exercise bank. Use this if an exercise responds better to a higher or lower threshold than the global default.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Bodyweight exercises: Multipliers and RD calculation</div>
+        <p>Bodyweight exercises (pull-ups, dips, push-ups) are scaled by a muscle-group specific multiplier. This accounts for the fact that bodyweight work is highly correlated with your total body mass, not just local muscle. Agon uses these multipliers:</p>
+        <ul>
+          <li><strong>Pull-ups / chin-ups</strong> — 0.6× your bodyweight. A 200 lb person pulling up moves ~120 lbs of effective load.</li>
+          <li><strong>Dips</strong> — 0.6× your bodyweight</li>
+          <li><strong>Push-ups</strong> — 0.4× your bodyweight</li>
+          <li><strong>Pistol squats / shrimp squats</strong> — 0.75× your bodyweight</li>
+        </ul>
+        <p>When you log a bodyweight exercise, the app calculates the effective load (bodyweight × multiplier) and uses that in your RD calculation. As you lose weight on GLP-1 or a cut, the effective load per rep automatically decreases, but the RD calculation captures it. A rising RD on bodyweight work while your weight falls is a powerful signal of true strength preservation.</p>
+        <p>You can also add weight via a vest (adds to BW) or subtract it via assistance (percentage reduction). These appear as modifiers in the set entry form.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Deload philosophy: Subjective, externally driven, not algorithmic</div>
+        <p><strong>Agon does not suggest deloads or algorithmic recovery windows.</strong> This is intentional. Deloads are a response to life stress, travel, illness, accumulated fatigue, or a grinding session — not a calendar event. Forcing a deload based on an algorithm often leads to unnecessary training loss or, conversely, training when you shouldn't.</p>
+        <p>Instead, <strong>you own the decision.</strong> If you need a deload:</p>
+        <ul>
+          <li>Reduce volume, load, or frequency for 3–7 days</li>
+          <li>Log the lighter sessions normally — Agon will show the dip in RD and volume</li>
+          <li>When you return to normal intensity, you'll see the recovery arc in the Trend chart and a reset arc in Block Rep Curves if you stepped back load-wise</li>
+          <li>Use your AI Insights to ask: "Did my RD recover after my deload week?" or "How does my Set 1 rep performance look?"</li>
+        </ul>
+        <p>This approach respects the reality that you know your body better than an algorithm ever will, while Agon provides the data to verify that your decision worked.</p>
+      </div>
+
+      <div class="guide-section">
+        <div class="guide-tab-label">Anatomy heatmap: RD delta by muscle group</div>
+        <p>The Progress tab shows an anatomy heatmap with muscle groups shaded by color intensity. <strong>This heatmap displays RD change per muscle, not load change.</strong> It answers: "Which muscles am I getting relatively stronger in, and which are lagging?"</p>
+        <p>Interpretation:</p>
+        <ul>
+          <li><strong>Green (bright)</strong> — RD is rising for that muscle group. You are accumulating strength in that area relative to your bodyweight.</li>
+          <li><strong>Yellow/orange (neutral to warm)</strong> — RD is flat or rising slowly. Maintenance or modest progress.</li>
+          <li><strong>Red (dark)</strong> — RD is falling for that muscle group. You may be losing relative strength there, or training frequency for that muscle is low.</li>
+        </ul>
+        <p>This is useful for spotting imbalances. If your back RD is rising but your chest RD is falling, it might signal an overemphasis on rows/pulls and underemphasis on pressing. Use this as input to adjust your next training phase.</p>
       </div>
     </div><!-- end guide-content-method -->
 
