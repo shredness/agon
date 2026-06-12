@@ -3702,12 +3702,30 @@ async function aiFetch(path, opts={}) {
 function updateKeyPlaceholder() {
   const model = document.getElementById('ai-model')?.value || '';
   const isClaude = model.startsWith('claude-');
+  const isOllama = model.startsWith('ollama:');
   const label = document.getElementById('ai-key-provider-label');
   const input = document.getElementById('ai-key');
-  if (label) label.textContent = isClaude ? '(Anthropic)' : '(Google Gemini)';
-  if (input && !input.value) {
-    input.placeholder = isClaude ? 'Paste your Anthropic API key' : 'Paste your Gemini API key';
+  const keySection = document.getElementById('ai-key-section');
+  const ollamaSection = document.getElementById('ollama-url-section');
+  
+  if (isOllama) {
+    if (label) label.textContent = '';
+    if (input) input.style.display = 'none';
+    if (keySection) keySection.style.display = 'none';
+    if (ollamaSection) ollamaSection.style.display = 'block';
+  } else {
+    if (keySection) keySection.style.display = 'block';
+    if (ollamaSection) ollamaSection.style.display = 'none';
+    if (label) label.textContent = isClaude ? '(Anthropic)' : '(Google Gemini)';
+    if (input) input.style.display = 'block';
+    if (input && !input.value) {
+      input.placeholder = isClaude ? 'Paste your Anthropic API key' : 'Paste your Gemini API key';
+    }
   }
+}
+
+function updateAiSettings() {
+  updateKeyPlaceholder();
 }
 
 async function loadSettingsMfa() {
@@ -3747,6 +3765,7 @@ async function openSettings() {
   document.getElementById('settings-modal').style.display = 'flex';
   document.getElementById('settings-msg').style.display = 'none';
   document.getElementById('ai-key').value = '';
+  document.getElementById('ollama-url').value = '';
   loadSettingsProfile();
   loadProtocols();
   loadExtKey();
@@ -3756,6 +3775,9 @@ async function openSettings() {
     _aiHasKey = s.has_key;
     _aiModel = s.model || 'gemini-2.5-flash';
     document.getElementById('ai-model').value = _aiModel;
+    if (s.ollama_base_url) {
+      document.getElementById('ollama-url').value = s.ollama_base_url;
+    }
     updateKeyPlaceholder();
     const status = document.getElementById('ai-key-status');
     const removeBtn = document.getElementById('settings-remove-btn');
@@ -3804,10 +3826,15 @@ async function testAiKey() {
 async function saveSettings() {
   const key = document.getElementById('ai-key').value.trim();
   const model = document.getElementById('ai-model').value;
+  const ollamaUrl = document.getElementById('ollama-url').value.trim() || null;
   try {
-    await aiFetch('/ai/settings', { method:'POST', body: JSON.stringify({ ai_key: key || null, ai_model: model }) });
+    await aiFetch('/ai/settings', { method:'POST', body: JSON.stringify({ ai_key: key || null, ai_model: model, ollama_base_url: ollamaUrl }) });
     settingsMsg('✓ Saved.', false);
     _aiModel = model;
+    // Also save to profile if Ollama URL was provided
+    if (ollamaUrl) {
+      await aiFetch('/profile', { method:'POST', body: JSON.stringify({ ollama_base_url: ollamaUrl }) });
+    }
     setTimeout(() => { closeSettings(); openInsights(); }, 600);
   } catch(e) {
     settingsMsg(e.message, true);
@@ -3950,6 +3977,8 @@ async function loadSettingsProfile() {
     _userRepTrigger = p.rep_trigger || 50;
     const rtEl = document.getElementById('s-rep-trigger');
     if (rtEl) rtEl.value = _userRepTrigger;
+    // Load Ollama URL
+    document.getElementById('ollama-url').value = p.ollama_base_url || '';
   } catch(e) { /* non-fatal */ }
 }
 
@@ -3965,6 +3994,7 @@ async function saveSettingsProfile() {
     const ft = parseFloat(document.getElementById('s-height-ft').value) || 0;
     const inn = parseFloat(document.getElementById('s-height-in').value) || 0;
     const heightIn = (ft > 0 || inn > 0) ? (ft * 12 + inn) : null;
+    const ollamaUrl = document.getElementById('ollama-url').value.trim() || null;
     await aiFetch('/profile', {
       method: 'POST',
       body: JSON.stringify({
@@ -3977,6 +4007,7 @@ async function saveSettingsProfile() {
         target_bw:      parseFloat(document.getElementById('s-target-bw').value) || null,
         activity_level: document.getElementById('s-activity').value || '1.55',
         rep_trigger:    parseInt(document.getElementById('s-rep-trigger')?.value) || 50,
+        ollama_base_url: ollamaUrl,
       })
     });
     show('Profile saved.', false);
@@ -4751,8 +4782,17 @@ function switchGuideTab(tab) {
 }
 
 
-// ── Changelog ─────────────────────────────────────────────────
+// ── Version & Changelog ───────────────────────────────────────
+const APP_VERSION = '0.9.0';
+
 const CHANGELOG = {
+  '0.9.0': [
+    'AI Insights: Ollama support — self-hosted LLM option for privacy-first users',
+    'Settings: new "Ollama base URL" field in AI Insights section',
+    'AI router: detects model prefix and routes to Claude, Gemini, or Ollama (OpenAI-compatible)',
+    'Onboarding: Step 1 collects gender and birthdate (MM/DD/YYYY) for AI context injection',
+    'Profile: fixed save_profile to properly handle partial updates without data loss',
+  ],
   '0.8.5': [
     'Phases: optional Label field added — name phases "GLP-1 Phase 2", "Pre-contest", etc.',
     'Phase dropdown (heatmap): now shows type + label + date range — disambiguates same-type phases',
@@ -5653,6 +5693,157 @@ function parseMarkdown(text) {
     <div id="wn-content"></div>
   </div>
 </div>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settings-modal" style="display:none;" onclick="if(event.target===this)closeSettings()">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 style="margin:0;">Settings</h3>
+      <button class="btn btn-sm" onclick="closeSettings()">Close</button>
+    </div>
+
+    <!-- Profile Section -->
+    <div style="margin-bottom:24px;">
+      <div class="section-label" style="margin-bottom:14px;">Profile</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div class="form-group">
+          <label>First name</label>
+          <input type="text" id="p-first" style="width:100%;">
+        </div>
+        <div class="form-group">
+          <label>Last name</label>
+          <input type="text" id="p-last" style="width:100%;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="s-gender" style="width:100%;">
+            <option value="">- Select -</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="O">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Birth date (YYYY-MM-DD)</label>
+          <input type="date" id="s-dob" style="width:100%;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div class="form-group">
+          <label>Height</label>
+          <div style="display:flex;gap:6px;">
+            <input type="number" id="s-height-ft" min="4" max="7" style="width:60px;" placeholder="ft">
+            <span style="color:var(--text3);align-self:center;">ft</span>
+            <input type="number" id="s-height-in" min="0" max="11" style="width:60px;" placeholder="in">
+            <span style="color:var(--text3);align-self:center;">in</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Target bodyweight (lbs)</label>
+          <input type="number" id="s-target-bw" step="0.5" style="width:100%;">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div class="form-group">
+          <label>Training week starts on</label>
+          <select id="s-week-start" style="width:100%;">
+            <option value="Monday">Monday</option>
+            <option value="Tuesday">Tuesday</option>
+            <option value="Wednesday">Wednesday</option>
+            <option value="Thursday">Thursday</option>
+            <option value="Friday">Friday</option>
+            <option value="Saturday">Saturday</option>
+            <option value="Sunday">Sunday</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Activity level</label>
+          <select id="s-activity" style="width:100%;">
+            <option value="1.2">Sedentary</option>
+            <option value="1.375">Lightly active</option>
+            <option value="1.55">Moderately active</option>
+            <option value="1.725">Very active</option>
+            <option value="1.9">Extremely active</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Rep accumulation trigger</label>
+        <input type="number" id="s-rep-trigger" min="30" max="200" step="5" style="width:100%;">
+      </div>
+      <div id="settings-profile-msg" style="font-size:12px;color:var(--red-text);margin-bottom:10px;display:none;"></div>
+      <button class="btn btn-primary" onclick="saveSettingsProfile()">Save profile</button>
+    </div>
+
+    <!-- Protocols Section -->
+    <div style="margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div class="section-label" style="margin-bottom:0;">Protocols</div>
+        <button class="btn btn-sm" onclick="openAddProtoModal()">+ Add</button>
+      </div>
+      <div id="protocols-list"></div>
+    </div>
+
+    <!-- AI Insights Section -->
+    <div style="margin-bottom:24px;">
+      <div class="section-label" style="margin-bottom:14px;">AI Insights</div>
+      
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Provider</label>
+        <select id="ai-model" style="width:100%;" onchange="updateAiSettings()">
+          <option value="gemini-2.5-flash">Google Gemini</option>
+          <option value="claude-3.5-sonnet">Anthropic Claude</option>
+          <option value="ollama:mistral">Ollama (Self-hosted)</option>
+        </select>
+      </div>
+
+      <div id="ai-key-section" style="margin-bottom:12px;">
+        <div class="form-group">
+          <label>API Key <span id="ai-key-provider-label" style="font-size:11px;color:var(--text3);">  (Google Gemini)</span></label>
+          <input type="text" id="ai-key" placeholder="Paste your API key here" style="width:100%;">
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">
+          <span id="ai-key-status">No key configured yet.</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="testAiKey()">Test</button>
+          <button class="btn btn-danger btn-sm" id="settings-remove-btn" style="display:none;" onclick="removeAiKey()">Remove key</button>
+        </div>
+      </div>
+
+      <div id="ollama-url-section" style="display:none;margin-bottom:12px;">
+        <div class="form-group">
+          <label>Ollama base URL</label>
+          <input type="text" id="ollama-url" placeholder="http://localhost:11434" style="width:100%;">
+        </div>
+        <div style="font-size:12px;color:var(--text3);">Local Ollama instance URL. Leave blank if running locally on default port.</div>
+      </div>
+
+      <div id="settings-msg" style="font-size:12px;color:var(--red-text);margin-bottom:12px;display:none;"></div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+    </div>
+
+    <!-- Two-factor Auth Section -->
+    <div style="margin-bottom:24px;">
+      <div class="section-label" style="margin-bottom:14px;">Security</div>
+      <div id="settings-mfa-status"></div>
+    </div>
+
+    <!-- External API Key Section -->
+    <div style="margin-bottom:24px;">
+      <div class="section-label" style="margin-bottom:14px;">External API</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">Generate a read-only key to share your data with any external tool.</div>
+      <div id="ext-key-status" style="font-size:12px;color:var(--text2);margin-bottom:10px;"></div>
+      <div id="ext-key-value" style="font-size:11px;color:var(--text3);margin-bottom:10px;"></div>
+      <div id="ext-key-url" style="font-size:11px;color:var(--text3);margin-bottom:10px;"></div>
+      <button class="btn btn-sm" onclick="generateExtKey()">Generate key</button>
+    </div>
+
+  </div>
+</div>
+
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

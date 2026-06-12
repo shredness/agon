@@ -214,6 +214,7 @@ class ProfileIn(BaseModel):
     last_seen_version:  Optional[str] = None
     external_api_key:   Optional[str] = None
     rep_trigger:        Optional[int] = None    # cumulative rep threshold (default 50)
+    ollama_base_url:    Optional[str] = None    # e.g. http://localhost:11434
 
 class ProtocolIn(BaseModel):
     name:       str
@@ -233,6 +234,7 @@ class PhaseIn(BaseModel):
 class AISettingsIn(BaseModel):
     ai_key: Optional[str] = None      # plaintext key from user; None = don't change
     ai_model: Optional[str] = None
+    ollama_base_url: Optional[str] = None  # e.g., http://localhost:11434
 
 class MFAVerify(BaseModel):
     code: str
@@ -876,7 +878,7 @@ def get_profile(user=Depends(current_user)):
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version FROM user_settings WHERE user_id=?",
+            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, ollama_base_url FROM user_settings WHERE user_id=?",
             (user["id"],)
         ).fetchone()
     except Exception:
@@ -890,7 +892,7 @@ def get_profile(user=Depends(current_user)):
             row = None
     conn.close()
     if not row:
-        return {"first_name":"","last_name":"","dob":"","gender":"","week_start":"Saturday","height_in":None,"target_bw":None}
+        return {"first_name":"","last_name":"","dob":"","gender":"","week_start":"Saturday","height_in":None,"target_bw":None,"ollama_base_url":""}
     return {
         "first_name": row["first_name"] or "",
         "last_name":  row["last_name"]  or "",
@@ -903,6 +905,7 @@ def get_profile(user=Depends(current_user)):
         "onboarded":        row["onboarded"]        if "onboarded"        in row.keys() else "0",
         "last_seen_version": row["last_seen_version"] if "last_seen_version" in row.keys() else "0.0.0",
         "rep_trigger":      int(row["rep_trigger"]) if "rep_trigger" in row.keys() and row["rep_trigger"] else 50,
+        "ollama_base_url":  row["ollama_base_url"]  if "ollama_base_url"  in row.keys() else "",
     }
 
 @app.post("/profile")
@@ -911,25 +914,35 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
         raise HTTPException(status_code=403, detail="Demo accounts cannot save profile data")
     conn = get_db()
     existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
+    
+    # Build dynamic UPDATE to only update provided fields
     if existing:
-        conn.execute("""
-            UPDATE user_settings SET
-                first_name=COALESCE(?,first_name),
-                last_name=COALESCE(?,last_name),
-                dob=COALESCE(?,dob),
-                gender=COALESCE(?,gender),
-                week_start=COALESCE(?,week_start),
-                height_in=COALESCE(?,height_in),
-                target_bw=COALESCE(?,target_bw),
-                activity_level=COALESCE(?,activity_level),
-                onboarded=COALESCE(?,onboarded),
-                last_seen_version=COALESCE(?,last_seen_version),
-                rep_trigger=COALESCE(?,rep_trigger),
-                updated_at=datetime('now')
-            WHERE user_id=?
-        """, (body.first_name, body.last_name, body.dob, body.gender, body.week_start,
-                body.height_in, body.target_bw, body.activity_level, body.onboarded,
-                body.last_seen_version, body.rep_trigger, user["id"]))
+        updates = []
+        params = []
+        field_map = {
+            'first_name': body.first_name,
+            'last_name': body.last_name,
+            'dob': body.dob,
+            'gender': body.gender,
+            'week_start': body.week_start,
+            'height_in': body.height_in,
+            'target_bw': body.target_bw,
+            'activity_level': body.activity_level,
+            'onboarded': body.onboarded,
+            'last_seen_version': body.last_seen_version,
+            'rep_trigger': body.rep_trigger,
+            'ollama_base_url': body.ollama_base_url,
+        }
+        for field, value in field_map.items():
+            if value is not None:
+                updates.append(f"{field}=?")
+                params.append(value)
+        
+        if updates:
+            updates.append("updated_at=datetime('now')")
+            sql = f"UPDATE user_settings SET {', '.join(updates)} WHERE user_id=?"
+            params.append(user["id"])
+            conn.execute(sql, params)
     else:
         conn.execute("""
             INSERT INTO user_settings (user_id, first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, rep_trigger)
@@ -946,16 +959,26 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
 # ── AI Settings endpoints ─────────────────────────────────────
 @app.get("/ai/settings")
 def get_ai_settings(user=Depends(current_user)):
-    """Return whether a key is set + masked preview + model. Never returns the raw key."""
+    """Return whether a key is set + masked preview + model + ollama URL."""
     conn = get_db()
-    row = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
+    row = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=?",
                        (user["id"],)).fetchone()
     conn.close()
     if not row or not row["ai_key_enc"]:
-        return {"has_key": False, "masked": "", "model": (row["ai_model"] if row else "gemini-2.5-flash")}
+        return {
+            "has_key": False,
+            "masked": "",
+            "model": (row["ai_model"] if row else "gemini-2.5-flash"),
+            "ollama_base_url": (row["ollama_base_url"] if row else "")
+        }
     plain = decrypt_secret(row["ai_key_enc"])
     masked = ("•" * max(0, len(plain) - 4) + plain[-4:]) if plain else ""
-    return {"has_key": bool(plain), "masked": masked, "model": row["ai_model"] or "gemini-2.5-flash"}
+    return {
+        "has_key": bool(plain),
+        "masked": masked,
+        "model": row["ai_model"] or "gemini-2.5-flash",
+        "ollama_base_url": row["ollama_base_url"] or ""
+    }
 
 @app.post("/ai/settings")
 def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
@@ -964,22 +987,23 @@ def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
     conn = get_db()
     existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?",
                             (user["id"],)).fetchone()
-    # Build the update — always write both fields atomically
+    # Build the update — always write fields atomically
     key_enc = None
     if body.ai_key is not None and body.ai_key.strip():
         key_enc = encrypt_secret(body.ai_key.strip())
     if existing:
-        cur = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
+        cur = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=?",
                            (user["id"],)).fetchone()
-        final_key   = key_enc if key_enc is not None else cur["ai_key_enc"]
-        final_model = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.5-flash")
+        final_key        = key_enc if key_enc is not None else cur["ai_key_enc"]
+        final_model      = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.5-flash")
+        final_ollama_url = body.ollama_base_url if body.ollama_base_url is not None else cur["ollama_base_url"]
         conn.execute(
-            "UPDATE user_settings SET ai_key_enc=?, ai_model=?, updated_at=datetime('now') WHERE user_id=?",
-            (final_key, final_model, user["id"])
+            "UPDATE user_settings SET ai_key_enc=?, ai_model=?, ollama_base_url=?, updated_at=datetime('now') WHERE user_id=?",
+            (final_key, final_model, final_ollama_url, user["id"])
         )
     else:
-        conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model) VALUES (?,?,?)",
-                     (user["id"], key_enc, body.ai_model or "gemini-2.5-flash"))
+        conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model, ollama_base_url) VALUES (?,?,?,?)",
+                     (user["id"], key_enc, body.ai_model or "gemini-2.5-flash", body.ollama_base_url or ""))
     conn.commit()
     conn.close()
     return {"status": "saved"}
@@ -1132,11 +1156,57 @@ who wants signal, not filler. When discussing trends, cite the specific sessions
 def _is_claude_model(model: str) -> bool:
     return model.startswith("claude-")
 
-async def call_llm(api_key: str, model: str, context: str, history: list, question: str) -> str:
-    """Route to Gemini or Anthropic depending on the model name."""
-    if _is_claude_model(model):
+def _is_ollama_model(model: str) -> bool:
+    return model.startswith("ollama:")
+
+async def call_llm(api_key: str, model: str, context: str, history: list, question: str, ollama_url: str = None) -> str:
+    """Route to Claude, Gemini, or Ollama depending on the model name."""
+    if _is_ollama_model(model):
+        if not ollama_url:
+            raise HTTPException(status_code=400, detail="Ollama URL not configured")
+        model_name = model[7:]  # Strip "ollama:" prefix
+        return await _call_ollama(ollama_url, model_name, context, history, question)
+    elif _is_claude_model(model):
         return await _call_anthropic(api_key, model, context, history, question)
     return await _call_gemini(api_key, model, context, history, question)
+
+async def _call_ollama(base_url: str, model_name: str, context: str, history: list, question: str) -> str:
+    """Call Ollama (OpenAI-compatible API) with training context + conversation history."""
+    url = f"{base_url.rstrip('/')}/v1/chat/completions"
+    messages = []
+    messages.append({
+        "role": "system",
+        "content": f"{SYSTEM_PROMPT}\n\n=== TRAINING DATA ===\n{context}\n\n=== END DATA ==="
+    })
+    # Prior conversation turns
+    for msg in history:
+        messages.append({
+            "role": "user" if msg["role"] == "user" else "assistant",
+            "content": msg["content"]
+        })
+    messages.append({"role": "user", "content": question})
+    
+    payload = {
+        "model": model_name,
+        "messages": messages,
+        "temperature": 0.7,
+        "top_p": 0.9,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Ollama error ({resp.status_code}): {resp.text[:300]}")
+            data = resp.json()
+            try:
+                return data["choices"][0]["message"]["content"]
+            except (KeyError, IndexError):
+                raise HTTPException(status_code=502, detail="Ollama returned an unexpected response shape")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail=f"Could not reach Ollama at {base_url}. Is it running?")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Ollama error: {str(e)[:300]}")
 
 async def _call_gemini(api_key: str, model: str, context: str, history: list, question: str) -> str:
     """Call the Gemini API with training context + conversation history."""
@@ -1229,17 +1299,21 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
     if not q:
         raise HTTPException(status_code=400, detail="Empty question")
 
-    # Get the user's key + model
+    # Get the user's key + model + ollama settings
     conn = get_db()
-    settings = conn.execute("SELECT ai_key_enc, ai_model FROM user_settings WHERE user_id=?",
+    settings = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=?",
                             (user["id"],)).fetchone()
     conn.close()
-    if not settings or not settings["ai_key_enc"]:
-        raise HTTPException(status_code=400, detail="No API key configured. Add one in Settings.")
-    api_key = decrypt_secret(settings["ai_key_enc"])
-    if not api_key:
+    
+    if not settings or (not settings["ai_key_enc"] and not settings.get("ollama_base_url")):
+        raise HTTPException(status_code=400, detail="No AI provider configured. Add one in Settings.")
+    
+    api_key = decrypt_secret(settings["ai_key_enc"]) if settings["ai_key_enc"] else None
+    if settings["ai_key_enc"] and not api_key:
         raise HTTPException(status_code=400, detail="Stored key could not be decrypted. Re-enter it in Settings.")
+    
     model = settings["ai_model"] or "gemini-2.5-flash"
+    ollama_url = settings.get("ollama_base_url", "")
 
     # Build context from the data the user is allowed to see
     uid = data_user_id(user)
@@ -1256,7 +1330,7 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
         conn.close()
         history = [dict(r) for r in rows]
 
-    answer = await call_llm(api_key, model, context, history, q)
+    answer = await call_llm(api_key, model, context, history, q, ollama_url=ollama_url)
 
     # Persist both turns (not for demo)
     if user["role"] != "demo":
