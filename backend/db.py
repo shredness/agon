@@ -215,5 +215,14 @@ def _init_schema(conn):
         ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0
     """)
     
+    # Add missing AI columns to user_settings if they don't exist
+    cursor.execute("""
+        ALTER TABLE user_settings
+        ADD COLUMN IF NOT EXISTS ai_key_enc TEXT,
+        ADD COLUMN IF NOT EXISTS ai_model VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS ollama_base_url TEXT,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    """)
+    
     conn.commit()
     cursor.close()
