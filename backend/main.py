@@ -622,7 +622,6 @@ def save_session(session: SessionIn, user=Depends(current_user)):
 
     conn = get_db()
     try:
-        print(f"DEBUG: Attempting session save - user_id={uid}, date={session.date}")
         # Try UPDATE first
         cursor = conn.execute(
             """UPDATE sessions SET bw=%s, rd=%s, total_density=%s, exercises=%s, notes=%s 
@@ -630,22 +629,17 @@ def save_session(session: SessionIn, user=Depends(current_user)):
             (session.bw, rd, round(total_density, 2), json.dumps(exercises_out), 
              session.notes or "", uid, session.date)
         )
-        print(f"DEBUG: UPDATE rowcount={cursor.rowcount}")
         
         # If no rows were updated, INSERT a new one
         if cursor.rowcount == 0:
-            print(f"DEBUG: No UPDATE match, attempting INSERT")
             conn.execute(
                 """INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises, notes) 
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                 (uid, session.date, session.bw, rd, round(total_density, 2), 
                  json.dumps(exercises_out), session.notes or "")
             )
-            print(f"DEBUG: INSERT completed")
         conn.commit()
-        print(f"DEBUG: COMMIT completed")
     except Exception as e:
-        print(f"DEBUG: Exception caught: {str(e)}")
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
     conn.close()
