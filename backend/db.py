@@ -63,6 +63,13 @@ class _ConnectionWrapper:
         """Get a cursor from the connection."""
         return self._conn.cursor(*args, **kwargs)
     
+    @property
+    def rowcount(self):
+        """Return rowcount from the last execute (for UPDATE/DELETE operations)."""
+        if self._cursor:
+            return self._cursor.rowcount
+        return 0
+    
     def execute(self, sql, params=None):
         """Execute SQL directly (like sqlite3). Converts ? to %s for psycopg2."""
         if not self._cursor:

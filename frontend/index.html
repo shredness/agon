@@ -1158,7 +1158,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.1';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4797,6 +4797,15 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.9.1': [
+    'Ollama: added to old AI settings modal dropdown with dynamic help text',
+    'Settings: AI provider help text now clickable links (Gemini, Claude, Ollama)',
+    'Guide: expanded Method section — exemptions (10+ sets, kettlebells), rep trigger mechanics, BW multipliers, deload philosophy, anatomy heatmap interpretation',
+    'Guide: clarified Block Rep Curve exemption for 10+ set exercises in Progress section',
+    'Database: fixed session save with UPDATE-then-INSERT upsert pattern (eliminates duplicate key errors)',
+    'Database: added unique constraint on sessions(user_id, date) for proper conflict detection',
+    'Fix: PostgreSQL compatibility — CURRENT_TIMESTAMP instead of datetime(\'now\') in all endpoints',
+  ],
   '0.9.0': [
     'AI Insights: Ollama support — self-hosted LLM option for privacy-first users',
     'Settings: new "Ollama base URL" field in AI Insights section',
