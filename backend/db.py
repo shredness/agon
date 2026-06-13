@@ -163,7 +163,9 @@ def _init_schema(conn):
             rd NUMERIC(6,4),
             notes TEXT,
             exercises JSONB DEFAULT '[]'::jsonb,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            total_density NUMERIC(6,4),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, date)
         )
     """)
     
@@ -204,6 +206,24 @@ def _init_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_protocols_user_id ON protocols(user_id)")
+    
+    # Add missing columns to sessions if they don't exist
+    cursor.execute("""
+        ALTER TABLE sessions
+        ADD COLUMN IF NOT EXISTS total_density NUMERIC(6,4)
+    """)
+    
+    # Add unique constraint on (user_id, date) if it doesn't exist
+    # Check if constraint already exists
+    cursor.execute("""
+        SELECT 1 FROM information_schema.constraint_column_usage 
+        WHERE table_name='sessions' AND column_name='date' AND constraint_name LIKE '%user_id%date%'
+    """)
+    if not cursor.fetchone():
+        try:
+            cursor.execute("ALTER TABLE sessions ADD UNIQUE(user_id, date)")
+        except Exception:
+            pass  # Constraint might already exist, ignore
     
     # Migrate existing exercises table - add missing columns if they don't exist
     cursor.execute("""
