@@ -622,15 +622,22 @@ def save_session(session: SessionIn, user=Depends(current_user)):
 
     conn = get_db()
     try:
-        conn.execute("""
-            INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises, notes)
-            VALUES (?,?,?,?,?,?,?)
-            ON CONFLICT(user_id, date) DO UPDATE SET
-                bw=excluded.bw, rd=excluded.rd,
-                total_density=excluded.total_density, exercises=excluded.exercises,
-                notes=excluded.notes
-        """, (uid, session.date, session.bw, rd, round(total_density, 2),
-              json.dumps(exercises_out), session.notes or ""))
+        # Try UPDATE first
+        cursor = conn.execute(
+            """UPDATE sessions SET bw=%s, rd=%s, total_density=%s, exercises=%s, notes=%s 
+               WHERE user_id=%s AND date=%s""",
+            (session.bw, rd, round(total_density, 2), json.dumps(exercises_out), 
+             session.notes or "", uid, session.date)
+        )
+        
+        # If no rows were updated, INSERT a new one
+        if cursor.rowcount == 0:
+            conn.execute(
+                """INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises, notes) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (uid, session.date, session.bw, rd, round(total_density, 2), 
+                 json.dumps(exercises_out), session.notes or "")
+            )
         conn.commit()
     except Exception as e:
         conn.close()
