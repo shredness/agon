@@ -245,7 +245,8 @@ class ProtocolIn(BaseModel):
     track:      Optional[bool] = False
 
 class ProtocolTrack(BaseModel):
-    track: bool
+    track: Optional[bool] = None
+    end_date: Optional[str] = None
 
 class PhaseIn(BaseModel):
     phase_type: str
@@ -1964,11 +1965,16 @@ def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_use
 def patch_protocol(protocol_id: int, body: ProtocolTrack, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
+    fields, params = [], []
+    if body.track is not None:
+        fields.append("track=%s"); params.append(bool(body.track))
+    if body.end_date is not None:
+        fields.append("end_date=%s"); params.append(body.end_date)
+    if not fields:
+        return {"status": "nothing to update"}
+    params.extend([protocol_id, user["id"]])
     conn = get_db()
-    conn.execute(
-        "UPDATE protocols SET track=%s WHERE id=%s AND user_id=%s",
-        (bool(body.track), protocol_id, user["id"])
-    )
+    conn.execute(f"UPDATE protocols SET {', '.join(fields)} WHERE id=%s AND user_id=%s", params)
     conn.commit()
     conn.close()
     return {"status": "updated"}

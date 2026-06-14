@@ -4220,7 +4220,7 @@ function openAddProtocolModal() {
 function _protoRow(r) {
   const endCell = r.end_date
     ? `<span style="color:var(--text3);font-size:11px;">${escapeHtml(r.end_date)}</span>`
-    : (r.start_date ? `<span style="color:var(--accent);font-size:11px;">active</span>` : '');
+    : `<button onclick="endProtocol(${r.id})" style="background:none;border:1px solid var(--accent);border-radius:3px;cursor:pointer;color:var(--accent);font-size:10px;font-weight:600;padding:2px 6px;white-space:nowrap;" title="Click to end this protocol today">active</button>`;
   const trackCheckbox = `<input type="checkbox" id="track-${r.id}" ${r.track ? 'checked' : ''} onchange="toggleProtocolTrack(${r.id}, this.checked)" style="cursor:pointer;">`;
   const data = encodeURIComponent(JSON.stringify(r));
   return `<tr id="proto-row-${r.id}" style="border-bottom:0.5px solid var(--border);">
@@ -4236,6 +4236,19 @@ function _protoRow(r) {
       <button onclick="deleteProtocol(${r.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;" title="Delete">✕</button>
     </td>
   </tr>`;
+}
+
+async function endProtocol(id) {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    await aiFetch(`/protocols/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ end_date: today })
+    });
+    await loadProtocols();
+    renderProtocolPills();
+    showToast('Protocol ended ' + today);
+  } catch(e) { showToast(e.message); }
 }
 
 function _editProto(id, dataStr) {
