@@ -301,6 +301,12 @@ def _init_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_protocols_user_id ON protocols(user_id)")
     
+    # Fix protocols sequence if out of sync
+    cursor.execute("SELECT MAX(id) FROM protocols")
+    max_id = cursor.fetchone()[0]
+    if max_id:
+        cursor.execute(f"SELECT setval('protocols_id_seq', {max_id + 1})")
+    
     # Add missing columns to sessions if they don't exist
     cursor.execute("""
         ALTER TABLE sessions
