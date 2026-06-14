@@ -2789,6 +2789,21 @@ function buildBankRows() {
   return EXERCISE_BANK.map(e=>({'Name':e.name,'Alias':e.alias,'Tool':e.tool,'Multiplier':e.mult,'Muscle Group':e.muscle,'Load Input':e.loadHint,'Is Bodyweight':e.isBW?'Yes':'No'}));
 }
 
+async function buildProtocolRows() {
+  try {
+    const protocols = await aiFetch('/protocols');
+    return protocols.map(p => ({
+      'Protocol Name': p.name,
+      'Dose': p.dose || '',
+      'Frequency': p.frequency || '',
+      'Start Date': p.start_date || '',
+      'End Date': p.end_date || '',
+      'Tracked': p.track ? 'Yes' : 'No',
+      'Notes': p.notes || ''
+    }));
+  } catch(e) { return []; }
+}
+
 async function updateExportSummary() {
   const lr=buildLogRows();
   document.getElementById('exp-log-ct').textContent=lr.length+' rows';
@@ -2828,9 +2843,13 @@ async function doExport() {
     const br=buildBankRows();
     const wsB=XLSX.utils.json_to_sheet(br);
     wsB['!cols']=[26,26,12,12,20,18,14].map(w=>({wch:w}));
+    const pr=await buildProtocolRows();
+    const wsP=XLSX.utils.json_to_sheet(pr.length?pr:[{'Protocol Name':'','Dose':'','Frequency':'','Start Date':'','End Date':'','Tracked':'','Notes':''}]);
+    wsP['!cols']=[20,15,18,14,14,10,30].map(w=>({wch:w}));
     XLSX.utils.book_append_sheet(wb,wsL,'Log');
     XLSX.utils.book_append_sheet(wb,wsT,'Trend');
     XLSX.utils.book_append_sheet(wb,wsB,'ExerciseBank');
+    XLSX.utils.book_append_sheet(wb,wsP,'Protocols');
     const today=new Date().toISOString().slice(0,10);
     XLSX.writeFile(wb,`RD_Tracker_${today}.xlsx`);
     st.textContent=`✓ Downloaded RD_Tracker_${today}.xlsx`;
