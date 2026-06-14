@@ -454,6 +454,7 @@
     </div>
 
     <div class="card" style="padding:16px;">
+      <p style="font-size:11px;color:var(--text3);margin:0 0 10px 0;">Weekly averages. RD higher = stronger relative to bodyweight.</p>
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
         <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
           <span style="display:inline-block;width:24px;height:3px;background:var(--chart-rd);border-radius:2px;"></span> Relative Density (left)
@@ -468,16 +469,28 @@
       <div style="position:relative;width:100%;height:320px;">
         <canvas id="trendChart" role="img" aria-label="RD and bodyweight trend overlaid"></canvas>
       </div>
-      <p style="font-size:11px;color:var(--text3);margin-top:8px;" id="trend-week-label">Weekly averages. RD higher = stronger relative to bodyweight.</p>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+        <p style="font-size:11px;color:var(--text3);margin:0 0 8px 0;">Toggle protocol cycle windows on chart — shaded = ON cycle, gap = OFF cycle.</p>
+        <div id="trend-protocol-pills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
     </div>
 
     <!-- Phase management -->
     <div class="card" style="padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-        <div style="font-size:13px;font-weight:600;">Training phases</div>
+        <div style="font-size:13px;font-weight:600;">Phases</div>
         <button class="btn btn-sm" onclick="openNewPhaseModal()">+ New phase</button>
       </div>
       <div id="phases-list" style="font-size:13px;color:var(--text3);">Loading...</div>
+    </div>
+
+    <!-- Protocols -->
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;font-weight:600;">Protocols</div>
+        <button class="btn btn-sm" onclick="openAddProtocolModal()">+ Add protocol</button>
+      </div>
+      <div id="trend-protocols-list" style="font-size:13px;color:var(--text3);">Loading...</div>
     </div>
 
     <!-- Macro calculator -->
@@ -488,7 +501,7 @@
 
     <!-- Phase macro history -->
     <div class="card" style="padding:16px;" id="phase-macro-card" style="display:none;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Macro targets by phase</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Macro targets</div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <div id="phase-macro-output" style="font-size:13px;color:var(--text3);min-width:480px;">Loading...</div>
       </div>
@@ -1489,7 +1502,7 @@ function switchTab(name) {
       doExportTab();
     }
   }
-  if (name==='trend') { loadRecompScore(); loadPhases(); loadMacroData(); }
+  if (name==='trend') { loadRecompScore(); loadPhases(); loadMacroData(); loadProtocols(); }
   if (name==='insights') openInsights();
   if (name==='users') { loadUsers(); loadActivityLog(); }
 }
@@ -4038,12 +4051,15 @@ async function saveSettingsProfile() {
 
 // ── Protocols ─────────────────────────────────────────────────
 async function loadProtocols() {
-  const list = document.getElementById('protocols-list');
-  if (!list) return;
+  const targets = [
+    document.getElementById('protocols-list'),
+    document.getElementById('trend-protocols-list')
+  ].filter(Boolean);
+  if (!targets.length) return;
   try {
     const rows = await aiFetch('/protocols');
     if (!rows.length) {
-      list.innerHTML = '<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">No protocols added yet.</div>';
+      targets.forEach(t => { t.innerHTML = '<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">No protocols added yet.</div>'; });
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
@@ -4069,10 +4085,18 @@ async function loadProtocols() {
       html += inactive.map(r => _protoRow(r)).join('');
     }
     html += '</tbody></table>';
-    list.innerHTML = html;
+    targets.forEach(t => { t.innerHTML = html; });
   } catch(e) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--red-text);">Could not load protocols.</div>';
+    targets.forEach(t => { t.innerHTML = '<div style="font-size:12px;color:var(--red-text);">Could not load protocols.</div>'; });
   }
+}
+
+function openAddProtocolModal() {
+  openSettings();
+  setTimeout(() => {
+    const el = document.getElementById('trend-protocols-list');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }, 300);
 }
 
 function _protoRow(r) {
@@ -5447,9 +5471,10 @@ function parseMarkdown(text) {
         <div class="guide-tab-label"><i class="ti ti-trending-up"></i> Trend</div>
         <p>Weekly RD and bodyweight overlaid on a dual-axis chart. Colored bands show your training phases (Weight Loss, Cut, Recomp, Bulk, etc). The Recomp score card tells you whether you are building strength while losing weight, maintaining, or regressing.</p>
         <ul>
-          <li><strong>Training phases</strong> - add phases to track your training cycles. Phases inform the AI and the macro calculator</li>
+          <li><strong>Phases</strong> - add phases to track your training cycles. Phases inform the AI and the macro calculator</li>
+          <li><strong>Protocols</strong> - your active supplements, peptides, and medications. Toggle cyclic protocol windows directly on the chart to correlate RD trends against cycle timing</li>
           <li><strong>Macro calculator</strong> - computes BMR, TDEE, and daily macro targets based on your profile and current phase</li>
-          <li><strong>Macro targets by phase</strong> - retroactive macro history across all logged phases using average bodyweight per phase period</li>
+          <li><strong>Macro targets</strong> - retroactive macro history across all logged phases using average bodyweight per phase period</li>
         </ul>
       </div>
 
