@@ -1937,9 +1937,10 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot add protocols")
     conn = get_db()
-    max_order = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM protocols WHERE user_id=%s", (user["id"],)
-    ).fetchone()[0]
+    row = conn.execute(
+        "SELECT COALESCE(MAX(sort_order),0) AS max_order FROM protocols WHERE user_id=%s", (user["id"],)
+    ).fetchone()
+    max_order = row["max_order"] if row else 0
     conn.execute(
         "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1, bool(body.track))
