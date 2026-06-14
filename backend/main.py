@@ -1941,7 +1941,7 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
     ).fetchone()[0]
     conn.execute(
         "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (?,?,?,?,?,?,?,?,?)",
-        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1, 1 if body.track else 0)
+        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1, bool(body.track))
     )
     conn.commit()
     conn.close()
@@ -1954,7 +1954,7 @@ def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_use
     conn = get_db()
     conn.execute(
         "UPDATE protocols SET name=?, dose=?, frequency=?, notes=?, start_date=?, end_date=?, track=? WHERE id=? AND user_id=?",
-        (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, 1 if body.track else 0, protocol_id, user["id"])
+        (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, bool(body.track), protocol_id, user["id"])
     )
     conn.commit()
     conn.close()
@@ -1967,7 +1967,7 @@ def patch_protocol(protocol_id: int, body: ProtocolTrack, user=Depends(current_u
     conn = get_db()
     conn.execute(
         "UPDATE protocols SET track=? WHERE id=? AND user_id=?",
-        (1 if body.track else 0, protocol_id, user["id"])
+        (bool(body.track), protocol_id, user["id"])
     )
     conn.commit()
     conn.close()
