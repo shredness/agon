@@ -2207,6 +2207,7 @@ async function renderTrend() {
         borderWidth: 0,
       };
     });
+    _phaseAnnotations = phaseAnnotations;
   } catch(e) { /* phases non-fatal */ }
 
   if(tC)tC.destroy();
@@ -2315,7 +2316,8 @@ function getProtocolColor(proto) {
 // Tracks which protocol ids are currently toggled ON for chart shading
 const _activeProtocolIds = new Set();
 let _cachedProtocols = [];
-
+let _allPhases = [];
+let _phaseAnnotations = {};
 // Global helper: map a date string to nearest trend chart label index
 function _dateToLabelIndex(dateStr) {
   if (!tC || !tC.data || !tC.data.labels) return 0;
@@ -2382,29 +2384,16 @@ function toggleProtocolPill(id) {
 
 function updateProtocolAnnotations() {
   if (!tC) return;
-  const annotations = {};
+  // Start from the already-computed phase bands, add/replace protocol bands
+  const annotations = Object.assign({}, _phaseAnnotations);
 
-  // Phase bands
-  (_allPhases || []).forEach((ph, i) => {
-    const color = PHASE_BAND_COLORS[ph.phase_type];
-    if (!color) return;
-    annotations['phase_' + i] = {
-      type: 'box',
-      xMin: _dateToLabelIndex(ph.start_date),
-      xMax: ph.end_date ? _dateToLabelIndex(ph.end_date) : (tC.data.labels.length - 1),
-      backgroundColor: color,
-      borderWidth: 0,
-    };
-  });
-
-  // Active protocol bands
   _cachedProtocols.filter(p => _activeProtocolIds.has(p.id)).forEach(p => {
     const color = getProtocolColor(p);
     annotations['proto_' + p.id] = {
       type: 'box',
       xMin: _dateToLabelIndex(p.start_date),
       xMax: p.end_date ? _dateToLabelIndex(p.end_date) : (tC.data.labels.length - 1),
-      backgroundColor: _hexToRgba(color.border, 0.12),
+      backgroundColor: _hexToRgba(color.border, 0.18),
       borderWidth: 1,
       borderColor: color.border,
       label: {
