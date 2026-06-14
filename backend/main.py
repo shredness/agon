@@ -1941,9 +1941,12 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
         "SELECT COALESCE(MAX(sort_order),0) AS max_order FROM protocols WHERE user_id=%s", (user["id"],)
     ).fetchone()
     max_order = row["max_order"] if row else 0
+    # Coerce empty strings to None for optional date fields
+    start_date = body.start_date if body.start_date else None
+    end_date = body.end_date if body.end_date else None
     conn.execute(
         "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1, bool(body.track))
+        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, start_date, end_date, max_order + 1, bool(body.track))
     )
     conn.commit()
     conn.close()
@@ -1954,9 +1957,11 @@ def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_use
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
     conn = get_db()
+    start_date = body.start_date if body.start_date else None
+    end_date = body.end_date if body.end_date else None
     conn.execute(
         "UPDATE protocols SET name=%s, dose=%s, frequency=%s, notes=%s, start_date=%s, end_date=%s, track=%s WHERE id=%s AND user_id=%s",
-        (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, bool(body.track), protocol_id, user["id"])
+        (body.name.strip(), body.dose, body.frequency, body.notes, start_date, end_date, bool(body.track), protocol_id, user["id"])
     )
     conn.commit()
     conn.close()
