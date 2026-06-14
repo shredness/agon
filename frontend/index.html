@@ -486,11 +486,10 @@
 
     <!-- Protocols -->
     <div class="card" style="padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-        <div style="font-size:13px;font-weight:600;">Protocols</div>
-        <button class="btn btn-sm" onclick="openAddProtocolModal()">+ Add protocol</button>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Protocols</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="trend-protocols-list" style="font-size:13px;color:var(--text3);margin-bottom:16px;">Loading...</div>
       </div>
-      <div id="trend-protocols-list" style="font-size:13px;color:var(--text3);margin-bottom:16px;">Loading...</div>
       
       <!-- Add protocol form -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -511,7 +510,7 @@
           <input type="date" id="proto-end" style="font-size:12px;width:100%;">
         </div>
       </div>
-      <button class="btn btn-sm" onclick="addProtocol()">+ Add protocol</button>
+      <button class="btn btn-sm btn-primary" onclick="addProtocol()">+ Add protocol</button>
     </div>
 
     <!-- Macro calculator -->
@@ -2269,58 +2268,51 @@ async function renderTrend() {
   renderProtocolPills();
 }
 
-async function renderProtocolPills() {
-  const container = document.getElementById('trend-protocol-pills');
-  if (!container) return;
-  try {
-    const protocols = await apiFetch('/protocols');
-    const today = new Date().toISOString().slice(0, 10);
-    const active = protocols.filter(p => !p.end_date || p.end_date >= today);
-    if (!active.length) {
-      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No active protocols</div>';
-      return;
-    }
-    container.innerHTML = active.map(p => {
-      const bgColor = p.start_date && p.start_date <= today && (!p.end_date || p.end_date >= today) 
-        ? 'var(--green-bg)' 
-        : 'var(--bg2)';
-      const textColor = p.start_date && p.start_date <= today && (!p.end_date || p.end_date >= today)
-        ? 'var(--green)'
-        : 'var(--text2)';
-      return `<span style="display:inline-block;padding:4px 10px;background:${bgColor};border:1px solid ${textColor};border-radius:4px;font-size:11px;color:${textColor};font-weight:500;white-space:nowrap;">${escapeHtml(p.name)}</span>`;
-    }).join('');
-  } catch(e) {
-    container.innerHTML = '';
-  }
-}
-
 let EXERCISE_BANK = []; // populated by loadBankFromAPI()
 
-// Protocol color scheme (similar to muscle colors)
+// Protocol color palette — first 8 by name match, remainder cycle through palette
 const PROTOCOL_COLORS = {
-  'GLP': { bg: 'rgba(74,222,128,0.15)', border: '#10B981', text: '#059669' },
-  'Peptide': { bg: 'rgba(59,130,246,0.15)', border: '#3B82F6', text: '#1D4ED8' },
-  'Supplement': { bg: 'rgba(245,158,11,0.15)', border: '#F59E0B', text: '#D97706' },
-  'Vitamin': { bg: 'rgba(168,85,247,0.15)', border: '#A855F7', text: '#7C3AED' },
-  'Amino': { bg: 'rgba(236,72,153,0.15)', border: '#EC4899', text: '#BE185D' },
-  'Mineral': { bg: 'rgba(14,165,233,0.15)', border: '#0EA5E9', text: '#0369A1' },
-  'default': { bg: 'var(--bg2)', border: 'var(--border)', text: 'var(--text2)' }
+  'GLP':        { bg: 'rgba(74,222,128,0.15)',  border: '#10B981', text: '#059669' },
+  'Peptide':    { bg: 'rgba(59,130,246,0.15)',  border: '#3B82F6', text: '#1D4ED8' },
+  'Supplement': { bg: 'rgba(245,158,11,0.15)',  border: '#F59E0B', text: '#D97706' },
+  'Vitamin':    { bg: 'rgba(168,85,247,0.15)',  border: '#A855F7', text: '#7C3AED' },
+  'Amino':      { bg: 'rgba(236,72,153,0.15)',  border: '#EC4899', text: '#BE185D' },
+  'Mineral':    { bg: 'rgba(14,165,233,0.15)',  border: '#0EA5E9', text: '#0369A1' },
 };
+const PROTOCOL_PALETTE = [
+  { bg: 'rgba(74,222,128,0.15)',  border: '#10B981', text: '#059669' },
+  { bg: 'rgba(59,130,246,0.15)',  border: '#3B82F6', text: '#1D4ED8' },
+  { bg: 'rgba(245,158,11,0.15)',  border: '#F59E0B', text: '#D97706' },
+  { bg: 'rgba(168,85,247,0.15)', border: '#A855F7', text: '#7C3AED' },
+  { bg: 'rgba(236,72,153,0.15)', border: '#EC4899', text: '#BE185D' },
+  { bg: 'rgba(14,165,233,0.15)', border: '#0EA5E9', text: '#0369A1' },
+  { bg: 'rgba(251,113,133,0.15)',border: '#F43F5E', text: '#BE123C' },
+  { bg: 'rgba(52,211,153,0.15)', border: '#34D399', text: '#065F46' },
+];
+
+// Persistent map of protocol id → palette index (assigned on first render)
+const _protoPaletteMap = {};
+let _protoPaletteCounter = 0;
 
 function getProtocolColor(proto) {
   const notes = (proto.notes || '').toLowerCase();
-  const name = (proto.name || '').toLowerCase();
-  
-  // Try to match based on notes or name
+  const name  = (proto.name  || '').toLowerCase();
   if (notes.includes('glp') || name.includes('glp') || name.includes('retatrutide') || name.includes('semaglutide') || name.includes('tirzepatide')) return PROTOCOL_COLORS['GLP'];
-  if (notes.includes('peptide') || name.includes('bpc') || name.includes('tb500') || name.includes('selank')) return PROTOCOL_COLORS['Peptide'];
-  if (notes.includes('vitamin') || name.match(/vitamin|d3|k2/i)) return PROTOCOL_COLORS['Vitamin'];
-  if (notes.includes('amino') || name.match(/amino|1mq|theanine/i)) return PROTOCOL_COLORS['Amino'];
-  if (notes.includes('mineral') || name.match(/magnesium|boron|zinc/i)) return PROTOCOL_COLORS['Mineral'];
-  if (notes.includes('supplement') || name.match(/omega|creatine/i)) return PROTOCOL_COLORS['Supplement'];
-  
-  return PROTOCOL_COLORS['default'];
+  if (notes.includes('peptide') || name.match(/bpc|tb500|selank|dihexa|dsip|ss31|kpv|ghk/i)) return PROTOCOL_COLORS['Peptide'];
+  if (name.match(/vitamin|d3|k2/i)) return PROTOCOL_COLORS['Vitamin'];
+  if (name.match(/amino|1mq|theanine/i)) return PROTOCOL_COLORS['Amino'];
+  if (name.match(/magnesium|boron|zinc/i)) return PROTOCOL_COLORS['Mineral'];
+  if (name.match(/omega|creatine|fish.?oil/i)) return PROTOCOL_COLORS['Supplement'];
+  // Assign a stable palette color by protocol id
+  if (_protoPaletteMap[proto.id] === undefined) {
+    _protoPaletteMap[proto.id] = _protoPaletteCounter % PROTOCOL_PALETTE.length;
+    _protoPaletteCounter++;
+  }
+  return PROTOCOL_PALETTE[_protoPaletteMap[proto.id]];
 }
+
+// Tracks which protocol ids are currently toggled ON for chart shading
+const _activeProtocolIds = new Set();
 
 async function renderProtocolPills() {
   const container = document.getElementById('trend-protocol-pills');
@@ -2329,18 +2321,37 @@ async function renderProtocolPills() {
     const protocols = await aiFetch('/protocols');
     const today = new Date().toISOString().slice(0, 10);
     const trackedActive = protocols.filter(p => p.track && (!p.end_date || p.end_date >= today));
-    
+
     if (!trackedActive.length) {
-      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No tracked protocols</div>';
+      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No tracked protocols — check Track? in the table below.</div>';
       return;
     }
     container.innerHTML = trackedActive.map(p => {
       const color = getProtocolColor(p);
-      return `<span style="display:inline-block;padding:4px 10px;background:${color.bg};border:1px solid ${color.border};border-radius:4px;font-size:11px;color:${color.text};font-weight:600;white-space:nowrap;">${escapeHtml(p.name)}</span>`;
+      const isOn  = _activeProtocolIds.has(p.id);
+      const bg    = isOn ? color.border : color.bg;
+      const txt   = isOn ? '#fff' : color.text;
+      return `<span
+        data-proto-id="${p.id}"
+        onclick="toggleProtocolPill(${p.id}, this)"
+        style="display:inline-block;padding:4px 12px;background:${bg};border:1px solid ${color.border};border-radius:4px;font-size:11px;color:${txt};font-weight:600;white-space:nowrap;cursor:pointer;user-select:none;transition:background 0.15s,color 0.15s;"
+      >${escapeHtml(p.name)}</span>`;
     }).join('');
   } catch(e) {
     container.innerHTML = '';
   }
+}
+
+function toggleProtocolPill(id, el) {
+  if (_activeProtocolIds.has(id)) {
+    _activeProtocolIds.delete(id);
+  } else {
+    _activeProtocolIds.add(id);
+  }
+  // Re-render pills to reflect toggle state
+  renderProtocolPills();
+  // TODO: overlay shading on trend chart per active protocol
+  showToast(_activeProtocolIds.has(id) ? 'Protocol highlighted' : 'Highlight removed');
 }
 
 function toggleMuscleChipColored(el, name) {
