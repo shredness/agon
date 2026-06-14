@@ -242,6 +242,10 @@ class ProtocolIn(BaseModel):
     notes:      Optional[str] = None
     start_date: Optional[str] = None
     end_date:   Optional[str] = None
+    track:      Optional[bool] = False
+
+class ProtocolTrack(BaseModel):
+    track: bool
 
 class PhaseIn(BaseModel):
     phase_type: str
@@ -1915,12 +1919,23 @@ def get_recomp(user=Depends(current_user)):
 @app.get("/protocols")
 def get_protocols(user=Depends(current_user)):
     conn = get_db()
+    # Add track column if missing (migration)
+    try:
+        conn.execute("SELECT track FROM protocols LIMIT 1")
+    except Exception:
+        conn.execute("ALTER TABLE protocols ADD COLUMN track INTEGER DEFAULT 0")
+        conn.commit()
     rows = conn.execute(
-        "SELECT id, name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=? ORDER BY CASE WHEN end_date IS NULL THEN 0 ELSE 1 END ASC, end_date DESC, start_date DESC",
+        "SELECT id, name, dose, frequency, notes, start_date, end_date, track FROM protocols WHERE user_id=? ORDER BY CASE WHEN end_date IS NULL THEN 0 ELSE 1 END ASC, end_date DESC, start_date DESC",
         (user["id"],)
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["track"] = bool(d.get("track", 0))
+        result.append(d)
+    return result
 
 @app.post("/protocols")
 def add_protocol(body: ProtocolIn, user=Depends(current_user)):
@@ -1931,8 +1946,8 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
         "SELECT COALESCE(MAX(sort_order),0) FROM protocols WHERE user_id=?", (user["id"],)
     ).fetchone()[0]
     conn.execute(
-        "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order) VALUES (?,?,?,?,?,?,?,?)",
-        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1)
+        "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (?,?,?,?,?,?,?,?,?)",
+        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1, 1 if body.track else 0)
     )
     conn.commit()
     conn.close()
@@ -1944,8 +1959,21 @@ def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_use
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
     conn = get_db()
     conn.execute(
-        "UPDATE protocols SET name=?, dose=?, frequency=?, notes=?, start_date=?, end_date=? WHERE id=? AND user_id=?",
-        (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, protocol_id, user["id"])
+        "UPDATE protocols SET name=?, dose=?, frequency=?, notes=?, start_date=?, end_date=?, track=? WHERE id=? AND user_id=?",
+        (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, 1 if body.track else 0, protocol_id, user["id"])
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "updated"}
+
+@app.patch("/protocols/{protocol_id}")
+def patch_protocol(protocol_id: int, body: ProtocolTrack, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
+    conn = get_db()
+    conn.execute(
+        "UPDATE protocols SET track=? WHERE id=? AND user_id=?",
+        (1 if body.track else 0, protocol_id, user["id"])
     )
     conn.commit()
     conn.close()
