@@ -1962,16 +1962,22 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
 def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
-    conn = get_db()
-    start_date = body.start_date if body.start_date else None
-    end_date = body.end_date if body.end_date else None
-    conn.execute(
-        "UPDATE protocols SET name=%s, dose=%s, frequency=%s, notes=%s, start_date=%s, end_date=%s, track=%s WHERE id=%s AND user_id=%s",
-        (body.name.strip(), body.dose, body.frequency, body.notes, start_date, end_date, bool(body.track), protocol_id, user["id"])
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "updated"}
+    try:
+        conn = get_db()
+        start_date = body.start_date if body.start_date else None
+        end_date = body.end_date if body.end_date else None
+        conn.execute(
+            "UPDATE protocols SET name=%s, dose=%s, frequency=%s, notes=%s, start_date=%s, end_date=%s, track=%s WHERE id=%s AND user_id=%s",
+            (body.name.strip(), body.dose, body.frequency, body.notes, start_date, end_date, bool(body.track), protocol_id, user["id"])
+        )
+        conn.commit()
+        conn.close()
+        return {"status": "updated"}
+    except Exception as e:
+        import traceback
+        print(f"ERROR in update_protocol: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Protocol update failed: {str(e)}")
 
 @app.patch("/protocols/{protocol_id}")
 def patch_protocol(protocol_id: int, body: ProtocolTrack, user=Depends(current_user)):
