@@ -88,41 +88,33 @@ def get_db():
 
 
 class _ConnectionWrapper:
-    """Wrapper for psycopg2 connections from the pool that ensures proper cleanup.
-    Mimics sqlite3 connection API (execute directly on connection, ? -> %s conversion)."""
+    """Wrapper for psycopg2 connections from the pool that ensures proper cleanup."""
     def __init__(self, conn):
         self._conn = conn
         self._cursor = None
     
     def cursor(self, *args, **kwargs):
-        """Get a cursor from the connection."""
         return self._conn.cursor(*args, **kwargs)
     
     @property
     def rowcount(self):
-        """Return rowcount from the last execute (for UPDATE/DELETE operations)."""
         if self._cursor:
             return self._cursor.rowcount
         return 0
     
     def execute(self, sql, params=None):
-        """Execute SQL directly (like sqlite3). Converts ? to %s for psycopg2."""
+        """Execute SQL using native psycopg2 %s placeholders."""
         if not self._cursor:
             self._cursor = self._conn.cursor()
-        # Convert SQLite ? placeholders to psycopg2 %s
-        if params and '?' in sql:
-            sql = sql.replace('?', '%s')
         self._cursor.execute(sql, params)
-        return self  # Return self to support chaining: conn.execute().fetchone()
+        return self
     
     def fetchone(self):
-        """Fetch one row from the last execute."""
         if self._cursor:
             return self._cursor.fetchone()
         return None
     
     def fetchall(self):
-        """Fetch all rows from the last execute."""
         if self._cursor:
             return self._cursor.fetchall()
         return []

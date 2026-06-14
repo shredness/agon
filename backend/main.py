@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, status, Request, Header
+﻿from fastapi import FastAPI, HTTPException, Depends, status, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -86,7 +86,7 @@ def log_event(user_id: int, username: str, event_type: str, detail: str = None, 
     try:
         conn = get_db()
         conn.execute(
-            "INSERT INTO events (user_id, username, event_type, detail, ip) VALUES (?,?,?,?,?)",
+            "INSERT INTO events (user_id, username, event_type, detail, ip) VALUES (%s,%s,%s,%s,%s)",
             (user_id, username, event_type, detail, ip)
         )
         conn.commit()
@@ -143,7 +143,7 @@ def create_token(data: dict):
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 def get_user(conn, username: str):
-    return conn.execute("SELECT * FROM users WHERE username=?", (username.strip().lower(),)).fetchone()
+    return conn.execute("SELECT * FROM users WHERE username=%s", (username.strip().lower(),)).fetchone()
 
 async def current_user(token: str = Depends(oauth2)):
     err = HTTPException(status_code=401, detail="Invalid or expired token",
@@ -302,12 +302,12 @@ def register(body: UserRegister, request: Request):
     validate_password(body.password)
 
     conn = get_db()
-    if conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
+    if conn.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Username already taken")
 
     conn.execute(
-        "INSERT INTO users (username, hashed_pw, role, status) VALUES (?,?,?,?)",
+        "INSERT INTO users (username, hashed_pw, role, status) VALUES (%s,%s,%s,%s)",
         (username, hash_password(body.password), "guest", "pending")
     )
     conn.commit()
@@ -337,7 +337,7 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends()):
 
     # Check if MFA is enabled for this user
     settings = conn.execute(
-        "SELECT totp_enabled FROM user_settings WHERE user_id=?", (user["id"],)
+        "SELECT totp_enabled FROM user_settings WHERE user_id=%s", (user["id"],)
     ).fetchone()
     conn.close()
 
@@ -381,7 +381,7 @@ def mfa_verify(body: MFAVerify, request: Request, token: str = Depends(oauth2)):
         raise err
 
     settings = conn.execute(
-        "SELECT totp_secret FROM user_settings WHERE user_id=?", (user["id"],)
+        "SELECT totp_secret FROM user_settings WHERE user_id=%s", (user["id"],)
     ).fetchone()
     conn.close()
 
@@ -416,12 +416,12 @@ def mfa_setup(user=Depends(current_user)):
     # Store the (unconfirmed) secret encrypted — will be activated on /enable
     enc = encrypt_secret(secret)
     conn = get_db()
-    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
+    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=%s", (user["id"],)).fetchone()
     if existing:
-        conn.execute("UPDATE user_settings SET totp_secret=?, totp_enabled='0' WHERE user_id=?",
+        conn.execute("UPDATE user_settings SET totp_secret=%s, totp_enabled='0' WHERE user_id=%s",
                      (enc, user["id"]))
     else:
-        conn.execute("INSERT INTO user_settings (user_id, totp_secret, totp_enabled) VALUES (?,?,'0')",
+        conn.execute("INSERT INTO user_settings (user_id, totp_secret, totp_enabled) VALUES (%s,%s,'0')",
                      (user["id"], enc))
     conn.commit()
     conn.close()
@@ -433,7 +433,7 @@ def mfa_enable(body: MFAVerify, user=Depends(current_user)):
     """Confirm TOTP code is working, then flip totp_enabled = 1."""
     conn = get_db()
     settings = conn.execute(
-        "SELECT totp_secret FROM user_settings WHERE user_id=?", (user["id"],)
+        "SELECT totp_secret FROM user_settings WHERE user_id=%s", (user["id"],)
     ).fetchone()
     conn.close()
 
@@ -446,7 +446,7 @@ def mfa_enable(body: MFAVerify, user=Depends(current_user)):
         raise HTTPException(status_code=401, detail="Invalid TOTP code — try again")
 
     conn = get_db()
-    conn.execute("UPDATE user_settings SET totp_enabled='1' WHERE user_id=?", (user["id"],))
+    conn.execute("UPDATE user_settings SET totp_enabled='1' WHERE user_id=%s", (user["id"],))
     conn.commit()
     conn.close()
     log_event(user["id"], user["username"], "mfa_enabled", "TOTP activated")
@@ -458,7 +458,7 @@ def mfa_disable(user=Depends(current_user)):
     """Any user: disable their own MFA."""
     conn = get_db()
     conn.execute(
-        "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=?",
+        "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=%s",
         (user["id"],)
     )
     conn.commit()
@@ -471,12 +471,12 @@ def mfa_disable(user=Depends(current_user)):
 def admin_disable_user_mfa(username: str, user=Depends(admin_only)):
     """Admin: disable MFA for any user by username."""
     conn = get_db()
-    target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    target = conn.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
     if not target:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
     conn.execute(
-        "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=?",
+        "UPDATE user_settings SET totp_enabled='0', totp_secret=NULL WHERE user_id=%s",
         (target["id"],)
     )
     conn.commit()
@@ -489,7 +489,7 @@ def admin_disable_user_mfa(username: str, user=Depends(admin_only)):
 def me(user=Depends(current_user)):
     conn = get_db()
     s = conn.execute(
-        "SELECT totp_enabled FROM user_settings WHERE user_id=?", (user["id"],)
+        "SELECT totp_enabled FROM user_settings WHERE user_id=%s", (user["id"],)
     ).fetchone()
     conn.close()
     mfa_enabled = bool(s and s["totp_enabled"] == "1")
@@ -503,13 +503,13 @@ def change_own_password(body: PasswordSelfChange, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot change their password")
     conn = get_db()
-    stored = conn.execute("SELECT hashed_pw FROM users WHERE id=?", (user["id"],)).fetchone()
+    stored = conn.execute("SELECT hashed_pw FROM users WHERE id=%s", (user["id"],)).fetchone()
     conn.close()
     if not stored or not verify_password(body.current_password, stored["hashed_pw"]):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
     validate_password(body.new_password)
     conn = get_db()
-    conn.execute("UPDATE users SET hashed_pw=? WHERE id=?",
+    conn.execute("UPDATE users SET hashed_pw=%s WHERE id=%s",
                  (hash_password(body.new_password), user["id"]))
     conn.commit()
     conn.close()
@@ -525,7 +525,7 @@ def list_users(user=Depends(admin_only)):
     result = []
     for r in rows:
         s = conn.execute(
-            "SELECT totp_enabled FROM user_settings WHERE user_id=?", (r["id"],)
+            "SELECT totp_enabled FROM user_settings WHERE user_id=%s", (r["id"],)
         ).fetchone()
         result.append({**dict(r), "mfa_enabled": bool(s and s["totp_enabled"] == "1")})
     conn.close()
@@ -535,11 +535,11 @@ def list_users(user=Depends(admin_only)):
 @app.post("/admin/users/{username}/approve")
 def approve_user(username: str, user=Depends(admin_only)):
     conn = get_db()
-    target = conn.execute("SELECT id, status FROM users WHERE username=?", (username,)).fetchone()
+    target = conn.execute("SELECT id, status FROM users WHERE username=%s", (username,)).fetchone()
     if not target:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
-    conn.execute("UPDATE users SET status='active' WHERE username=?", (username,))
+    conn.execute("UPDATE users SET status='active' WHERE username=%s", (username,))
     conn.commit()
     conn.close()
     log_event(user["id"], user["username"], "user_approved", f"approved {username}")
@@ -549,11 +549,11 @@ def approve_user(username: str, user=Depends(admin_only)):
 @app.post("/admin/users/{username}/reject")
 def reject_user(username: str, user=Depends(admin_only)):
     conn = get_db()
-    target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    target = conn.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
     if not target:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
-    conn.execute("DELETE FROM users WHERE username=?", (username,))
+    conn.execute("DELETE FROM users WHERE username=%s", (username,))
     conn.commit()
     conn.close()
     log_event(user["id"], user["username"], "user_rejected", f"rejected and deleted {username}")
@@ -564,10 +564,10 @@ def create_user(body: UserCreate, user=Depends(admin_only)):
     validate_password(body.password)
     conn = get_db()
     body.username = body.username.strip().lower()
-    if conn.execute("SELECT id FROM users WHERE username=?", (body.username,)).fetchone():
+    if conn.execute("SELECT id FROM users WHERE username=%s", (body.username,)).fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Username already exists")
-    conn.execute("INSERT INTO users (username, hashed_pw, role) VALUES (?,?,?)",
+    conn.execute("INSERT INTO users (username, hashed_pw, role) VALUES (%s,%s,%s)",
                  (body.username, hash_password(body.password), body.role))
     conn.commit()
     conn.close()
@@ -578,14 +578,14 @@ def delete_user(username: str, user=Depends(admin_only)):
     if username == user["username"]:
         raise HTTPException(status_code=400, detail="You cannot delete your own account")
     conn = get_db()
-    target = conn.execute("SELECT role FROM users WHERE username=?", (username,)).fetchone()
+    target = conn.execute("SELECT role FROM users WHERE username=%s", (username,)).fetchone()
     if not target:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
     if target["role"] == "admin":
         conn.close()
         raise HTTPException(status_code=400, detail="Cannot delete an admin account")
-    conn.execute("DELETE FROM users WHERE username=?", (username,))
+    conn.execute("DELETE FROM users WHERE username=%s", (username,))
     conn.commit()
     conn.close()
     return {"status": "deleted", "username": username}
@@ -594,11 +594,11 @@ def delete_user(username: str, user=Depends(admin_only)):
 def change_password(username: str, body: PasswordChange, user=Depends(admin_only)):
     validate_password(body.password)
     conn = get_db()
-    target = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    target = conn.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
     if not target:
         conn.close()
         raise HTTPException(status_code=404, detail="User not found")
-    conn.execute("UPDATE users SET hashed_pw=? WHERE username=?",
+    conn.execute("UPDATE users SET hashed_pw=%s WHERE username=%s",
                  (hash_password(body.password), username))
     conn.commit()
     conn.close()
@@ -611,7 +611,7 @@ def get_sessions(user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM sessions WHERE user_id=? ORDER BY date ASC", (uid,)
+        "SELECT * FROM sessions WHERE user_id=%s ORDER BY date ASC", (uid,)
     ).fetchall()
     conn.close()
     return [{"id": r["id"], "date": r["date"], "bw": r["bw"], "rd": r["rd"],
@@ -674,7 +674,7 @@ def delete_session(date: str, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo account is read-only")
     conn = get_db()
-    conn.execute("DELETE FROM sessions WHERE user_id=? AND date=?", (user["id"], date))
+    conn.execute("DELETE FROM sessions WHERE user_id=%s AND date=%s", (user["id"], date))
     conn.commit()
     conn.close()
     return {"status": "deleted", "date": date}
@@ -686,9 +686,9 @@ def get_trend(user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, bw, rd FROM sessions WHERE user_id=? ORDER BY date ASC", (uid,)
+        "SELECT date, bw, rd FROM sessions WHERE user_id=%s ORDER BY date ASC", (uid,)
     ).fetchall()
-    settings_row = conn.execute("SELECT week_start FROM user_settings WHERE user_id=?", (uid,)).fetchone()
+    settings_row = conn.execute("SELECT week_start FROM user_settings WHERE user_id=%s", (uid,)).fetchone()
     conn.close()
     week_start_pref = (settings_row["week_start"] if settings_row and settings_row["week_start"] else "Saturday")
 
@@ -733,7 +733,7 @@ def get_progress(exercise_name: str, user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, bw, rd, exercises FROM sessions WHERE user_id=? ORDER BY date ASC", (uid,)
+        "SELECT date, bw, rd, exercises FROM sessions WHERE user_id=%s ORDER BY date ASC", (uid,)
     ).fetchall()
     conn.close()
 
@@ -784,7 +784,7 @@ def add_exercise(body: ExerciseIn, user=Depends(current_user)):
     try:
         conn.execute("""
             INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by, rep_trigger_override)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT(name) DO UPDATE SET
                 alias=excluded.alias, tool=excluded.tool, mult=excluded.mult,
                 muscles=excluded.muscles, day=excluded.day, load_hint=excluded.load_hint,
@@ -805,21 +805,21 @@ def update_exercise(ex_name: str, body: ExerciseIn, user=Depends(current_user)):
     if user["role"] not in ("admin", "guest"):
         raise HTTPException(status_code=403, detail="Read-only account")
     conn = get_db()
-    existing = conn.execute("SELECT created_by FROM exercises WHERE name=?", (ex_name,)).fetchone()
+    existing = conn.execute("SELECT created_by FROM exercises WHERE name=%s", (ex_name,)).fetchone()
     if existing:
         # Non-admin can only edit their own exercises
         if user["role"] != "admin" and existing["created_by"] != user["id"]:
             conn.close()
             raise HTTPException(status_code=403, detail="You can only edit exercises you created")
         result = conn.execute(
-            "UPDATE exercises SET alias=?, tool=?, mult=?, muscles=?, day=?, load_hint=?, is_bw=?, sort_order=?, rep_trigger_override=? WHERE name=?",
+            "UPDATE exercises SET alias=%s, tool=%s, mult=%s, muscles=%s, day=%s, load_hint=%s, is_bw=%s, sort_order=%s, rep_trigger_override=%s WHERE name=%s",
             (body.alias, body.tool, body.mult, json.dumps(body.muscles),
              body.day, body.load_hint, body.is_bw, body.sort_order,
              body.rep_trigger_override, ex_name))
     else:
         # New exercise — insert with ownership
         conn.execute(
-            "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by, rep_trigger_override) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO exercises (name, alias, tool, mult, muscles, day, load_hint, is_bw, sort_order, created_by, rep_trigger_override) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (ex_name, body.alias, body.tool, body.mult, json.dumps(body.muscles),
              body.day, body.load_hint, body.is_bw, body.sort_order, user["id"],
              body.rep_trigger_override))
@@ -832,14 +832,14 @@ def delete_exercise(ex_name: str, user=Depends(current_user)):
     if user["role"] not in ("admin", "guest"):
         raise HTTPException(status_code=403, detail="Read-only account")
     conn = get_db()
-    existing = conn.execute("SELECT created_by FROM exercises WHERE name=?", (ex_name,)).fetchone()
+    existing = conn.execute("SELECT created_by FROM exercises WHERE name=%s", (ex_name,)).fetchone()
     if not existing:
         conn.close()
         return {"status": "not found"}
     if user["role"] != "admin" and existing["created_by"] != user["id"]:
         conn.close()
         raise HTTPException(status_code=403, detail="You can only delete exercises you created")
-    conn.execute("DELETE FROM exercises WHERE name=?", (ex_name,))
+    conn.execute("DELETE FROM exercises WHERE name=%s", (ex_name,))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
@@ -851,7 +851,7 @@ def get_set_curve(ex_name: str, user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, exercises FROM sessions WHERE user_id=? ORDER BY date ASC", (uid,)
+        "SELECT date, exercises FROM sessions WHERE user_id=%s ORDER BY date ASC", (uid,)
     ).fetchall()
     conn.close()
 
@@ -891,7 +891,7 @@ def get_logged_exercises(user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT exercises FROM sessions WHERE user_id=?", (uid,)
+        "SELECT exercises FROM sessions WHERE user_id=%s", (uid,)
     ).fetchall()
     conn.close()
     names = set()
@@ -908,14 +908,14 @@ def get_profile(user=Depends(current_user)):
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, ollama_base_url FROM user_settings WHERE user_id=?",
+            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, ollama_base_url FROM user_settings WHERE user_id=%s",
             (user["id"],)
         ).fetchone()
     except Exception:
         # Columns may not exist yet — fall back to partial query
         try:
             row = conn.execute(
-                "SELECT first_name, last_name, dob, gender, week_start FROM user_settings WHERE user_id=?",
+                "SELECT first_name, last_name, dob, gender, week_start FROM user_settings WHERE user_id=%s",
                 (user["id"],)
             ).fetchone()
         except Exception:
@@ -947,7 +947,7 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
     if body.ollama_base_url and body.ollama_base_url.strip() and user["role"] != "admin":
         body.ollama_base_url = None
     conn = get_db()
-    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
+    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=%s", (user["id"],)).fetchone()
     
     # Build dynamic UPDATE to only update provided fields
     if existing:
@@ -969,18 +969,18 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
         }
         for field, value in field_map.items():
             if value is not None:
-                updates.append(f"{field}=?")
+                updates.append(f"{field}=%s")
                 params.append(value)
         
         if updates:
             updates.append("updated_at=CURRENT_TIMESTAMP")
-            sql = f"UPDATE user_settings SET {', '.join(updates)} WHERE user_id=?"
+            sql = f"UPDATE user_settings SET {', '.join(updates)} WHERE user_id=%s"
             params.append(user["id"])
             conn.execute(sql, params)
     else:
         conn.execute("""
             INSERT INTO user_settings (user_id, first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, rep_trigger)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (user["id"], body.first_name, body.last_name, body.dob, body.gender,
                 body.week_start or "Saturday", body.height_in, body.target_bw,
                 body.activity_level or "1.55", body.onboarded or "0",
@@ -995,7 +995,7 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
 def get_ai_settings(user=Depends(current_user)):
     """Return whether a key is set + masked preview + model + ollama URL."""
     conn = get_db()
-    row = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=?",
+    row = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=%s",
                        (user["id"],)).fetchone()
     conn.close()
     if not row or not row["ai_key_enc"]:
@@ -1023,24 +1023,24 @@ def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
     if body.ollama_base_url and body.ollama_base_url.strip() and user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only an admin can set the Ollama base URL")
     conn = get_db()
-    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?",
+    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=%s",
                             (user["id"],)).fetchone()
     # Build the update — always write fields atomically
     key_enc = None
     if body.ai_key is not None and body.ai_key.strip():
         key_enc = encrypt_secret(body.ai_key.strip())
     if existing:
-        cur = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=?",
+        cur = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=%s",
                            (user["id"],)).fetchone()
         final_key        = key_enc if key_enc is not None else cur["ai_key_enc"]
         final_model      = body.ai_model if body.ai_model else (cur["ai_model"] or "gemini-2.5-flash")
         final_ollama_url = body.ollama_base_url if body.ollama_base_url is not None else cur["ollama_base_url"]
         conn.execute(
-            "UPDATE user_settings SET ai_key_enc=?, ai_model=?, ollama_base_url=?, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
+            "UPDATE user_settings SET ai_key_enc=%s, ai_model=%s, ollama_base_url=%s, updated_at=CURRENT_TIMESTAMP WHERE user_id=%s",
             (final_key, final_model, final_ollama_url, user["id"])
         )
     else:
-        conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model, ollama_base_url) VALUES (?,?,?,?)",
+        conn.execute("INSERT INTO user_settings (user_id, ai_key_enc, ai_model, ollama_base_url) VALUES (%s,%s,%s,%s)",
                      (user["id"], key_enc, body.ai_model or "gemini-2.5-flash", body.ollama_base_url or ""))
     conn.commit()
     conn.close()
@@ -1051,7 +1051,7 @@ def delete_ai_settings(user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts have no stored key")
     conn = get_db()
-    conn.execute("UPDATE user_settings SET ai_key_enc=NULL, updated_at=CURRENT_TIMESTAMP WHERE user_id=?",
+    conn.execute("UPDATE user_settings SET ai_key_enc=NULL, updated_at=CURRENT_TIMESTAMP WHERE user_id=%s",
                  (user["id"],))
     conn.commit()
     conn.close()
@@ -1062,7 +1062,7 @@ def build_training_context(uid: int) -> str:
     """Produce a compact text summary of the user's training data for the LLM."""
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=? ORDER BY date",
+        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=%s ORDER BY date",
         (uid,)
     ).fetchall()
     if not rows:
@@ -1072,7 +1072,7 @@ def build_training_context(uid: int) -> str:
     lines = []
     # Load profile for richer AI context
     prof = conn.execute(
-        "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw FROM user_settings WHERE user_id=?",
+        "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw FROM user_settings WHERE user_id=%s",
         (uid,)
     ).fetchone()
 
@@ -1102,12 +1102,12 @@ def build_training_context(uid: int) -> str:
 
     # Add active phase
     active_phase = conn.execute(
-        "SELECT phase_type, start_date, label FROM phases WHERE user_id=? AND end_date IS NULL ORDER BY start_date DESC LIMIT 1",
+        "SELECT phase_type, start_date, label FROM phases WHERE user_id=%s AND end_date IS NULL ORDER BY start_date DESC LIMIT 1",
         (uid,)
     ).fetchone()
     # Add active protocols
     protos = conn.execute(
-        "SELECT name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=? ORDER BY sort_order, id",
+        "SELECT name, dose, frequency, notes, start_date, end_date FROM protocols WHERE user_id=%s ORDER BY sort_order, id",
         (uid,)
     ).fetchall()
     conn.close()
@@ -1242,7 +1242,7 @@ async def _call_ollama(base_url: str, model_name: str, context: str, history: li
             except (KeyError, IndexError):
                 raise HTTPException(status_code=502, detail="Ollama returned an unexpected response shape")
     except httpx.ConnectError:
-        raise HTTPException(status_code=502, detail=f"Could not reach Ollama at {base_url}. Is it running?")
+        raise HTTPException(status_code=502, detail=f"Could not reach Ollama at {base_url}. Is it running%s")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Ollama error: {str(e)[:300]}")
 
@@ -1256,7 +1256,7 @@ async def _call_gemini(api_key: str, model: str, context: str, history: list, qu
     })
     contents.append({
         "role": "model",
-        "parts": [{"text": "I have your full training history loaded and I'm ready to analyze it. What would you like to know?"}]
+        "parts": [{"text": "I have your full training history loaded and I'm ready to analyze it. What would you like to know%s"}]
     })
     for msg in history:
         contents.append({
@@ -1315,7 +1315,7 @@ def get_insights_history(user=Depends(current_user)):
         return {"messages": []}
     conn = get_db()
     rows = conn.execute(
-        "SELECT role, content, created_at FROM insights_messages WHERE user_id=? ORDER BY id",
+        "SELECT role, content, created_at FROM insights_messages WHERE user_id=%s ORDER BY id",
         (user["id"],)
     ).fetchall()
     conn.close()
@@ -1326,7 +1326,7 @@ def clear_insights_history(user=Depends(current_user)):
     if user["role"] == "demo":
         return {"status": "noop"}
     conn = get_db()
-    conn.execute("DELETE FROM insights_messages WHERE user_id=?", (user["id"],))
+    conn.execute("DELETE FROM insights_messages WHERE user_id=%s", (user["id"],))
     conn.commit()
     conn.close()
     return {"status": "cleared"}
@@ -1339,7 +1339,7 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
 
     # Get the user's key + model + ollama settings
     conn = get_db()
-    settings = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=?",
+    settings = conn.execute("SELECT ai_key_enc, ai_model, ollama_base_url FROM user_settings WHERE user_id=%s",
                             (user["id"],)).fetchone()
     conn.close()
     
@@ -1362,7 +1362,7 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
     if user["role"] != "demo":
         conn = get_db()
         rows = conn.execute(
-            "SELECT role, content FROM insights_messages WHERE user_id=? ORDER BY id",
+            "SELECT role, content FROM insights_messages WHERE user_id=%s ORDER BY id",
             (user["id"],)
         ).fetchall()
         conn.close()
@@ -1373,9 +1373,9 @@ async def insights_ask(body: InsightsQuery, user=Depends(current_user)):
     # Persist both turns (not for demo)
     if user["role"] != "demo":
         conn = get_db()
-        conn.execute("INSERT INTO insights_messages (user_id, role, content) VALUES (?,?,?)",
+        conn.execute("INSERT INTO insights_messages (user_id, role, content) VALUES (%s,%s,%s)",
                      (user["id"], "user", q))
-        conn.execute("INSERT INTO insights_messages (user_id, role, content) VALUES (?,?,?)",
+        conn.execute("INSERT INTO insights_messages (user_id, role, content) VALUES (%s,%s,%s)",
                      (user["id"], "model", answer))
         conn.commit()
         conn.close()
@@ -1390,7 +1390,7 @@ async def test_ai_key(body: AISettingsIn, user=Depends(current_user)):
     model = body.ai_model or "gemini-2.5-flash"
     if not key:
         conn = get_db()
-        row = conn.execute("SELECT ai_key_enc FROM user_settings WHERE user_id=?",
+        row = conn.execute("SELECT ai_key_enc FROM user_settings WHERE user_id=%s",
                            (user["id"],)).fetchone()
         conn.close()
         if row and row["ai_key_enc"]:
@@ -1669,7 +1669,7 @@ async def import_sessions(user=Depends(current_user), file: UploadFile = File(..
     for (date_str, bw), exercises_map in sessions_map.items():
         # Check for existing session
         existing = conn.execute(
-            "SELECT id FROM sessions WHERE user_id=? AND date=?",
+            "SELECT id FROM sessions WHERE user_id=%s AND date=%s",
             (user["id"], date_str)
         ).fetchone()
         if existing:
@@ -1697,7 +1697,7 @@ async def import_sessions(user=Depends(current_user), file: UploadFile = File(..
         total_density = round(total_vol / total_time, 4) if total_time > 0 else 0
 
         conn.execute(
-            "INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises) VALUES (%s,%s,%s,%s,%s,%s)",
             (user["id"], date_str, bw, rd, total_density, json.dumps(exercises))
         )
         inserted += 1
@@ -1732,12 +1732,12 @@ async def import_sessions(user=Depends(current_user), file: UploadFile = File(..
             if not phase_type:
                 continue
             existing = conn.execute(
-                "SELECT id FROM phases WHERE user_id=? AND phase_type=? AND start_date=?",
+                "SELECT id FROM phases WHERE user_id=%s AND phase_type=%s AND start_date=%s",
                 (user["id"], phase_type, start_date)
             ).fetchone()
             if not existing:
                 conn.execute(
-                    "INSERT INTO phases (user_id, phase_type, start_date, end_date) VALUES (?,?,?,?)",
+                    "INSERT INTO phases (user_id, phase_type, start_date, end_date) VALUES (%s,%s,%s,%s)",
                     (user["id"], phase_type, start_date, end_date)
                 )
                 phases_created += 1
@@ -1762,7 +1762,7 @@ def get_events(user=Depends(current_user), limit: int = 200):
     conn = get_db()
     rows = conn.execute(
         """SELECT e.created_at, e.username, e.event_type, e.detail, e.ip
-           FROM events e ORDER BY e.id DESC LIMIT ?""",
+           FROM events e ORDER BY e.id DESC LIMIT %s""",
         (limit,)
     ).fetchall()
     conn.close()
@@ -1797,7 +1797,7 @@ def get_phases(user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, phase_type, start_date, end_date, notes, label FROM phases WHERE user_id=? ORDER BY start_date DESC",
+        "SELECT id, phase_type, start_date, end_date, notes, label FROM phases WHERE user_id=%s ORDER BY start_date DESC",
         (uid,)
     ).fetchall()
     conn.close()
@@ -1814,11 +1814,11 @@ def create_phase(body: PhaseIn, user=Depends(current_user)):
     # For historical phases (past start date) the user sets end dates manually
     if not body.end_date and body.start_date >= today_str:
         conn.execute(
-            "UPDATE phases SET end_date=? WHERE user_id=? AND end_date IS NULL",
+            "UPDATE phases SET end_date=%s WHERE user_id=%s AND end_date IS NULL",
             (body.start_date, user["id"])
         )
     conn.execute(
-        "INSERT INTO phases (user_id, phase_type, start_date, end_date, notes, label) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO phases (user_id, phase_type, start_date, end_date, notes, label) VALUES (%s,%s,%s,%s,%s,%s)",
         (user["id"], body.phase_type, body.start_date, body.end_date or None, body.notes or None, body.label or None)
     )
     conn.commit()
@@ -1828,7 +1828,7 @@ def create_phase(body: PhaseIn, user=Depends(current_user)):
 @app.delete("/phases/{phase_id}")
 def delete_phase(phase_id: int, user=Depends(current_user)):
     conn = get_db()
-    conn.execute("DELETE FROM phases WHERE id=? AND user_id=?", (phase_id, user["id"]))
+    conn.execute("DELETE FROM phases WHERE id=%s AND user_id=%s", (phase_id, user["id"]))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
@@ -1838,7 +1838,7 @@ def close_phase(phase_id: int, user=Depends(current_user)):
     today = _date.today().strftime("%Y-%m-%d")
     conn = get_db()
     conn.execute(
-        "UPDATE phases SET end_date=? WHERE id=? AND user_id=? AND end_date IS NULL",
+        "UPDATE phases SET end_date=%s WHERE id=%s AND user_id=%s AND end_date IS NULL",
         (today, phase_id, user["id"])
     )
     conn.commit()
@@ -1859,12 +1859,12 @@ def get_recomp(user=Depends(current_user)):
     uid = data_user_id(user)
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, bw, rd FROM sessions WHERE user_id=? ORDER BY date DESC LIMIT 60",
+        "SELECT date, bw, rd FROM sessions WHERE user_id=%s ORDER BY date DESC LIMIT 60",
         (uid,)
     ).fetchall()
     # Get target_bw — defensive in case column not yet migrated
     try:
-        settings = conn.execute("SELECT target_bw FROM user_settings WHERE user_id=?", (uid,)).fetchone()
+        settings = conn.execute("SELECT target_bw FROM user_settings WHERE user_id=%s", (uid,)).fetchone()
     except Exception:
         settings = None
     conn.close()
@@ -1920,7 +1920,7 @@ def get_recomp(user=Depends(current_user)):
 def get_protocols(user=Depends(current_user)):
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, name, dose, frequency, notes, start_date, end_date, track FROM protocols WHERE user_id=? ORDER BY CASE WHEN end_date IS NULL THEN 0 ELSE 1 END ASC, end_date DESC, start_date DESC",
+        "SELECT id, name, dose, frequency, notes, start_date, end_date, track FROM protocols WHERE user_id=%s ORDER BY CASE WHEN end_date IS NULL THEN 0 ELSE 1 END ASC, end_date DESC, start_date DESC",
         (user["id"],)
     ).fetchall()
     conn.close()
@@ -1937,10 +1937,10 @@ def add_protocol(body: ProtocolIn, user=Depends(current_user)):
         raise HTTPException(status_code=403, detail="Demo accounts cannot add protocols")
     conn = get_db()
     max_order = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) FROM protocols WHERE user_id=?", (user["id"],)
+        "SELECT COALESCE(MAX(sort_order),0) FROM protocols WHERE user_id=%s", (user["id"],)
     ).fetchone()[0]
     conn.execute(
-        "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, max_order + 1, bool(body.track))
     )
     conn.commit()
@@ -1953,7 +1953,7 @@ def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_use
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
     conn = get_db()
     conn.execute(
-        "UPDATE protocols SET name=?, dose=?, frequency=?, notes=?, start_date=?, end_date=?, track=? WHERE id=? AND user_id=?",
+        "UPDATE protocols SET name=%s, dose=%s, frequency=%s, notes=%s, start_date=%s, end_date=%s, track=%s WHERE id=%s AND user_id=%s",
         (body.name.strip(), body.dose, body.frequency, body.notes, body.start_date, body.end_date, bool(body.track), protocol_id, user["id"])
     )
     conn.commit()
@@ -1966,7 +1966,7 @@ def patch_protocol(protocol_id: int, body: ProtocolTrack, user=Depends(current_u
         raise HTTPException(status_code=403, detail="Demo accounts cannot modify protocols")
     conn = get_db()
     conn.execute(
-        "UPDATE protocols SET track=? WHERE id=? AND user_id=?",
+        "UPDATE protocols SET track=%s WHERE id=%s AND user_id=%s",
         (bool(body.track), protocol_id, user["id"])
     )
     conn.commit()
@@ -1976,7 +1976,7 @@ def patch_protocol(protocol_id: int, body: ProtocolTrack, user=Depends(current_u
 @app.delete("/protocols/{protocol_id}")
 def delete_protocol(protocol_id: int, user=Depends(current_user)):
     conn = get_db()
-    conn.execute("DELETE FROM protocols WHERE id=? AND user_id=?", (protocol_id, user["id"]))
+    conn.execute("DELETE FROM protocols WHERE id=%s AND user_id=%s", (protocol_id, user["id"]))
     conn.commit()
     conn.close()
     return {"status": "deleted"}
@@ -1991,7 +1991,7 @@ def get_external_key(user=Depends(current_user)):
         raise HTTPException(status_code=403, detail="Demo accounts cannot have external API keys")
     conn = get_db()
     try:
-        row = conn.execute("SELECT external_api_key FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
+        row = conn.execute("SELECT external_api_key FROM user_settings WHERE user_id=%s", (user["id"],)).fetchone()
     except Exception:
         row = None
     conn.close()
@@ -2007,11 +2007,11 @@ def generate_external_key(user=Depends(current_user)):
         raise HTTPException(status_code=403, detail="Demo accounts cannot have external API keys")
     new_key = "agon_" + _secrets.token_urlsafe(32)
     conn = get_db()
-    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
+    existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=%s", (user["id"],)).fetchone()
     if existing:
-        conn.execute("UPDATE user_settings SET external_api_key=? WHERE user_id=?", (new_key, user["id"]))
+        conn.execute("UPDATE user_settings SET external_api_key=%s WHERE user_id=%s", (new_key, user["id"]))
     else:
-        conn.execute("INSERT INTO user_settings (user_id, external_api_key) VALUES (?,?)", (user["id"], new_key))
+        conn.execute("INSERT INTO user_settings (user_id, external_api_key) VALUES (%s,%s)", (user["id"], new_key))
     conn.commit()
     conn.close()
     return {"key": new_key}
@@ -2019,7 +2019,7 @@ def generate_external_key(user=Depends(current_user)):
 @app.delete("/external/key")
 def revoke_external_key(user=Depends(current_user)):
     conn = get_db()
-    conn.execute("UPDATE user_settings SET external_api_key=NULL WHERE user_id=?", (user["id"],))
+    conn.execute("UPDATE user_settings SET external_api_key=NULL WHERE user_id=%s", (user["id"],))
     conn.commit()
     conn.close()
     return {"status": "revoked"}
@@ -2047,7 +2047,7 @@ def get_external_data(request: Request,
         row = conn.execute(
             "SELECT u.id, u.username, us.external_api_key FROM users u "
             "JOIN user_settings us ON us.user_id = u.id "
-            "WHERE us.external_api_key=?", (api_key,)
+            "WHERE us.external_api_key=%s", (api_key,)
         ).fetchone()
     except Exception:
         row = None
@@ -2060,14 +2060,14 @@ def get_external_data(request: Request,
 
     # Sessions
     sessions = conn.execute(
-        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=? ORDER BY date",
+        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=%s ORDER BY date",
         (uid,)
     ).fetchall()
 
     # Profile
     try:
         prof = conn.execute(
-            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level FROM user_settings WHERE user_id=?",
+            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level FROM user_settings WHERE user_id=%s",
             (uid,)
         ).fetchone()
     except Exception:
@@ -2075,13 +2075,13 @@ def get_external_data(request: Request,
 
     # Phases
     phases = conn.execute(
-        "SELECT phase_type, start_date, end_date, notes FROM phases WHERE user_id=? ORDER BY start_date",
+        "SELECT phase_type, start_date, end_date, notes FROM phases WHERE user_id=%s ORDER BY start_date",
         (uid,)
     ).fetchall()
 
     # Protocols
     protocols = conn.execute(
-        "SELECT name, dose, frequency, notes FROM protocols WHERE user_id=? ORDER BY sort_order, id",
+        "SELECT name, dose, frequency, notes FROM protocols WHERE user_id=%s ORDER BY sort_order, id",
         (uid,)
     ).fetchall()
 
