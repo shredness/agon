@@ -4180,8 +4180,10 @@ async function loadProtocols() {
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
-    const active   = rows.filter(r => !r.end_date || r.end_date >= today);
-    const inactive = rows.filter(r => r.end_date && r.end_date < today);
+    const active   = rows.filter(r => !r.end_date || r.end_date >= today)
+      .sort((a, b) => (a.start_date || '').localeCompare(b.start_date || ''));
+    const inactive = rows.filter(r => r.end_date && r.end_date < today)
+      .sort((a, b) => (b.end_date || '').localeCompare(a.end_date || ''));
     const th = 'padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;font-size:11px;';
     const tableHead = `<thead><tr style="border-bottom:1px solid var(--border);">
         <th style="${th}width:36px;">Track</th>
