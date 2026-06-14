@@ -1165,7 +1165,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.9.3';
+const APP_VERSION = '0.9.5';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2134,6 +2134,7 @@ function editSession(date) {
 async function renderTrend() {
   let trendData=[];
   try { trendData=await apiFetch('/trend'); } catch(e){return;}
+  window._trendData = trendData;
   const labels=trendData.map(d=>{ const p=d.week.split('/'); return p[0]+'/'+p[1]; });
   const rdV=trendData.map(d=>+d.rd.toFixed(2));
   const wtV=trendData.map(d=>+d.wt.toFixed(1));
@@ -2313,45 +2314,114 @@ function getProtocolColor(proto) {
 
 // Tracks which protocol ids are currently toggled ON for chart shading
 const _activeProtocolIds = new Set();
+let _cachedProtocols = [];
+
+// Global helper: map a date string to nearest trend chart label index
+function _dateToLabelIndex(dateStr) {
+  if (!tC || !tC.data || !tC.data.labels) return 0;
+  const labels = tC.data.labels;
+  if (!dateStr) return labels.length - 1;
+  const d = new Date(dateStr);
+  let best = 0, bestDiff = Infinity;
+  // trendData is the raw weekly array used to build the chart
+  (window._trendData || []).forEach((td, i) => {
+    const parts = td.week.split('/');
+    const w = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
+    const diff = Math.abs(w - d);
+    if (diff < bestDiff) { bestDiff = diff; best = i; }
+  });
+  return best;
+}
+
+// Convert a hex color to rgba with given alpha
+function _hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 async function renderProtocolPills() {
   const container = document.getElementById('trend-protocol-pills');
   if (!container) return;
   try {
     const protocols = await aiFetch('/protocols');
-    const today = new Date().toISOString().slice(0, 10);
-    const trackedActive = protocols.filter(p => p.track && (!p.end_date || p.end_date >= today));
+    _cachedProtocols = protocols;
+    const tracked = protocols.filter(p => p.track);
 
-    if (!trackedActive.length) {
-      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No tracked protocols — check Track? in the table below.</div>';
+    if (!tracked.length) {
+      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No tracked protocols — check Track in the table below.</div>';
       return;
     }
-    container.innerHTML = trackedActive.map(p => {
+    container.innerHTML = tracked.map(p => {
       const color = getProtocolColor(p);
       const isOn  = _activeProtocolIds.has(p.id);
       const bg    = isOn ? color.border : color.bg;
       const txt   = isOn ? '#fff' : color.text;
+      const discontinued = p.end_date && p.end_date < new Date().toISOString().slice(0,10);
+      const opacity = discontinued ? '0.6' : '1';
       return `<span
         data-proto-id="${p.id}"
-        onclick="toggleProtocolPill(${p.id}, this)"
-        style="display:inline-block;padding:4px 12px;background:${bg};border:1px solid ${color.border};border-radius:4px;font-size:11px;color:${txt};font-weight:600;white-space:nowrap;cursor:pointer;user-select:none;transition:background 0.15s,color 0.15s;"
-      >${escapeHtml(p.name)}</span>`;
+        onclick="toggleProtocolPill(${p.id})"
+        title="${discontinued ? 'Discontinued ' + p.end_date : 'Active'}"
+        style="display:inline-block;padding:4px 12px;background:${bg};border:1px solid ${color.border};border-radius:4px;font-size:11px;color:${txt};font-weight:600;white-space:nowrap;cursor:pointer;user-select:none;opacity:${opacity};transition:background 0.15s,color 0.15s;"
+      >${escapeHtml(p.name)}${discontinued ? ' ·' : ''}</span>`;
     }).join('');
   } catch(e) {
     container.innerHTML = '';
   }
 }
 
-function toggleProtocolPill(id, el) {
+function toggleProtocolPill(id) {
   if (_activeProtocolIds.has(id)) {
     _activeProtocolIds.delete(id);
   } else {
     _activeProtocolIds.add(id);
   }
-  // Re-render pills to reflect toggle state
   renderProtocolPills();
-  // TODO: overlay shading on trend chart per active protocol
-  showToast(_activeProtocolIds.has(id) ? 'Protocol highlighted' : 'Highlight removed');
+  updateProtocolAnnotations();
+}
+
+function updateProtocolAnnotations() {
+  if (!tC) return;
+  const annotations = {};
+
+  // Phase bands
+  (_allPhases || []).forEach((ph, i) => {
+    const color = PHASE_BAND_COLORS[ph.phase_type];
+    if (!color) return;
+    annotations['phase_' + i] = {
+      type: 'box',
+      xMin: _dateToLabelIndex(ph.start_date),
+      xMax: ph.end_date ? _dateToLabelIndex(ph.end_date) : (tC.data.labels.length - 1),
+      backgroundColor: color,
+      borderWidth: 0,
+    };
+  });
+
+  // Active protocol bands
+  _cachedProtocols.filter(p => _activeProtocolIds.has(p.id)).forEach(p => {
+    const color = getProtocolColor(p);
+    annotations['proto_' + p.id] = {
+      type: 'box',
+      xMin: _dateToLabelIndex(p.start_date),
+      xMax: p.end_date ? _dateToLabelIndex(p.end_date) : (tC.data.labels.length - 1),
+      backgroundColor: _hexToRgba(color.border, 0.12),
+      borderWidth: 1,
+      borderColor: color.border,
+      label: {
+        display: true,
+        content: p.name,
+        position: 'start',
+        yAdjust: -6,
+        font: { size: 9, weight: '600' },
+        color: color.text,
+        backgroundColor: 'transparent',
+        padding: 0,
+      }
+    };
+  });
+
+  tC.options.plugins.annotation.annotations = annotations;
+  tC.update('none');
 }
 
 function toggleMuscleChipColored(el, name) {
@@ -4125,12 +4195,12 @@ async function loadProtocols() {
     const inactive = rows.filter(r => r.end_date && r.end_date < today);
     const th = 'padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;font-size:11px;';
     const tableHead = `<thead><tr style="border-bottom:1px solid var(--border);">
+        <th style="${th}width:36px;">Track</th>
         <th style="${th}">Name</th>
         <th style="${th}">Dose</th>
         <th style="${th}">Freq</th>
         <th style="${th}">Start</th>
         <th style="${th}">End</th>
-        <th style="${th}">Track?</th>
         <th style="${th}">Notes</th>
         <th style="width:48px;"></th>
       </tr></thead>`;
@@ -4165,12 +4235,12 @@ function _protoRow(r) {
   const trackCheckbox = `<input type="checkbox" id="track-${r.id}" ${r.track ? 'checked' : ''} onchange="toggleProtocolTrack(${r.id}, this.checked)" style="cursor:pointer;">`;
   const data = encodeURIComponent(JSON.stringify(r));
   return `<tr id="proto-row-${r.id}" style="border-bottom:0.5px solid var(--border);">
+    <td style="padding:4px 6px;text-align:center;">${trackCheckbox}</td>
     <td style="padding:4px 6px;color:var(--text);">${escapeHtml(r.name)}</td>
     <td style="padding:4px 6px;color:var(--text2);">${escapeHtml(r.dose||'')}</td>
     <td style="padding:4px 6px;color:var(--text2);">${escapeHtml(r.frequency||'')}</td>
     <td style="padding:4px 6px;color:var(--text3);font-size:11px;">${escapeHtml(r.start_date||'')}</td>
     <td style="padding:4px 6px;font-size:11px;">${endCell}</td>
-    <td style="padding:4px 6px;text-align:center;">${trackCheckbox}</td>
     <td style="padding:4px 6px;color:var(--text3);">${escapeHtml(r.notes||'')}</td>
     <td style="padding:4px 6px;white-space:nowrap;">
       <button onclick="_editProto(${r.id},decodeURIComponent('${data}'))" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;padding:0 5px 0 0;" title="Edit">✎</button>
@@ -4185,12 +4255,12 @@ function _editProto(id, dataStr) {
   if (!row) return;
   const inp = 'style="width:100%;font-size:11px;padding:2px 4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box;"';
   row.innerHTML = `
+    <td style="padding:3px 3px;text-align:center;"><input type="checkbox" id="pe-track-${id}" ${r.track ? 'checked' : ''} style="cursor:pointer;"></td>
     <td style="padding:3px 3px;"><input id="pe-name-${id}" value="${escapeHtml(r.name||'')}" ${inp}></td>
     <td style="padding:3px 3px;"><input id="pe-dose-${id}" value="${escapeHtml(r.dose||'')}" ${inp}></td>
     <td style="padding:3px 3px;"><input id="pe-freq-${id}" value="${escapeHtml(r.frequency||'')}" ${inp}></td>
     <td style="padding:3px 3px;"><input type="date" id="pe-start-${id}" value="${r.start_date||''}" ${inp}></td>
     <td style="padding:3px 3px;"><input type="date" id="pe-end-${id}" value="${r.end_date||''}" ${inp}></td>
-    <td style="padding:3px 3px;text-align:center;"><input type="checkbox" id="pe-track-${id}" ${r.track ? 'checked' : ''} style="cursor:pointer;"></td>
     <td style="padding:3px 3px;"><input id="pe-notes-${id}" value="${escapeHtml(r.notes||'')}" ${inp}></td>
     <td style="padding:3px 3px;white-space:nowrap;">
       <button onclick="_saveProto(${id})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;padding:0 5px 0 0;" title="Save">✓</button>
@@ -4895,6 +4965,13 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.9.5': [
+    'Trend: protocol pills now clickable — toggles a shaded band on the RD chart showing the protocol window',
+    'Trend: discontinued protocols now generate pills (dimmed) so past peptide cycles are visible on chart',
+    'Trend: Track column moved to first position in protocols table, removed question mark',
+    'Trend: all tracked protocols now get a distinct color — palette cycling for unmatched names',
+    'Trend: duplicate "+ Add protocol" button removed',
+  ],
   '0.9.3': [
     'Trend: chart note moved above legend for clarity',
     'Trend: protocol pills added below chart — toggle cyclic windows to correlate RD against cycle timing',
