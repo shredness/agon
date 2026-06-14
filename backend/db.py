@@ -257,8 +257,13 @@ def _init_schema(conn):
             start_date DATE,
             end_date DATE,
             sort_order INTEGER DEFAULT 0,
+            track BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    """)
+    # Migration: add track column if it doesn't exist yet
+    cursor.execute("""
+        ALTER TABLE protocols ADD COLUMN IF NOT EXISTS track BOOLEAN DEFAULT FALSE
     """)
 
     # Phases (training blocks: weight-loss, recomp, etc.)

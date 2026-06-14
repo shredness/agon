@@ -1919,12 +1919,6 @@ def get_recomp(user=Depends(current_user)):
 @app.get("/protocols")
 def get_protocols(user=Depends(current_user)):
     conn = get_db()
-    # Add track column if missing (migration)
-    try:
-        conn.execute("SELECT track FROM protocols LIMIT 1")
-    except Exception:
-        conn.execute("ALTER TABLE protocols ADD COLUMN track INTEGER DEFAULT 0")
-        conn.commit()
     rows = conn.execute(
         "SELECT id, name, dose, frequency, notes, start_date, end_date, track FROM protocols WHERE user_id=? ORDER BY CASE WHEN end_date IS NULL THEN 0 ELSE 1 END ASC, end_date DESC, start_date DESC",
         (user["id"],)
@@ -1933,7 +1927,7 @@ def get_protocols(user=Depends(current_user)):
     result = []
     for r in rows:
         d = dict(r)
-        d["track"] = bool(d.get("track", 0))
+        d["track"] = bool(d.get("track", False))
         result.append(d)
     return result
 
