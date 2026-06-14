@@ -1158,7 +1158,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.9.1';
+const APP_VERSION = '0.9.2';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4797,6 +4797,13 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.9.2': [
+    'Stability: connections now reclaimed per-request — fixes the pool drain that caused intermittent "Cannot reach the API"',
+    'Database: rebuilt the from-scratch schema to match the live app (users, MFA, AI, external-key columns; added phases, events, insights_messages tables; protocol start/end dates) so a fresh deploy or disaster-recovery build works',
+    'Security: removed hardcoded default admin password from source; refuses to boot on the known default',
+    'Security: external data API key is header-only now (no ?key= query param leaking into logs)',
+    'Security: Ollama base URL is admin-only (closes a server-side request vector for non-admin users)',
+  ],
   '0.9.1': [
     'Ollama: added to old AI settings modal dropdown with dynamic help text',
     'Settings: AI provider help text now clickable links (Gemini, Claude, Ollama)',

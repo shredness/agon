@@ -36,6 +36,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def db_connection_scope(request: Request, call_next):
+    """Open a per-request DB connection scope and reap any connection that wasn't
+    released, so an exception between get_db() and conn.close() can't leak a pooled
+    connection. Without this, the 10-slot pool drains and the API becomes unreachable."""
+    token = database_module.begin_request_scope()
+    try:
+        return await call_next(request)
+    finally:
+        database_module.end_request_scope(token)
+
 SECRET_KEY        = os.environ.get("SECRET_KEY", "agon-change-this-in-production")
 ALGORITHM         = "HS256"
 TOKEN_EXPIRE_DAYS = 30
@@ -50,8 +62,15 @@ if SECRET_KEY == _DEFAULT_SECRET and os.environ.get("ALLOW_DEFAULT_SECRET", "fal
 
 oauth2 = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
-ADMIN_USER         = os.environ.get("ADMIN_USER", "manny")
-ADMIN_PASS         = os.environ.get("ADMIN_PASS", "pR0m3th3us")
+ADMIN_USER         = os.environ.get("ADMIN_USER")
+ADMIN_PASS         = os.environ.get("ADMIN_PASS")
+# These shipped with a weak default in early builds. Never hardcode a fallback —
+# and refuse to boot if the old known value is still present in the environment.
+if ADMIN_PASS == "pR0m3th3us" and os.environ.get("ALLOW_DEFAULT_SECRET", "false").lower() != "true":
+    raise RuntimeError(
+        "ADMIN_PASS is the known insecure default. Set a strong ADMIN_PASS env var, "
+        "or set ALLOW_DEFAULT_SECRET=true for local development only."
+    )
 ALLOW_REGISTRATION = os.environ.get("ALLOW_REGISTRATION", "false").lower() == "true"
 
 
@@ -919,6 +938,10 @@ def get_profile(user=Depends(current_user)):
 def save_profile(body: ProfileIn, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot save profile data")
+    # ollama_base_url is a server-side request target (SSRF sink). Only admins may
+    # set it; for everyone else, ignore the field rather than failing the whole save.
+    if body.ollama_base_url and body.ollama_base_url.strip() and user["role"] != "admin":
+        body.ollama_base_url = None
     conn = get_db()
     existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?", (user["id"],)).fetchone()
     
@@ -991,6 +1014,10 @@ def get_ai_settings(user=Depends(current_user)):
 def save_ai_settings(body: AISettingsIn, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot store API keys")
+    # The Ollama base URL is a server-side request target (SSRF sink): the backend
+    # POSTs to whatever host it names. Only admins may set it. Clearing it is fine.
+    if body.ollama_base_url and body.ollama_base_url.strip() and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only an admin can set the Ollama base URL")
     conn = get_db()
     existing = conn.execute("SELECT user_id FROM user_settings WHERE user_id=?",
                             (user["id"],)).fetchone()
@@ -1976,22 +2003,19 @@ def revoke_external_key(user=Depends(current_user)):
     return {"status": "revoked"}
 
 @app.get("/external/data")
-def get_external_data(request: Request, key: Optional[str] = None,
+def get_external_data(request: Request,
                       x_api_key: Optional[str] = Header(default=None),
                       authorization: Optional[str] = Header(default=None)):
     """Public read-only endpoint for external consumers.
     Authenticated by external API key, supplied via (in order of preference):
       - Authorization: Bearer <key>
       - X-API-Key: <key>
-      - ?key=<key>  (deprecated — avoid, leaks into logs)
-    """
+    The key is never accepted as a query parameter, to keep it out of access logs."""
     api_key = None
     if authorization and authorization.lower().startswith("bearer "):
         api_key = authorization[7:].strip()
     elif x_api_key:
         api_key = x_api_key.strip()
-    elif key:
-        api_key = key.strip()
 
     if not api_key:
         raise HTTPException(status_code=401, detail="API key required (use Authorization: Bearer header)")

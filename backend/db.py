@@ -4,12 +4,47 @@ Postgres connection pooling and schema initialization.
 
 import os
 import logging
+import contextvars
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 _pg_pool = None
+
+# Per-request registry of connections handed out via get_db_sync(). A middleware
+# opens a scope at the start of each request and reaps any connection that wasn't
+# released, so a stray exception between get_db() and conn.close() can never leak
+# a pooled connection. This is what keeps the 10-slot pool from silently draining.
+_request_conns = contextvars.ContextVar("agon_request_conns", default=None)
+
+
+def begin_request_scope():
+    """Start a per-request connection scope. Returns a token for end_request_scope()."""
+    return _request_conns.set([])
+
+
+def end_request_scope(token):
+    """Reap any connection checked out during the request but not released."""
+    bucket = _request_conns.get()
+    if bucket:
+        for w in bucket:
+            try:
+                if getattr(w, "_conn", None) is not None:
+                    # Leaked due to an exception path — roll back any open/aborted
+                    # transaction before returning the connection to the pool so the
+                    # next borrower doesn't inherit a poisoned session.
+                    try:
+                        w._conn.rollback()
+                    except Exception:
+                        pass
+                    w.close()
+            except Exception:
+                pass
+    try:
+        _request_conns.reset(token)
+    except Exception:
+        pass
 
 
 def init_db():
@@ -124,7 +159,13 @@ def get_db_sync():
     
     conn = _pg_pool.getconn()
     conn.cursor_factory = DictCursor
-    return _ConnectionWrapper(conn)
+    wrapper = _ConnectionWrapper(conn)
+    # Track this connection for the current request so it gets reclaimed even if
+    # the caller never reaches its conn.close() (e.g. an exception fires first).
+    bucket = _request_conns.get()
+    if bucket is not None:
+        bucket.append(wrapper)
+    return wrapper
 
 
 def _init_schema(conn):
@@ -135,13 +176,15 @@ def _init_schema(conn):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
+            username VARCHAR(255) UNIQUE NOT NULL,
+            hashed_pw TEXT NOT NULL,
+            role VARCHAR(20) DEFAULT 'guest',
+            status VARCHAR(20) DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     
-    # User settings
+    # User settings (one row per user; holds profile, MFA, AI, and external-key state)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_settings (
             user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -149,14 +192,21 @@ def _init_schema(conn):
             last_name VARCHAR(100),
             dob DATE,
             gender VARCHAR(10),
-            week_start INTEGER DEFAULT 0,
+            week_start VARCHAR(12) DEFAULT 'Saturday',
             height_in NUMERIC(5,2),
             target_bw NUMERIC(6,2),
             activity_level VARCHAR(20),
-            onboarded BOOLEAN DEFAULT FALSE,
-            last_seen_version VARCHAR(20),
+            onboarded VARCHAR(4) DEFAULT '0',
+            last_seen_version VARCHAR(20) DEFAULT '0.0.0',
             rep_trigger NUMERIC(5,1) DEFAULT 50,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ollama_base_url TEXT,
+            totp_secret TEXT,
+            totp_enabled VARCHAR(4) DEFAULT '0',
+            ai_key_enc TEXT,
+            ai_model VARCHAR(100),
+            external_api_key TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     
@@ -204,7 +254,47 @@ def _init_schema(conn):
             dose VARCHAR(50),
             frequency VARCHAR(50),
             notes TEXT,
+            start_date DATE,
+            end_date DATE,
             sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Phases (training blocks: weight-loss, recomp, etc.)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS phases (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            phase_type VARCHAR(50) NOT NULL,
+            start_date DATE NOT NULL,
+            end_date DATE,
+            notes TEXT,
+            label VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # AI Insights conversation history
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS insights_messages (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role VARCHAR(16) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Event / audit log
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            username VARCHAR(255),
+            event_type VARCHAR(50),
+            detail TEXT,
+            ip VARCHAR(64),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -250,6 +340,33 @@ def _init_schema(conn):
         ADD COLUMN IF NOT EXISTS ollama_base_url TEXT,
         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """)
-    
+
+    # Add remaining user_settings columns the app relies on (MFA, external key,
+    # profile fields) so a partially-migrated database is brought fully up to date.
+    cursor.execute("""
+        ALTER TABLE user_settings
+        ADD COLUMN IF NOT EXISTS totp_secret TEXT,
+        ADD COLUMN IF NOT EXISTS totp_enabled VARCHAR(4) DEFAULT '0',
+        ADD COLUMN IF NOT EXISTS external_api_key TEXT,
+        ADD COLUMN IF NOT EXISTS activity_level VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS height_in NUMERIC(5,2),
+        ADD COLUMN IF NOT EXISTS target_bw NUMERIC(6,2),
+        ADD COLUMN IF NOT EXISTS onboarded VARCHAR(4) DEFAULT '0',
+        ADD COLUMN IF NOT EXISTS last_seen_version VARCHAR(20) DEFAULT '0.0.0',
+        ADD COLUMN IF NOT EXISTS rep_trigger NUMERIC(5,1) DEFAULT 50
+    """)
+
+    # Add protocol start/end date tracking if missing
+    cursor.execute("""
+        ALTER TABLE protocols
+        ADD COLUMN IF NOT EXISTS start_date DATE,
+        ADD COLUMN IF NOT EXISTS end_date DATE
+    """)
+
+    # Indexes for the tables added above
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_phases_user_id ON phases(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_insights_user_id ON insights_messages(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_username ON events(username)")
+
     conn.commit()
     cursor.close()
