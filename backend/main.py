@@ -1936,21 +1936,27 @@ def get_protocols(user=Depends(current_user)):
 def add_protocol(body: ProtocolIn, user=Depends(current_user)):
     if user["role"] == "demo":
         raise HTTPException(status_code=403, detail="Demo accounts cannot add protocols")
-    conn = get_db()
-    row = conn.execute(
-        "SELECT COALESCE(MAX(sort_order),0) AS max_order FROM protocols WHERE user_id=%s", (user["id"],)
-    ).fetchone()
-    max_order = row["max_order"] if row else 0
-    # Coerce empty strings to None for optional date fields
-    start_date = body.start_date if body.start_date else None
-    end_date = body.end_date if body.end_date else None
-    conn.execute(
-        "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-        (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, start_date, end_date, max_order + 1, bool(body.track))
-    )
-    conn.commit()
-    conn.close()
-    return {"status": "added"}
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order),0) AS max_order FROM protocols WHERE user_id=%s", (user["id"],)
+        ).fetchone()
+        max_order = row["max_order"] if row else 0
+        # Coerce empty strings to None for optional date fields
+        start_date = body.start_date if body.start_date else None
+        end_date = body.end_date if body.end_date else None
+        conn.execute(
+            "INSERT INTO protocols (user_id, name, dose, frequency, notes, start_date, end_date, sort_order, track) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (user["id"], body.name.strip(), body.dose, body.frequency, body.notes, start_date, end_date, max_order + 1, bool(body.track))
+        )
+        conn.commit()
+        conn.close()
+        return {"status": "added"}
+    except Exception as e:
+        import traceback
+        print(f"ERROR in add_protocol: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Protocol add failed: {str(e)}")
 
 @app.put("/protocols/{protocol_id}")
 def update_protocol(protocol_id: int, body: ProtocolIn, user=Depends(current_user)):
