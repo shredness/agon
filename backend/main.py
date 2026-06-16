@@ -1121,9 +1121,14 @@ def build_training_context(uid: int) -> str:
 
     if protos:
         today = _date.today().isoformat()
-        active_protos   = [p for p in protos if not p["end_date"] and (not p["start_date"] or p["start_date"] <= today)]
-        inactive_protos = [p for p in protos if p["end_date"] and p["end_date"] < today]
-        future_protos   = [p for p in protos if p["start_date"] and p["start_date"] > today]
+        # start_date/end_date are Postgres DATE columns (datetime.date), but TEXT
+        # under SQLite. Normalize to ISO strings before comparing to `today` (str),
+        # or `date <= str` raises TypeError and the whole endpoint 500s.
+        def _iso(x):
+            return x.isoformat() if hasattr(x, "isoformat") else x
+        active_protos   = [p for p in protos if not p["end_date"] and (not p["start_date"] or _iso(p["start_date"]) <= today)]
+        inactive_protos = [p for p in protos if p["end_date"] and _iso(p["end_date"]) < today]
+        future_protos   = [p for p in protos if p["start_date"] and _iso(p["start_date"]) > today]
 
         def proto_line(p):
             parts = [p["name"]]
