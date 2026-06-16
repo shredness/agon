@@ -1169,7 +1169,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.9.5';
+const APP_VERSION = '0.9.6';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4996,6 +4996,10 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.9.6': [
+    'Profile: user-configurable set time (default 1.5 min) — stored in profile, pre-fills every new set in the workout logger',
+    'Fix: AI Insights 500 error — date comparison TypeError when protocols have start/end dates set (Postgres DATE vs string coercion)',
+  ],
   '0.9.5': [
     'Trend: protocol pills now clickable — toggles a shaded band on the RD chart showing the protocol window',
     'Trend: discontinued protocols now generate pills (dimmed) so past peptide cycles are visible on chart',
@@ -5704,7 +5708,7 @@ function parseMarkdown(text) {
         <div class="guide-tab-label">Settings (click your username)</div>
         <p>Opens via clicking your username in the top-right corner.</p>
         <ul>
-          <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, week start, activity level, and rep accumulation trigger (default 50)</li>
+          <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, week start, activity level, rep accumulation trigger (default 50), and set time (default 1.5 min — pre-fills the time field on every new set and drives RD calculation)</li>
           <li><strong>Protocols</strong> - supplements, peptides, and medications. Passed to the AI as context only. Agon does not provide medical advice</li>
           <li><strong>Account</strong> - change your password</li>
           <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA. Scan the QR code with any authenticator app. Admins can reset it via the Admin panel if you lose your device</li>
@@ -5736,7 +5740,7 @@ function parseMarkdown(text) {
           <li>Session 1 at new load: 10, 8, 6, 6, 5, 5 = 40 reps — still building</li>
           <li>Session 3: 12, 10, 8, 7, 7, 6 = 50 reps — trigger hit, load up next session</li>
         </ul>
-        <p>Load increments are deliberately small — 1 lb for smaller muscle groups (biceps, triceps, shoulders), up to 1.5 lb for larger ones — because microloading allows near-continuous progression without the stalls common with larger jumps. Your <strong>rep trigger</strong> is configurable in Settings. You can also set a per-exercise override in the Exercise bank.</p>
+        <p>Load increments are deliberately small — 1 lb for smaller muscle groups (biceps, triceps, shoulders), up to 1.5 lb for larger ones — because microloading allows near-continuous progression without the stalls common with larger jumps. Your <strong>rep trigger</strong> is configurable in Settings (default 50). Your <strong>set time</strong> is also configurable in Settings (default 1.5 min) — this value pre-fills the time field on every new set and is the denominator in the RD and density calculations. Adjust it to match your actual rest-plus-effort window. You can also set a per-exercise rep trigger override in the Exercise bank.</p>
       </div>
 
       <div class="guide-section">

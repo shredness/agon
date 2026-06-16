@@ -125,7 +125,7 @@ Expect `401` for the first ~15 requests, then `503` once the burst is exceeded.
 Agon is built around two training approaches:
 
 **Accessory blocks — escalating density, fixed time, cumulative reps**
-Fixed load across multiple sets, AMRAP each set, fixed rest interval. The goal is to accumulate a target number of total reps (default 50, configurable per user and per exercise) before increasing the load. Load increments are small — 1 lb for smaller muscle groups, up to 1.5 lb for larger ones. Based on Schoenfeld's work on rep ranges and fatigue-based progressive overload.
+Fixed load across multiple sets, AMRAP each set, fixed rest interval. The goal is to accumulate a target number of total reps (default 50, configurable per user and per exercise) before increasing the load. Load increments are small — 1 lb for smaller muscle groups, up to 1.5 lb for larger ones. The **set time** (default 1.5 min, configurable per user) pre-fills the time field on every new set and is the denominator in the RD and density calculations — set it to match your actual rest-plus-effort window. Based on Schoenfeld's work on rep ranges and fatigue-based progressive overload.
 
 **Compound lifts — dual wave, weekly +1**
 10–12 sets across two ascending load waves, starting weight increasing +1 lb per week. Wave 2 exploits post-activation potentiation from Wave 1.
@@ -168,7 +168,9 @@ CI/CD: pushes to `master` build and push Docker images to GHCR. The service work
 
 ## Current Version
 
-**v0.9.0** — Major milestone: migrated from SQLite to PostgreSQL for enhanced stability and security.
+**v0.9.6**
+- User-configurable set time (default 1.5 min) in profile settings — pre-fills every new set and drives RD calculation
+- Fix: AI Insights 500 error on protocol date comparison (Postgres DATE vs string coercion)
 
 See the in-app What's New modal for the full changelog.
 
