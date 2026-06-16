@@ -191,6 +191,7 @@ def _init_schema(conn):
             onboarded VARCHAR(4) DEFAULT '0',
             last_seen_version VARCHAR(20) DEFAULT '0.0.0',
             rep_trigger NUMERIC(5,1) DEFAULT 50,
+            set_time NUMERIC(4,2) DEFAULT 1.5,
             ollama_base_url TEXT,
             totp_secret TEXT,
             totp_enabled VARCHAR(4) DEFAULT '0',
@@ -356,7 +357,8 @@ def _init_schema(conn):
         ADD COLUMN IF NOT EXISTS target_bw NUMERIC(6,2),
         ADD COLUMN IF NOT EXISTS onboarded VARCHAR(4) DEFAULT '0',
         ADD COLUMN IF NOT EXISTS last_seen_version VARCHAR(20) DEFAULT '0.0.0',
-        ADD COLUMN IF NOT EXISTS rep_trigger NUMERIC(5,1) DEFAULT 50
+        ADD COLUMN IF NOT EXISTS rep_trigger NUMERIC(5,1) DEFAULT 50,
+        ADD COLUMN IF NOT EXISTS set_time NUMERIC(4,2) DEFAULT 1.5
     """)
 
     # Add protocol start/end date tracking if missing

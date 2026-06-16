@@ -1002,6 +1002,10 @@
       <label>Rep accumulation trigger <span style="font-size:11px;color:var(--text3);">(default 50 — lower for smaller muscles, raise if needed)</span></label>
       <input type="number" id="s-rep-trigger" min="10" max="200" step="1" value="50" style="width:100px;">
     </div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Set time <span style="font-size:11px;color:var(--text3);">(minutes per set, default 1.5 — used for RD calculation)</span></label>
+      <input type="number" id="s-set-time" min="0.5" max="10" step="0.25" value="1.5" style="width:100px;">
+    </div>
     <button class="btn btn-sm" onclick="saveSettingsProfile()" style="margin-bottom:14px;">Save profile</button>
     <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
 
@@ -1178,7 +1182,8 @@ function escapeHtml(s) {
 
 let sessions = []; // always an array
 let exCount = 0, setCounts = {};
-let _userRepTrigger = 50; // loaded from profile, configurable per user
+let _userRepTrigger = 50;  // loaded from profile, configurable per user
+let _userSetTime = 1.5;    // minutes per set, loaded from profile (default 1.5)
 let tC = null;
 
 function getToken() {
@@ -1689,7 +1694,7 @@ function addSet(exId) {
     <td style="font-size:11px;color:var(--text3);">${sid+1}</td>
     <td><input type="number" id="l-${exId}-${sid}" step="0.5" placeholder="${def.isBW?'auto':'0'}" style="width:${def.isBW?62:78}px;" oninput="calcRD()" ${def.isBW?'disabled':''}></td>
     <td><input type="number" id="r-${exId}-${sid}" step="1" placeholder="0" style="width:58px;" oninput="calcRD()"></td>
-    <td><input type="number" id="t-${exId}-${sid}" step="0.5" min="0.5" value="1.5" placeholder="1.5" style="width:58px;" oninput="calcRD()"></td>
+    <td><input type="number" id="t-${exId}-${sid}" step="0.25" min="0.5" value="${_userSetTime}" placeholder="${_userSetTime}" style="width:58px;" oninput="calcRD()"></td>
     <td class="col-vol" style="font-size:12px;color:var(--text2);" id="v-${exId}-${sid}">-</td>
     <td><button class="btn btn-sm" style="padding:2px 6px;" onclick="removeSet(${exId},${sid})">✕</button></td>
   `;
@@ -4142,6 +4147,9 @@ async function loadSettingsProfile() {
     _userRepTrigger = p.rep_trigger || 50;
     const rtEl = document.getElementById('s-rep-trigger');
     if (rtEl) rtEl.value = _userRepTrigger;
+    _userSetTime = p.set_time || 1.5;
+    const stEl = document.getElementById('s-set-time');
+    if (stEl) stEl.value = _userSetTime;
     // Load Ollama URL
     document.getElementById('ollama-url').value = p.ollama_base_url || '';
   } catch(e) { /* non-fatal */ }
@@ -4172,6 +4180,7 @@ async function saveSettingsProfile() {
         target_bw:      parseFloat(document.getElementById('s-target-bw').value) || null,
         activity_level: document.getElementById('s-activity').value || '1.55',
         rep_trigger:    parseInt(document.getElementById('s-rep-trigger')?.value) || 50,
+        set_time:       parseFloat(document.getElementById('s-set-time')?.value) || 1.5,
         ollama_base_url: ollamaUrl,
       })
     });

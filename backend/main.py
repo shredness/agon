@@ -233,6 +233,7 @@ class ProfileIn(BaseModel):
     last_seen_version:  Optional[str] = None
     external_api_key:   Optional[str] = None
     rep_trigger:        Optional[int] = None    # cumulative rep threshold (default 50)
+    set_time:           Optional[float] = None  # minutes per set (default 1.5)
     ollama_base_url:    Optional[str] = None    # e.g. http://localhost:11434
 
 class ProtocolIn(BaseModel):
@@ -909,7 +910,7 @@ def get_profile(user=Depends(current_user)):
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, ollama_base_url FROM user_settings WHERE user_id=%s",
+            "SELECT first_name, last_name, dob, gender, week_start, height_in, target_bw, activity_level, onboarded, last_seen_version, ollama_base_url, set_time FROM user_settings WHERE user_id=%s",
             (user["id"],)
         ).fetchone()
     except Exception:
@@ -936,6 +937,7 @@ def get_profile(user=Depends(current_user)):
         "onboarded":        row["onboarded"]        if "onboarded"        in row.keys() else "0",
         "last_seen_version": row["last_seen_version"] if "last_seen_version" in row.keys() else "0.0.0",
         "rep_trigger":      int(row["rep_trigger"]) if "rep_trigger" in row.keys() and row["rep_trigger"] else 50,
+        "set_time":         float(row["set_time"]) if "set_time" in row.keys() and row["set_time"] else 1.5,
         "ollama_base_url":  row["ollama_base_url"]  if "ollama_base_url"  in row.keys() else "",
     }
 
@@ -966,6 +968,7 @@ def save_profile(body: ProfileIn, user=Depends(current_user)):
             'onboarded': body.onboarded,
             'last_seen_version': body.last_seen_version,
             'rep_trigger': body.rep_trigger,
+            'set_time': body.set_time,
             'ollama_base_url': body.ollama_base_url,
         }
         for field, value in field_map.items():
