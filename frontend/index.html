@@ -374,6 +374,8 @@
         <div class="form-group"><label>Date</label><input type="date" id="sess-date" style="width:155px;"></div>
         <div class="form-group"><label>Bodyweight (lbs)</label><input type="number" id="sess-bw" step="0.1" placeholder="199.0" style="width:115px;" oninput="calcRD();document.querySelectorAll('.exercise-block').forEach(b=>updateBWLoadFields(b.id.replace('ex-','')))"></div>
         <div class="form-group" style="flex:1;min-width:180px;"><label>Notes</label><input type="text" id="sess-notes" placeholder="Optional session notes…" style="width:100%;"></div>
+        <div class="form-group"><label>Sleep (hrs)</label><input type="number" id="sess-sleep-hours" step="0.5" placeholder="8" style="width:80px;" min="0" max="24"></div>
+        <div class="form-group"><label>Deep sleep %</label><input type="number" id="sess-deep-sleep-pct" placeholder="25" style="width:80px;" min="0" max="100"></div>
       </div>
       <div class="section-label">Exercises</div>
       <div id="ex-container"></div>
@@ -1764,6 +1766,8 @@ async function saveSession() {
   const date = document.getElementById('sess-date').value;
   const sessionNotes = document.getElementById('sess-notes')?.value||'';
   const bw = parseFloat(document.getElementById('sess-bw').value)||0;
+  const sleepHours = parseFloat(document.getElementById('sess-sleep-hours').value) || null;
+  const deepSleepPct = parseInt(document.getElementById('sess-deep-sleep-pct').value) || null;
   if (!date||!bw) { showToast('Enter date and bodyweight.'); return; }
   const blocks = document.querySelectorAll('.exercise-block');
   let totalDensity=0; const exData=[];
@@ -1794,7 +1798,7 @@ async function saveSession() {
   const btn=document.getElementById('save-btn');
   btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
   try {
-    await apiFetch('/sessions',{method:'POST',body:JSON.stringify({date,bw,rd,total_density:totalDensity,exercises:exData,notes:sessionNotes})});
+    await apiFetch('/sessions',{method:'POST',body:JSON.stringify({date,bw,rd,total_density:totalDensity,exercises:exData,notes:sessionNotes,sleep_hours:sleepHours,deep_sleep_pct:deepSleepPct})});
     sessions=await apiFetch('/sessions');
     updateStats(); renderHistory(); updateExportSummary();
     document.getElementById('ex-container').innerHTML='';
@@ -2018,6 +2022,8 @@ function editSession(date) {
   // Set date and bodyweight
   document.getElementById('sess-date').value = session.date;
   document.getElementById('sess-notes').value = session.notes||'';
+  document.getElementById('sess-sleep-hours').value = session.sleep_hours || '';
+  document.getElementById('sess-deep-sleep-pct').value = session.deep_sleep_pct || '';
   const bwEl = document.getElementById('sess-bw');
   bwEl.value = session.bw;
   bwEl.style.color = '';

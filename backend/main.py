@@ -213,6 +213,8 @@ class SessionIn(BaseModel):
     total_density: float
     exercises: list[ExerciseData]
     notes: Optional[str] = ''
+    sleep_hours: Optional[float] = None
+    deep_sleep_pct: Optional[int] = None
 
 class UserCreate(BaseModel):
     username: str
@@ -618,6 +620,7 @@ def get_sessions(user=Depends(current_user)):
     conn.close()
     return [{"id": r["id"], "date": r["date"], "bw": r["bw"], "rd": r["rd"],
              "total_density": r["total_density"], "notes": r["notes"] or "",
+             "sleep_hours": r.get("sleep_hours"), "deep_sleep_pct": r.get("deep_sleep_pct"),
              "exercises": r["exercises"] if isinstance(r["exercises"], list) else json.loads(r["exercises"])} for r in rows]
 
 @app.post("/sessions")
@@ -649,19 +652,19 @@ def save_session(session: SessionIn, user=Depends(current_user)):
     try:
         # Try UPDATE first
         cursor = conn.execute(
-            """UPDATE sessions SET bw=%s, rd=%s, total_density=%s, exercises=%s, notes=%s 
+            """UPDATE sessions SET bw=%s, rd=%s, total_density=%s, exercises=%s, notes=%s, sleep_hours=%s, deep_sleep_pct=%s
                WHERE user_id=%s AND date=%s""",
             (session.bw, rd, round(total_density, 2), json.dumps(exercises_out), 
-             session.notes or "", uid, session.date)
+             session.notes or "", session.sleep_hours, session.deep_sleep_pct, uid, session.date)
         )
         
         # If no rows were updated, INSERT a new one
         if cursor.rowcount == 0:
             conn.execute(
-                """INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises, notes) 
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                """INSERT INTO sessions (user_id, date, bw, rd, total_density, exercises, notes, sleep_hours, deep_sleep_pct)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (uid, session.date, session.bw, rd, round(total_density, 2), 
-                 json.dumps(exercises_out), session.notes or "")
+                 json.dumps(exercises_out), session.notes or "", session.sleep_hours, session.deep_sleep_pct)
             )
         conn.commit()
     except Exception as e:

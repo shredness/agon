@@ -311,7 +311,9 @@ def _init_schema(conn):
     # Add missing columns to sessions if they don't exist
     cursor.execute("""
         ALTER TABLE sessions
-        ADD COLUMN IF NOT EXISTS total_density NUMERIC(6,4)
+        ADD COLUMN IF NOT EXISTS total_density NUMERIC(6,4),
+        ADD COLUMN IF NOT EXISTS sleep_hours NUMERIC(4,2),
+        ADD COLUMN IF NOT EXISTS deep_sleep_pct SMALLINT
     """)
     
     # Add unique constraint on (user_id, date) if it doesn't exist
