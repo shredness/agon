@@ -375,7 +375,7 @@
         <div class="form-group"><label>Bodyweight (lbs)</label><input type="number" id="sess-bw" step="0.1" placeholder="199.0" style="width:115px;" oninput="calcRD();document.querySelectorAll('.exercise-block').forEach(b=>updateBWLoadFields(b.id.replace('ex-','')))"></div>
         <div class="form-group" style="flex:1;min-width:180px;"><label>Notes</label><input type="text" id="sess-notes" placeholder="Optional session notes…" style="width:100%;"></div>
         <div class="form-group"><label>Sleep (hrs)</label><input type="number" id="sess-sleep-hours" step="0.5" placeholder="8" style="width:80px;" min="0" max="24"></div>
-        <div class="form-group"><label>Deep sleep %</label><input type="number" id="sess-deep-sleep-pct" placeholder="25" style="width:80px;" min="0" max="100"></div>
+        <div class="form-group"><label>Deep sleep (hrs)</label><input type="number" id="sess-deep-sleep-hours" step="0.25" placeholder="2" style="width:80px;" min="0" max="24"></div>
       </div>
       <div class="section-label">Exercises</div>
       <div id="ex-container"></div>
@@ -1758,7 +1758,8 @@ function calcRD() {
     const rd=sessionTotalVol/(sessionTotalTime*bw);
     rb.style.display='flex';
     document.getElementById('result-rd').textContent=rd.toFixed(2);
-    document.getElementById('result-detail').innerHTML=lines.map(l=>`<span style="display:inline-block;margin-right:10px;margin-bottom:3px;">${l} lbs/min</span>`).join('');
+    const volumeSpan = `<span style="display:inline-block;margin-right:10px;margin-bottom:3px;font-weight:500;">Volume: ${sessionTotalVol.toFixed(0)} lbs</span>`;
+    document.getElementById('result-detail').innerHTML=volumeSpan+lines.map(l=>`<span style="display:inline-block;margin-right:10px;margin-bottom:3px;">${l} lbs/min</span>`).join('');
   } else rb.style.display='none';
 }
 
@@ -1767,7 +1768,12 @@ async function saveSession() {
   const sessionNotes = document.getElementById('sess-notes')?.value||'';
   const bw = parseFloat(document.getElementById('sess-bw').value)||0;
   const sleepHours = parseFloat(document.getElementById('sess-sleep-hours').value) || null;
-  const deepSleepPct = parseInt(document.getElementById('sess-deep-sleep-pct').value) || null;
+  const deepSleepHours = parseFloat(document.getElementById('sess-deep-sleep-hours').value) || null;
+  // Calculate deep sleep percentage if both values provided
+  let deepSleepPct = null;
+  if (sleepHours && sleepHours > 0 && deepSleepHours && deepSleepHours > 0) {
+    deepSleepPct = Math.round((deepSleepHours / sleepHours) * 100);
+  }
   if (!date||!bw) { showToast('Enter date and bodyweight.'); return; }
   const blocks = document.querySelectorAll('.exercise-block');
   let totalDensity=0; const exData=[];
@@ -2023,7 +2029,13 @@ function editSession(date) {
   document.getElementById('sess-date').value = session.date;
   document.getElementById('sess-notes').value = session.notes||'';
   document.getElementById('sess-sleep-hours').value = session.sleep_hours || '';
-  document.getElementById('sess-deep-sleep-pct').value = session.deep_sleep_pct || '';
+  // Reverse-calculate deep sleep hours from percentage
+  if (session.sleep_hours && session.deep_sleep_pct) {
+    const deepSleepHours = (session.deep_sleep_pct / 100) * session.sleep_hours;
+    document.getElementById('sess-deep-sleep-hours').value = deepSleepHours.toFixed(2);
+  } else {
+    document.getElementById('sess-deep-sleep-hours').value = '';
+  }
   const bwEl = document.getElementById('sess-bw');
   bwEl.value = session.bw;
   bwEl.style.color = '';
