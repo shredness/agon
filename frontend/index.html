@@ -2629,7 +2629,8 @@ async function saveBankRowToAPI(ex) {
   const payload = {
     name: ex.name, alias: ex.alias||ex.name, tool: ex.tool||'Bar',
     mult: ex.mult||2.0, muscles, day: ex.day||'',
-    load_hint: ex.loadHint||'', is_bw: !!ex.isBW, sort_order: ex.sortOrder||0
+    load_hint: ex.loadHint||'', is_bw: !!ex.isBW, sort_order: ex.sortOrder||0,
+    rep_trigger_override: ex.repTriggerOverride || null
   };
   // PUT always upserts (backend inserts if not exists)
   await apiFetch('/exercises/bank/'+encodeURIComponent(ex.name), {method:'PUT', body:JSON.stringify(payload)});
