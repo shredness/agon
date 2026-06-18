@@ -374,6 +374,10 @@ def _init_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_phases_user_id ON phases(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_insights_user_id ON insights_messages(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_username ON events(username)")
+    
+    # Reset sequences to prevent duplicate key violations
+    cursor.execute("SELECT setval('insights_messages_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM insights_messages))")
+    cursor.execute("SELECT setval('events_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM events))")
 
     conn.commit()
     cursor.close()
