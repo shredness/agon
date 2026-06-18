@@ -2201,7 +2201,7 @@ async function renderTrend() {
   try { trendData=await apiFetch('/trend'); } catch(e){return;}
   window._trendData = trendData;
   
-  // Calculate rolling 7-day average deep sleep % for each week
+  // Calculate rolling 7-day average deep sleep % for each week (Saturday-Friday boundary)
   const sleepByDate = {};
   (sessions || []).forEach(s => {
     if (s.deep_sleep_pct !== null && s.deep_sleep_pct !== undefined) {
@@ -2209,11 +2209,18 @@ async function renderTrend() {
     }
   });
   
+  // Week grouping: Saturday-Friday (matches backend /trend)
+  const DAY_MAP = {0:'Monday',1:'Tuesday',2:'Wednesday',3:'Thursday',4:'Friday',5:'Saturday',6:'Sunday'};
+  const weekStartDay = 5; // Saturday = 5
+  const weekEndDay = (weekStartDay - 1 + 7) % 7; // Friday = 4
+  
   const sleepAvgByWeek = {};
   trendData.forEach((td, i) => {
     const parts = td.week.split('/');
     const weekEnd = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
-    const weekStart = new Date(weekEnd - 6*24*60*60*1000);
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekStart.getDate() - 6); // 7 days back
+    
     const sleepVals = [];
     for (let d = new Date(weekStart); d <= weekEnd; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
