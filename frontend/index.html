@@ -1893,6 +1893,19 @@ function clearHistoryFilters() {
   applyHistPreset();
 }
 
+function getSessionVolume(session) {
+  let totalVol = 0;
+  (session.exercises || []).forEach(ex => {
+    const def = EXERCISE_BANK.find(e => e.name === ex.name) || {};
+    (ex.sets || []).forEach(set => {
+      const trueLbs = set.trueLbs || set.rawLoad || 0;
+      const reps = set.reps || 0;
+      totalVol += trueLbs * reps;
+    });
+  });
+  return totalVol;
+}
+
 function renderHistory() {
   const list = document.getElementById('history-list');
   if (!sessions.length) { list.innerHTML = '<div class="empty">No sessions logged yet.</div>'; return; }
@@ -1949,7 +1962,7 @@ function renderHistory() {
       <div style="font-size:18px;font-weight:700;width:54px;flex-shrink:0;color:var(--accent);">${s.rd.toFixed(2)}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml((s.exercises||[]).map(e=>e.name).join(', '))}</div>
-        <div style="font-size:11px;color:var(--text3);">${s.bw} lbs${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+escapeHtml(s.notes)+'</span>' : ''}</div>
+        <div style="font-size:11px;color:var(--text3);">${s.bw} lbs<span style="margin-left:12px;color:var(--text2);">Volume: ${getSessionVolume(s).toFixed(0)} lbs</span>${s.notes ? '<span style="margin-left:8px;color:var(--text2);font-style:italic;">'+escapeHtml(s.notes)+'</span>' : ''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;min-width:80px;justify-content:flex-end;">
         ${crownHtml}
