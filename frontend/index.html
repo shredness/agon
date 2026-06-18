@@ -374,8 +374,8 @@
         <div class="form-group"><label>Date</label><input type="date" id="sess-date" style="width:155px;"></div>
         <div class="form-group"><label>Bodyweight (lbs)</label><input type="number" id="sess-bw" step="0.1" placeholder="199.0" style="width:115px;" oninput="calcRD();document.querySelectorAll('.exercise-block').forEach(b=>updateBWLoadFields(b.id.replace('ex-','')))"></div>
         <div class="form-group" style="flex:1;min-width:180px;"><label>Notes</label><input type="text" id="sess-notes" placeholder="Optional session notes…" style="width:100%;"></div>
-        <div class="form-group"><label>Sleep (hrs)</label><input type="number" id="sess-sleep-hours" step="0.5" placeholder="8" style="width:80px;" min="0" max="24"></div>
-        <div class="form-group"><label>Deep sleep (hrs)</label><input type="number" id="sess-deep-sleep-hours" step="0.25" placeholder="2" style="width:80px;" min="0" max="24"></div>
+        <div class="form-group"><label>Sleep</label><div style="display:flex;gap:6px;"><input type="number" id="sess-sleep-h" step="1" placeholder="8" style="width:50px;" min="0" max="24"><span style="align-self:center;color:var(--text2);">h</span><input type="number" id="sess-sleep-m" step="1" placeholder="30" style="width:50px;" min="0" max="59"><span style="align-self:center;color:var(--text2);">m</span></div></div>
+        <div class="form-group"><label>Deep sleep</label><div style="display:flex;gap:6px;"><input type="number" id="sess-deep-h" step="1" placeholder="2" style="width:50px;" min="0" max="24"><span style="align-self:center;color:var(--text2);">h</span><input type="number" id="sess-deep-m" step="1" placeholder="0" style="width:50px;" min="0" max="59"><span style="align-self:center;color:var(--text2);">m</span></div></div>
       </div>
       <div class="section-label">Exercises</div>
       <div id="ex-container"></div>
@@ -1767,8 +1767,14 @@ async function saveSession() {
   const date = document.getElementById('sess-date').value;
   const sessionNotes = document.getElementById('sess-notes')?.value||'';
   const bw = parseFloat(document.getElementById('sess-bw').value)||0;
-  const sleepHours = parseFloat(document.getElementById('sess-sleep-hours').value) || null;
-  const deepSleepHours = parseFloat(document.getElementById('sess-deep-sleep-hours').value) || null;
+  // Parse sleep h,m to decimal hours
+  const sleepH = parseFloat(document.getElementById('sess-sleep-h').value) || 0;
+  const sleepM = parseFloat(document.getElementById('sess-sleep-m').value) || 0;
+  const sleepHours = sleepH + (sleepM / 60) || null;
+  // Parse deep sleep h,m to decimal hours
+  const deepH = parseFloat(document.getElementById('sess-deep-h').value) || 0;
+  const deepM = parseFloat(document.getElementById('sess-deep-m').value) || 0;
+  const deepSleepHours = deepH + (deepM / 60) || null;
   // Calculate deep sleep percentage if both values provided
   let deepSleepPct = null;
   if (sleepHours && sleepHours > 0 && deepSleepHours && deepSleepHours > 0) {
@@ -2028,13 +2034,26 @@ function editSession(date) {
   // Set date and bodyweight
   document.getElementById('sess-date').value = session.date;
   document.getElementById('sess-notes').value = session.notes||'';
-  document.getElementById('sess-sleep-hours').value = session.sleep_hours || '';
-  // Reverse-calculate deep sleep hours from percentage
+  // Convert sleep hours to h,m format
+  if (session.sleep_hours) {
+    const sleepH = Math.floor(session.sleep_hours);
+    const sleepM = Math.round((session.sleep_hours % 1) * 60);
+    document.getElementById('sess-sleep-h').value = sleepH;
+    document.getElementById('sess-sleep-m').value = sleepM;
+  } else {
+    document.getElementById('sess-sleep-h').value = '';
+    document.getElementById('sess-sleep-m').value = '';
+  }
+  // Reverse-calculate and convert deep sleep hours to h,m format
   if (session.sleep_hours && session.deep_sleep_pct) {
     const deepSleepHours = (session.deep_sleep_pct / 100) * session.sleep_hours;
-    document.getElementById('sess-deep-sleep-hours').value = deepSleepHours.toFixed(2);
+    const deepH = Math.floor(deepSleepHours);
+    const deepM = Math.round((deepSleepHours % 1) * 60);
+    document.getElementById('sess-deep-h').value = deepH;
+    document.getElementById('sess-deep-m').value = deepM;
   } else {
-    document.getElementById('sess-deep-sleep-hours').value = '';
+    document.getElementById('sess-deep-h').value = '';
+    document.getElementById('sess-deep-m').value = '';
   }
   const bwEl = document.getElementById('sess-bw');
   bwEl.value = session.bw;
