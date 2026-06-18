@@ -2197,6 +2197,16 @@ async function renderTrend() {
   const btn = document.getElementById('sleep-toggle-btn');
   if (btn) btn.textContent = showSleepInitial ? '✅ Hide sleep' : '🌙 Show sleep';
   
+  // Fetch user's week_start preference for sleep calculation
+  let weekStartDay = 5; // default Saturday
+  try {
+    const profile = await apiFetch('/profile');
+    if (profile?.week_start) {
+      const dayMap = {'Monday':0,'Tuesday':1,'Wednesday':2,'Thursday':3,'Friday':4,'Saturday':5,'Sunday':6};
+      weekStartDay = dayMap[profile.week_start] || 5;
+    }
+  } catch(e) { /* use default */ }
+  
   let trendData=[];
   try { trendData=await apiFetch('/trend'); } catch(e){return;}
   window._trendData = trendData;
@@ -2209,10 +2219,8 @@ async function renderTrend() {
     }
   });
   
-  // Week grouping: Saturday-Friday (matches backend /trend)
-  const DAY_MAP = {0:'Monday',1:'Tuesday',2:'Wednesday',3:'Thursday',4:'Friday',5:'Saturday',6:'Sunday'};
-  const weekStartDay = 5; // Saturday = 5
-  const weekEndDay = (weekStartDay - 1 + 7) % 7; // Friday = 4
+  // Week grouping: matches backend /trend week calculation
+  const weekEndDay = (weekStartDay - 1 + 7) % 7;
   
   const sleepAvgByWeek = {};
   trendData.forEach((td, i) => {
