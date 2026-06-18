@@ -1171,7 +1171,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.10.0';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -5034,6 +5034,10 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.0': [
+    'Sleep tracking: optional session logging for total sleep hours and deep sleep hours (app calculates % automatically)',
+    'Session result bar: total volume now displayed first, followed by exercise density breakdown',
+  ],
   '0.9.6': [
     'Profile: user-configurable set time (default 1.5 min) — stored in profile, pre-fills every new set in the workout logger',
     'Fix: AI Insights 500 error — date comparison TypeError when protocols have start/end dates set (Postgres DATE vs string coercion)',
