@@ -2355,7 +2355,8 @@ async function renderTrend() {
           return +(monthAvg[monthKey]||0).toFixed(2);
         });
       })(),borderColor:getComputedStyle(document.documentElement).getPropertyValue('--text3').trim()||'#9C8E7A',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'yRD'},
-      {label:'Bodyweight',data:wtV,borderColor:getComputedStyle(document.documentElement).getPropertyValue('--chart-wt').trim()||'#4A7A2E',backgroundColor:'rgba(74,122,46,0.0)',tension:.35,fill:false,pointRadius:3,borderWidth:2,yAxisID:'yWT',borderDash:[]}
+      {label:'Bodyweight',data:wtV,borderColor:getComputedStyle(document.documentElement).getPropertyValue('--chart-wt').trim()||'#4A7A2E',backgroundColor:'rgba(74,122,46,0.0)',tension:.35,fill:false,pointRadius:3,borderWidth:2,yAxisID:'yWT',borderDash:[]},
+      {label:'Deep sleep %',data:trendData.map((td,i)=>sleepAvgByWeek[i]),borderColor:'transparent',backgroundColor:'transparent',pointRadius:0,borderWidth:0,fill:false,yAxisID:'yRD',hidden:true}
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
@@ -2365,6 +2366,7 @@ async function renderTrend() {
         annotation:{annotations: {...phaseAnnotations, ...sleepAnnotations}},
         tooltip:{callbacks:{
           label:ctx=>{
+            if(ctx.dataset.label === 'Deep sleep %') return ` Sleep: ${ctx.parsed.y}%`;
             if(ctx.dataset.yAxisID==='yWT') return ` ${ctx.parsed.y.toFixed(1)} lbs`;
             return ` RD ${ctx.parsed.y.toFixed(2)}`;
           }
