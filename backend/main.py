@@ -1069,7 +1069,7 @@ def build_training_context(uid: int) -> str:
     """Produce a compact text summary of the user's training data for the LLM."""
     conn = get_db()
     rows = conn.execute(
-        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=%s ORDER BY date",
+        "SELECT date, bw, rd, total_density, exercises, notes, sleep_hours, deep_sleep_pct FROM sessions WHERE user_id=%s ORDER BY date",
         (uid,)
     ).fetchall()
     if not rows:
@@ -1190,7 +1190,13 @@ def build_training_context(uid: int) -> str:
             total_reps = sum(s.get("reps", 0) for s in sets)
             ex_parts.append(f"{ex.get('name','?')} {max_load:g}x{total_reps:g}")
         note = f" | note: {r['notes']}" if r["notes"] else ""
-        lines.append(f"{r['date']} | {r['bw']:g}lb | RD {r['rd']:.2f} | {'; '.join(ex_parts)}{note}")
+        sleep_note = ""
+        if r.get("sleep_hours") is not None:
+            sleep_str = f"{r['sleep_hours']:.1f}h sleep"
+            if r.get("deep_sleep_pct") is not None:
+                sleep_str += f" ({r['deep_sleep_pct']}% deep)"
+            sleep_note = f" | {sleep_str}"
+        lines.append(f"{r['date']} | {r['bw']:g}lb | RD {r['rd']:.2f} | {'; '.join(ex_parts)}{note}{sleep_note}")
 
     return "\n".join(lines)
 
