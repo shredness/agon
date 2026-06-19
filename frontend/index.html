@@ -2193,7 +2193,7 @@ function editSession(date) {
 }
 
 async function renderTrend() {
-  const showSleepInitial = localStorage.getItem('agon-show-sleep') !== 'false';
+  const showSleepInitial = localStorage.getItem('agon-show-sleep') === 'true';
   const btn = document.getElementById('sleep-toggle-btn');
   if (btn) btn.textContent = showSleepInitial ? '✅ Hide sleep' : '🌙 Show sleep';
   
@@ -2313,7 +2313,7 @@ async function renderTrend() {
   } catch(e) { /* phases non-fatal */ }
 
   // ── Sleep overlay bands ──
-  const showSleep = localStorage.getItem('agon-show-sleep') !== 'false'; // default true
+  const showSleep = localStorage.getItem('agon-show-sleep') === 'true'; // default false (hidden)
   let sleepAnnotations = {};
   if (showSleep) {
     const getSleepColor = (pct) => {
@@ -2364,9 +2364,16 @@ async function renderTrend() {
         legend:{display:false},
         annotation:{annotations: {...phaseAnnotations, ...sleepAnnotations}},
         tooltip:{callbacks:{
-          afterLabel:ctx=>{
-            const sleepVal = sleepAvgByWeek[ctx.dataIndex];
-            return sleepVal !== null ? ` Sleep: ${sleepVal}%` : '';
+          afterBody:ctx=>{
+            const dataIndex = ctx[0].dataIndex;
+            const sleepVal = sleepAvgByWeek[dataIndex];
+            if (sleepVal === null) return '';
+            const getSleepColor = (pct) => {
+              if (pct >= 25) return '🟢'; // green
+              if (pct >= 15) return '🟡'; // yellow
+              return '🔴'; // red
+            };
+            return `${getSleepColor(sleepVal)} Sleep: ${sleepVal}%`;
           },
           label:ctx=>{
             if(ctx.dataset.yAxisID==='yWT') return ` ${ctx.parsed.y.toFixed(1)} lbs`;
@@ -2398,7 +2405,7 @@ async function renderTrend() {
 }
 
 function toggleSleepOverlay() {
-  const isShowing = localStorage.getItem('agon-show-sleep') !== 'false';
+  const isShowing = localStorage.getItem('agon-show-sleep') === 'true';
   localStorage.setItem('agon-show-sleep', isShowing ? 'false' : 'true');
   const btn = document.getElementById('sleep-toggle-btn');
   if (btn) btn.textContent = isShowing ? '🌙 Show sleep' : '✅ Hide sleep';
