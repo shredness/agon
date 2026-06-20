@@ -4495,7 +4495,9 @@ async function toggleProtocolTrack(id, tracked) {
       method: 'PATCH',
       body: JSON.stringify({ track: tracked })
     });
-    renderProtocolPills();
+    if (!tracked) _activeProtocolIds.delete(id);
+    await renderProtocolPills();
+    updateProtocolAnnotations();
   } catch(e) { showToast(e.message); }
 }
 
