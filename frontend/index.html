@@ -2325,8 +2325,8 @@ async function renderTrend() {
       if (pct === null) return;
       sleepAnnotations['sleep_' + weekIdx] = {
         type: 'box',
-        xMin: parseInt(weekIdx) - 0.3,
-        xMax: parseInt(weekIdx) + 0.3,
+        xMin: parseInt(weekIdx) - 0.5,
+        xMax: parseInt(weekIdx) + 0.5,
         backgroundColor: getSleepColor(pct),
         borderWidth: 0,
       };
