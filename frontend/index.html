@@ -2914,7 +2914,7 @@ function buildLogRows() {
     const phase = exportPhaseMap[s.date] || '';
     (s.exercises||[]).forEach(ex=>{
       (ex.sets||[]).forEach(set=>{
-        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||1.5,'Density':+((set.vol/(set.time||ex.time||1.5))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':set.notes||'','Phase':phase});
+        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||1.5,'Density':+((set.vol/(set.time||ex.time||1.5))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':s.notes||'','Phase':phase});
       });
     });
   });
