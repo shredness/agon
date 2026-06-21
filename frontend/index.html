@@ -1177,7 +1177,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.10.3';
+const APP_VERSION = '0.10.4';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2776,7 +2776,7 @@ function updateBankField(idx, field, val) {
   const exSnapshot = {...exToSave};
   clearTimeout(window._bankSaveTimer);
   window._bankSaveTimer = setTimeout(() => {
-    saveBankRowToAPI(exSnapshot).catch(err => console.error('Bank save failed:', err));
+    saveBankRowToAPI(exSnapshot).catch(err => { console.error('Bank save failed:', err); showToast('Exercise save failed — ' + (err.message||'check connection')); });
   }, 800);
   rebuildExerciseDropdowns();
   // Re-render the whole table so mult/isBW fields and formula preview update
@@ -5168,6 +5168,10 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.4': [
+    'Fix: exercises_id_seq sequence desync — PUT to existing exercise name hitting INSERT branch and colliding on primary key; added setval reset for all tables in _init_schema() and POST /admin/reset-sequences endpoint',
+    'Fix: bank field save errors (debounced updateBankField) now surface as a toast instead of silently logging to console',
+  ],
   '0.10.3': [
     'Fix: muscle picker Save button now works — confirmMusclePicker looks up exercise by name instead of array index (stale-index bug after re-sort), adds try/catch on API save, skips API call for unsaved placeholder exercises',
   ],

@@ -850,6 +850,24 @@ def delete_exercise(ex_name: str, user=Depends(current_user)):
     return {"status": "deleted"}
 
 
+@app.post("/admin/reset-sequences")
+def reset_sequences(user=Depends(admin_only)):
+    """Reset all SERIAL sequences to MAX(id)+1 to fix duplicate-key errors after data migrations."""
+    conn = get_db()
+    tables = ["users", "sessions", "exercises", "protocols", "phases",
+              "insights_messages", "events"]
+    results = {}
+    for t in tables:
+        try:
+            row = conn.execute(f"SELECT setval('{t}_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM {t}))").fetchone()
+            results[t] = row[0] if row else None
+        except Exception as e:
+            results[t] = f"error: {e}"
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "sequences": results}
+
+
 @app.get("/exercises/{ex_name}/set-curve")
 def get_set_curve(ex_name: str, user=Depends(current_user)):
     """Per-set rep data for fixed-load accessory blocks (2–9 sets, all same load ±0.5 lbs)."""

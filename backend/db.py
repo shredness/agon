@@ -378,6 +378,9 @@ def _init_schema(conn):
     # Reset sequences to prevent duplicate key violations
     cursor.execute("SELECT setval('insights_messages_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM insights_messages))")
     cursor.execute("SELECT setval('events_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM events))")
+    cursor.execute("SELECT setval('exercises_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM exercises))")
+    cursor.execute("SELECT setval('sessions_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM sessions))")
+    cursor.execute("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM users))")
 
     conn.commit()
     cursor.close()
