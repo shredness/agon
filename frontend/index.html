@@ -1177,7 +1177,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.10.1';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2677,13 +2677,13 @@ async function addBankRow() {
   // Don't save placeholder - wait until user sets a real name
   renderBankTable();
   rebuildExerciseDropdowns();
-  // Scroll to and focus the new name cell
-  const rows = document.querySelectorAll('#bank-body tr');
-  const lastRow = rows[rows.length-1];
-  if (lastRow) {
-    lastRow.scrollIntoView({behavior:'smooth',block:'center'});
-    const nameInput = lastRow.querySelector('input[data-field="name"]');
-    if (nameInput) { nameInput.focus(); nameInput.select(); }
+  // Scroll to and focus the new name cell — find it by default name since table is sorted alphabetically
+  const nameInputs = document.querySelectorAll('#bank-body input[data-field="name"]');
+  const newInput = Array.from(nameInputs).find(el => el.value === 'New Exercise');
+  if (newInput) {
+    const tr = newInput.closest('tr');
+    if (tr) tr.scrollIntoView({behavior:'smooth',block:'center'});
+    newInput.focus(); newInput.select();
   }
 }
 
@@ -5136,6 +5136,9 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.1': [
+    'Fix: Bank "+ Add exercise" button now scrolls to and focuses the correct new row (was landing on last alphabetical row instead)',
+  ],
   '0.10.0': [
     'Sleep tracking: optional session logging for total sleep hours and deep sleep hours (app calculates % automatically)',
     'Session result bar: total volume now displayed first, followed by exercise density breakdown',
