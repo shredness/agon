@@ -1177,7 +1177,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.10.1';
+const APP_VERSION = '0.10.2';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1192,6 +1192,7 @@ let sessions = []; // always an array
 let exCount = 0, setCounts = {};
 let _userRepTrigger = 50;  // loaded from profile, configurable per user
 let _userSetTime = 1.5;    // minutes per set, loaded from profile (default 1.5)
+let _musclePickerIdx = null; // index into EXERCISE_BANK for the bank-table muscle picker
 let tC = null;
 
 function getToken() {
@@ -2570,6 +2571,22 @@ function toggleMuscleChipColored(el, name) {
   }
 }
 
+function openMusclePicker(idx) {
+  _musclePickerIdx = idx;
+  const ex = EXERCISE_BANK[idx];
+  const existing = ex ? (ex.muscles || []) : [];
+  const container = document.getElementById('muscle-chip-container');
+  container.innerHTML = MUSCLE_GROUPS.map(m => {
+    const sel = existing.includes(m);
+    const c = MUSCLE_COLORS[m] || {};
+    const style = sel
+      ? `background:${c.border||'var(--accent)'};border-color:${c.border||'var(--accent)'};color:#fff;`
+      : `background:${c.bg||'var(--bg2)'};border-color:${c.border||'var(--border)'};color:${c.text||'var(--text2)'};`;
+    return `<div class="muscle-chip${sel?' selected':''}" style="${style}" onclick="toggleMuscleChipColored(this,'${escapeHtml(m)}')">${escapeHtml(m)}</div>`;
+  }).join('');
+  document.getElementById('muscle-picker-modal').style.display = 'flex';
+}
+
 function closeMusclePicker() {
   document.getElementById('muscle-picker-modal').style.display = 'none';
   _musclePickerIdx = null;
@@ -2797,6 +2814,7 @@ const MUSCLE_COLORS = {
   'Calves':     {bg:'#1A2520', border:'#00695C', text:'#80CBC4'},
   'Full Body':  {bg:'#1F1A10', border:'#BF8F00', text:'#FFE082'},
 };
+const MUSCLE_GROUPS = Object.keys(MUSCLE_COLORS);
 
 function muscleTagStyle(m) {
   const c = MUSCLE_COLORS[m] || {bg:'var(--bg2)', border:'var(--border)', text:'var(--text2)'};
@@ -5136,6 +5154,10 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.2': [
+    'Fix: Bank muscle group picker now opens correctly — openMusclePicker() function and MUSCLE_GROUPS constant were missing',
+    'Fix: _musclePickerIdx properly declared as module-level variable',
+  ],
   '0.10.1': [
     'Fix: Bank "+ Add exercise" button now scrolls to and focuses the correct new row (was landing on last alphabetical row instead)',
   ],
