@@ -1177,7 +1177,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.10.2';
+const APP_VERSION = '0.10.3';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1192,7 +1192,7 @@ let sessions = []; // always an array
 let exCount = 0, setCounts = {};
 let _userRepTrigger = 50;  // loaded from profile, configurable per user
 let _userSetTime = 1.5;    // minutes per set, loaded from profile (default 1.5)
-let _musclePickerIdx = null; // index into EXERCISE_BANK for the bank-table muscle picker
+let _musclePickerName = null; // exercise name for the bank-table muscle picker (name, not index, to survive re-sorts)
 let tC = null;
 
 function getToken() {
@@ -2572,9 +2572,10 @@ function toggleMuscleChipColored(el, name) {
 }
 
 function openMusclePicker(idx) {
-  _musclePickerIdx = idx;
   const ex = EXERCISE_BANK[idx];
-  const existing = ex ? (ex.muscles || []) : [];
+  if (!ex) return;
+  _musclePickerName = ex.name; // store by name — immune to array re-sorts while modal is open
+  const existing = ex.muscles || [];
   const container = document.getElementById('muscle-chip-container');
   container.innerHTML = MUSCLE_GROUPS.map(m => {
     const sel = existing.includes(m);
@@ -2589,24 +2590,37 @@ function openMusclePicker(idx) {
 
 function closeMusclePicker() {
   document.getElementById('muscle-picker-modal').style.display = 'none';
-  _musclePickerIdx = null;
+  _musclePickerName = null;
 }
 
 async function confirmMusclePicker() {
-  if (_musclePickerIdx === null) return;
+  if (!_musclePickerName) return;
   const selected = [...document.querySelectorAll('#muscle-chip-container .muscle-chip.selected')]
     .map(el => el.textContent.trim());
-  
+
   if (selected.length === 0) {
-    showToast('At least one muscle group is required');
+    showToast('Select at least one muscle group');
     return;
   }
 
-  const ex = EXERCISE_BANK[_musclePickerIdx];
+  // Look up by name, not index — safe even if EXERCISE_BANK was re-sorted while modal was open
+  const ex = EXERCISE_BANK.find(e => e.name === _musclePickerName);
+  if (!ex) { closeMusclePicker(); return; }
+
   ex.muscles = selected;
   ex.muscle = selected.join(' / ');
 
-  await saveBankRowToAPI(ex);
+  // Skip API save for placeholder exercises — the save will happen when the user sets a real name
+  if (!ex._isNew) {
+    try {
+      await saveBankRowToAPI(ex);
+    } catch (err) {
+      console.error('Muscle save failed:', err);
+      showToast('Save failed — check your connection and try again');
+      return; // leave modal open so the user can retry
+    }
+  }
+
   closeMusclePicker();
   renderBankTable();
   rebuildExerciseDropdowns();
@@ -5154,9 +5168,12 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.3': [
+    'Fix: muscle picker Save button now works — confirmMusclePicker looks up exercise by name instead of array index (stale-index bug after re-sort), adds try/catch on API save, skips API call for unsaved placeholder exercises',
+  ],
   '0.10.2': [
     'Fix: Bank muscle group picker now opens correctly — openMusclePicker() function and MUSCLE_GROUPS constant were missing',
-    'Fix: _musclePickerIdx properly declared as module-level variable',
+    'Fix: _musclePickerName properly declared as module-level variable',
   ],
   '0.10.1': [
     'Fix: Bank "+ Add exercise" button now scrolls to and focuses the correct new row (was landing on last alphabetical row instead)',
