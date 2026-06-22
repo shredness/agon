@@ -2119,7 +2119,7 @@ def get_external_data(request: Request,
 
     # Sessions
     sessions = conn.execute(
-        "SELECT date, bw, rd, total_density, exercises, notes FROM sessions WHERE user_id=%s ORDER BY date",
+        "SELECT date, bw, rd, total_density, exercises, notes, sleep_hours, deep_sleep_pct FROM sessions WHERE user_id=%s ORDER BY date",
         (uid,)
     ).fetchall()
 
@@ -2151,10 +2151,12 @@ def get_external_data(request: Request,
     for s in sessions:
         exs = s["exercises"] if isinstance(s["exercises"], list) else json.loads(s["exercises"])
         session_list.append({
-            "date": s["date"],
-            "bw":   s["bw"],
-            "rd":   s["rd"],
-            "notes": s["notes"] or "",
+            "date":          s["date"],
+            "bw":            s["bw"],
+            "rd":            s["rd"],
+            "notes":         s["notes"] or "",
+            "sleep_hours":   s["sleep_hours"],
+            "deep_sleep_pct": s["deep_sleep_pct"],
             "exercises": [{
                 "name":     ex.get("name"),
                 "tool":     ex.get("tool"),
