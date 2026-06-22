@@ -388,5 +388,24 @@ def _init_schema(conn):
         WHERE notes ~ ',\\s+'
     """)
 
+    # Rename "Low Bar Squat" → "Back Squat" everywhere
+    cursor.execute("""
+        UPDATE exercises SET name = 'Back Squat' WHERE name = 'Low Bar Squat'
+    """)
+    cursor.execute("""
+        UPDATE sessions
+        SET exercises = (
+            SELECT jsonb_agg(
+                CASE
+                    WHEN ex->>'name' = 'Low Bar Squat'
+                    THEN jsonb_set(ex, '{name}', '"Back Squat"')
+                    ELSE ex
+                END
+            )
+            FROM jsonb_array_elements(exercises) AS ex
+        )
+        WHERE exercises::text LIKE '%Low Bar Squat%'
+    """)
+
     conn.commit()
     cursor.close()
