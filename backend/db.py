@@ -389,6 +389,11 @@ def _init_schema(conn):
     """)
 
     # Rename "Low Bar Squat" → "Back Squat" everywhere
+    # If "Back Squat" already exists, just delete the duplicate row; otherwise rename it.
+    cursor.execute("""
+        DELETE FROM exercises WHERE name = 'Low Bar Squat'
+          AND EXISTS (SELECT 1 FROM exercises e2 WHERE e2.name = 'Back Squat')
+    """)
     cursor.execute("""
         UPDATE exercises SET name = 'Back Squat' WHERE name = 'Low Bar Squat'
     """)
