@@ -2140,7 +2140,7 @@ def get_external_data(request: Request,
 
     # Protocols
     protocols = conn.execute(
-        "SELECT name, dose, frequency, notes FROM protocols WHERE user_id=%s ORDER BY sort_order, id",
+        "SELECT name, dose, frequency, notes, start_date, end_date, track FROM protocols WHERE user_id=%s ORDER BY sort_order, id",
         (uid,)
     ).fetchall()
 
