@@ -382,5 +382,11 @@ def _init_schema(conn):
     cursor.execute("SELECT setval('sessions_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM sessions))")
     cursor.execute("SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM users))")
 
+    # Normalize protocol notes: strip spaces after commas (e.g. "KLOW, 5-AMINO" → "KLOW,5-AMINO")
+    cursor.execute("""
+        UPDATE protocols SET notes = REGEXP_REPLACE(notes, ',\\s+', ',', 'g')
+        WHERE notes ~ ',\\s+'
+    """)
+
     conn.commit()
     cursor.close()
