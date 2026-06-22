@@ -1177,7 +1177,7 @@
 })();
 
 const API = '/api';
-const APP_VERSION = '0.10.4';
+const APP_VERSION = '0.10.8';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -5171,6 +5171,18 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.8': [
+    'Fix: Low Bar Squat → Back Squat rename in exercise bank now handles pre-existing "Back Squat" entry — deletes duplicate instead of hitting unique constraint on startup',
+  ],
+  '0.10.7': [
+    'Data: renamed all "Low Bar Squat" entries to "Back Squat" across exercise bank and full session history (JSONB)',
+  ],
+  '0.10.6': [
+    'Data: protocol notes normalized on startup — spaces after commas stripped (e.g. "KLOW, 5-AMINO" → "KLOW,5-AMINO")',
+  ],
+  '0.10.5': [
+    'Fix: sleep overlay and protocol overlays no longer clobber each other on Trend chart — _sleepAnnotations tracked as module-level var, merged into updateProtocolAnnotations(); active protocol bands restored after renderTrend() rebuilds chart',
+  ],
   '0.10.4': [
     'Fix: exercises_id_seq sequence desync — PUT to existing exercise name hitting INSERT branch and colliding on primary key; added setval reset for all tables in _init_schema() and POST /admin/reset-sequences endpoint',
     'Fix: bank field save errors (debounced updateBankField) now surface as a toast instead of silently logging to console',
