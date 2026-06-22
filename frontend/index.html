@@ -2333,6 +2333,7 @@ async function renderTrend() {
       };
     });
   }
+  _sleepAnnotations = sleepAnnotations;
 
   if(tC)tC.destroy();
   tC=new Chart(document.getElementById('trendChart'),{
@@ -2402,7 +2403,8 @@ async function renderTrend() {
       }
     }
   });
-  renderProtocolPills();
+  await renderProtocolPills();
+  if (_activeProtocolIds.size > 0) updateProtocolAnnotations();
 }
 
 function toggleSleepOverlay() {
@@ -2461,6 +2463,7 @@ const _activeProtocolIds = new Set();
 let _cachedProtocols = [];
 let _allPhases = [];
 let _phaseAnnotations = {};
+let _sleepAnnotations = {};
 // Global helper: map a date string to nearest trend chart label index
 function _dateToLabelIndex(dateStr) {
   if (!tC || !tC.data || !tC.data.labels) return 0;
@@ -2527,8 +2530,8 @@ function toggleProtocolPill(id) {
 
 function updateProtocolAnnotations() {
   if (!tC) return;
-  // Start from the already-computed phase bands, add/replace protocol bands
-  const annotations = Object.assign({}, _phaseAnnotations);
+  // Start from the already-computed phase bands + sleep bands, add/replace protocol bands
+  const annotations = Object.assign({}, _phaseAnnotations, _sleepAnnotations);
 
   _cachedProtocols.filter(p => _activeProtocolIds.has(p.id)).forEach(p => {
     const color = getProtocolColor(p);
