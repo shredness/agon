@@ -379,15 +379,15 @@
         <div class="form-group"><label>Sleep</label><div style="display:flex;gap:6px;"><input type="number" id="sess-sleep-h" step="1" placeholder="8" style="width:65px;" min="0" max="24"><span style="align-self:center;color:var(--text2);">h</span><input type="number" id="sess-sleep-m" step="1" placeholder="30" style="width:65px;" min="0" max="59"><span style="align-self:center;color:var(--text2);">m</span></div></div>
         <div class="form-group"><label>Deep sleep</label><div style="display:flex;gap:6px;"><input type="number" id="sess-deep-h" step="1" placeholder="2" style="width:65px;" min="0" max="24"><span style="align-self:center;color:var(--text2);">h</span><input type="number" id="sess-deep-m" step="1" placeholder="0" style="width:65px;" min="0" max="59"><span style="align-self:center;color:var(--text2);">m</span></div></div>
       </div>
-      <div class="section-label">Exercises</div>
-      <div id="ex-container"></div>
-      <button class="btn btn-sm" onclick="addExercise()" style="margin-bottom:14px;">+ Add exercise</button>
       <div class="result-bar" id="result-bar" style="display:none;">
         <div><div style="font-size:12px;color:var(--text2);">Session RD</div><div class="rd-big" id="result-rd">0.00</div></div>
         <div style="flex:1;font-size:12px;color:var(--text2);" id="result-detail"></div>
         <button class="btn btn-sm" id="cancel-edit-btn" onclick="cancelEdit()" style="display:none;">Cancel edit</button>
         <button class="btn btn-primary" id="save-btn" onclick="saveSession()">Save session</button>
       </div>
+      <div class="section-label">Exercises</div>
+      <div id="ex-container"></div>
+      <button class="btn btn-sm" onclick="addExercise()" style="margin-bottom:14px;">+ Add exercise</button>
     </div>
   </div>
 
