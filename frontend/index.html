@@ -5922,12 +5922,12 @@ function parseMarkdown(text) {
         <p>Opens via clicking your username in the top-right corner.</p>
         <ul>
           <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, week start, activity level, rep accumulation trigger (default 50), and set time (default 1.5 min — pre-fills the time field on every new set and drives RD calculation)</li>
-          <li><strong>Protocols</strong> - supplements, peptides, and medications. Passed to the AI as context only. Agon does not provide medical advice</li>
           <li><strong>Account</strong> - change your password</li>
           <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA. Scan the QR code with any authenticator app. Admins can reset it via the Admin panel if you lose your device</li>
           <li><strong>External API</strong> - generate a read-only API key for your data for use with external AI tools</li>
           <li><strong>AI Insights</strong> - choose your AI provider: Gemini (free tier available), Claude (API key required), or Ollama (self-hosted, fully private). Keys are encrypted and stored on your server. Ollama requires a local or remote instance running an OpenAI-compatible API</li>
         </ul>
+        <p style="font-size:12px;color:var(--text2);margin-top:8px;">Protocols (supplements, peptides, medications) are managed from the <strong>Trend tab</strong>. They are passed to the AI as context. Agon does not provide medical advice.</p>
       </div>
     </div><!-- end guide-content-howto -->
 
@@ -6194,7 +6194,7 @@ function parseMarkdown(text) {
         <p>Import historical sessions from Excel using the provided template. Export with optional date range and phase filters. Generate a read-only External API key in Settings to share your data with any AI or external tool.</p>
       </div>
       <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:6px;padding:12px 14px;margin:16px 0;font-size:12px;color:var(--text2);line-height:1.6;">
-        <strong style="color:var(--text);">Tip:</strong> Click your username in the top-right at any time to edit your profile, manage protocols, or connect an AI key. Click <strong>?</strong> to reopen this guide.
+        <strong style="color:var(--text);">Tip:</strong> Click your username in the top-right at any time to edit your profile or connect an AI key. Manage protocols from the Trend tab. Click <strong>?</strong> to reopen this guide.
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <button class="btn btn-sm" onclick="obNext(2)">← Back</button>
@@ -6297,15 +6297,6 @@ function parseMarkdown(text) {
       </div>
       <div id="settings-profile-msg" style="font-size:12px;color:var(--red-text);margin-bottom:10px;display:none;"></div>
       <button class="btn btn-primary" onclick="saveSettingsProfile()">Save profile</button>
-    </div>
-
-    <!-- Protocols Section -->
-    <div style="margin-bottom:24px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div class="section-label" style="margin-bottom:0;">Protocols</div>
-        <button class="btn btn-sm" onclick="openAddProtoModal()">+ Add</button>
-      </div>
-      <div id="protocols-list"></div>
     </div>
 
     <!-- AI Insights Section -->
