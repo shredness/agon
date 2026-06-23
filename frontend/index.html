@@ -5859,11 +5859,12 @@ function parseMarkdown(text) {
 
       <div class="guide-section">
         <div class="guide-tab-label"><i class="ti ti-barbell"></i> Workout</div>
-        <p>Log each training session here. Set the date, your bodyweight, and optional session notes. Add exercises one by one - each set gets its own load, reps, and time. The app calculates volume, density, and RD automatically as you build the session. Hit Save to commit. Saved sessions appear in History.</p>
+        <p>Log each training session here. Set the date, your bodyweight, and optional session notes. Log sleep for the night before — total hours and deep sleep hours — to track recovery alongside training. Add exercises one by one - each set gets its own load, reps, and time. The app calculates volume, density, and RD automatically as you build the session. Hit Save to commit. Saved sessions appear in History.</p>
         <ul>
           <li><strong>Bar type</strong> - toggle between Standard (total weight) and Vitruvian (weight per side ×2)</li>
           <li><strong>Bodyweight exercises</strong> - choose Normal, Vest (adds lbs), or Assisted (subtracts %)</li>
           <li><strong>Crown icon 👑</strong> in History - flags when an exercise hit its rep accumulation trigger, signaling time to increase weight. The trigger is configurable in Settings</li>
+          <li><strong>Sleep</strong> - log total sleep and deep sleep in hours and minutes. Deep sleep quality is color-coded on the Trend chart (green ≥25%, yellow ≥15%, red &lt;15% of total sleep)</li>
         </ul>
       </div>
 
@@ -5878,6 +5879,7 @@ function parseMarkdown(text) {
         <ul>
           <li><strong>Phases</strong> - add phases to track your training cycles. Phases inform the AI and the macro calculator</li>
           <li><strong>Protocols</strong> - your active supplements, peptides, and medications. Toggle cyclic protocol windows directly on the chart to correlate RD trends against cycle timing</li>
+          <li><strong>Sleep overlay</strong> - toggle weekly deep sleep quality bands on the chart. Green = restorative (≥25% deep), yellow = marginal (≥15%), red = poor (&lt;15%). Coexists with protocol overlays</li>
           <li><strong>Macro calculator</strong> - computes BMR, TDEE, and daily macro targets based on your profile and current phase</li>
           <li><strong>Macro targets</strong> - retroactive macro history across all logged phases using average bodyweight per phase period</li>
         </ul>
