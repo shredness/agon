@@ -416,7 +416,7 @@
         </div>
         <button class="btn btn-sm" onclick="clearHistoryFilters()" style="margin-bottom:1px;">Clear</button>
       </div>
-      <!-- Custom date range — shown only when Custom range is selected -->
+      <!-- Custom date range, shown only when Custom range is selected -->
       <div id="hist-custom-range" style="display:none;gap:8px;flex-wrap:wrap;">
         <div class="form-group" style="margin:0;flex:1;min-width:140px;">
           <label>From</label>
@@ -474,7 +474,7 @@
         <canvas id="trendChart" role="img" aria-label="RD and bodyweight trend overlaid"></canvas>
       </div>
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
-        <p style="font-size:11px;color:var(--text3);margin:0 0 8px 0;">Toggle protocol cycle windows on chart — shaded = ON cycle, gap = OFF cycle.</p>
+        <p style="font-size:11px;color:var(--text3);margin:0 0 8px 0;">Toggle protocol cycle windows on chart, shaded = ON cycle, gap = OFF cycle.</p>
         <div id="trend-protocol-pills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
@@ -514,7 +514,7 @@
           <input type="date" id="proto-start" style="font-size:12px;width:100%;">
         </div>
         <div>
-          <label style="font-size:11px;color:var(--text3);">End date (optional — leave blank if active)</label>
+          <label style="font-size:11px;color:var(--text3);">End date (optional, leave blank if active)</label>
           <input type="date" id="proto-end" style="font-size:12px;width:100%;">
         </div>
       </div>
@@ -554,7 +554,7 @@
         </select>
       </div>
       <div class="form-group" style="margin-bottom:10px;">
-        <label>Label <span style="color:var(--text3);font-weight:400;">(optional — e.g. "GLP-1 Phase 2", "Pre-contest")</span></label>
+        <label>Label <span style="color:var(--text3);font-weight:400;">(optional, e.g. "GLP-1 Phase 2", "Pre-contest")</span></label>
         <input type="text" id="phase-label" style="width:100%;" placeholder="Short custom name for this phase">
       </div>
       <div class="form-group" style="margin-bottom:10px;">
@@ -612,7 +612,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
         <div>
           <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Strength Progress by Muscle</div>
-          <div style="font-size:13px;color:var(--text2);">% change in relative density (RD) per muscle group — needs 4+ sessions to show signal</div>
+          <div style="font-size:13px;color:var(--text2);">% change in relative density (RD) per muscle group, needs 4+ sessions to show signal</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <label style="font-size:12px;color:var(--text2);">Period</label>
@@ -684,22 +684,22 @@
         <span id="curve-trigger-badge" style="display:none;font-size:11px;padding:2px 10px;border-radius:20px;background:rgba(74,222,128,0.15);color:var(--green);font-weight:600;">👑 Trigger hit last session</span>
       </div>
       <div id="curve-load-info" style="font-size:12px;color:var(--text3);margin-bottom:12px;"></div>
-      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Last session — reps per set</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Last session, reps per set</div>
       <div id="curve-set-bars" style="display:flex;gap:6px;align-items:flex-end;height:100px;margin-bottom:16px;"></div>
       <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Total reps per session <span id="curve-threshold-label" style="font-weight:400;color:var(--text3);"></span></div>
       <div style="position:relative;width:100%;height:160px;margin-bottom:16px;">
         <canvas id="curveTotalChart"></canvas>
       </div>
-      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Set 1 reps — adaptation trend</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Set 1 reps, adaptation trend</div>
       <div style="position:relative;width:100%;height:120px;margin-bottom:16px;">
         <canvas id="curveOpeningChart"></canvas>
       </div>
       <div id="curve-reset-section" style="display:none;">
-        <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Load history — reset arc</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Load history, reset arc</div>
         <div id="curve-reset-info" style="font-size:12px;color:var(--text2);padding:10px;background:var(--bg2);border-radius:6px;border:1px solid var(--border);"></div>
       </div>
       <div id="curve-floor-warning" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:6px;font-size:12px;color:var(--red-text);">
-        ⚠️ One or more sets dropped below 4 reps last session — load may have jumped too far.
+        ⚠️ One or more sets dropped below 4 reps last session, load may have jumped too far.
       </div>
     </div>
 
@@ -1007,11 +1007,11 @@
       </select>
     </div>
     <div class="form-group" style="margin-bottom:12px;">
-      <label>Rep accumulation trigger <span style="font-size:11px;color:var(--text3);">(default 50 — lower for smaller muscles, raise if needed)</span></label>
+      <label>Rep accumulation trigger <span style="font-size:11px;color:var(--text3);">(default 50, lower for smaller muscles, raise if needed)</span></label>
       <input type="number" id="s-rep-trigger" min="10" max="200" step="1" value="50" style="width:100px;">
     </div>
     <div class="form-group" style="margin-bottom:12px;">
-      <label>Set time <span style="font-size:11px;color:var(--text3);">(minutes per set, default 1.5 — used for RD calculation)</span></label>
+      <label>Set time <span style="font-size:11px;color:var(--text3);">(minutes per set, default 1.5, used for RD calculation)</span></label>
       <input type="number" id="s-set-time" min="0.5" max="10" step="0.25" value="1.5" style="width:100px;">
     </div>
     <button class="btn btn-sm" onclick="saveSettingsProfile()" style="margin-bottom:14px;">Save profile</button>
@@ -1303,7 +1303,7 @@ async function checkRegistrationOpen() {
     const data = await r.json();
     const link = document.getElementById('login-register-link');
     if (link) link.style.display = data.open ? 'block' : 'none';
-  } catch(e) { /* silently fail — link stays hidden */ }
+  } catch(e) { /* silently fail, link stays hidden */ }
 }
 
 async function doLogin() {
@@ -1458,7 +1458,7 @@ async function init() {
       if (!isOnboarded) obShow();
       else await checkWhatsNew();
     } catch(e) {
-      // Profile fetch failed — show onboarding anyway for new users
+      // Profile fetch failed, show onboarding anyway for new users
       obShow();
     }
   }
@@ -1853,7 +1853,7 @@ function applyHistPreset() {
   const cr   = document.getElementById('hist-custom-range');
 
   if (val === '' ) {
-    // Custom — show date pickers
+    // Custom, show date pickers
     if (cr) cr.style.display = 'flex';
     renderHistory();
     return;
@@ -2404,7 +2404,7 @@ function toggleSleepOverlay() {
 
 let EXERCISE_BANK = []; // populated by loadBankFromAPI()
 
-// Protocol color palette — first 8 by name match, remainder cycle through palette
+// Protocol color palette, first 8 by name match, remainder cycle through palette
 const PROTOCOL_COLORS = {
   'GLP':        { bg: 'rgba(74,222,128,0.15)',  border: '#10B981', text: '#059669' },
   'Peptide':    { bg: 'rgba(59,130,246,0.15)',  border: '#3B82F6', text: '#1D4ED8' },
@@ -2483,7 +2483,7 @@ async function renderProtocolPills() {
     const tracked = protocols.filter(p => p.track);
 
     if (!tracked.length) {
-      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No tracked protocols — check Track in the table below.</div>';
+      container.innerHTML = '<div style="font-size:12px;color:var(--text3);">No tracked protocols, check Track in the table below.</div>';
       return;
     }
     container.innerHTML = tracked.map(p => {
@@ -2564,7 +2564,7 @@ function toggleMuscleChipColored(el, name) {
 function openMusclePicker(idx) {
   const ex = EXERCISE_BANK[idx];
   if (!ex) return;
-  _musclePickerName = ex.name; // store by name — immune to array re-sorts while modal is open
+  _musclePickerName = ex.name; // store by name, immune to array re-sorts while modal is open
   const existing = ex.muscles || [];
   const container = document.getElementById('muscle-chip-container');
   container.innerHTML = MUSCLE_GROUPS.map(m => {
@@ -2593,20 +2593,20 @@ async function confirmMusclePicker() {
     return;
   }
 
-  // Look up by name, not index — safe even if EXERCISE_BANK was re-sorted while modal was open
+  // Look up by name, not index, safe even if EXERCISE_BANK was re-sorted while modal was open
   const ex = EXERCISE_BANK.find(e => e.name === _musclePickerName);
   if (!ex) { closeMusclePicker(); return; }
 
   ex.muscles = selected;
   ex.muscle = selected.join(' / ');
 
-  // Skip API save for placeholder exercises — the save will happen when the user sets a real name
+  // Skip API save for placeholder exercises, the save will happen when the user sets a real name
   if (!ex._isNew) {
     try {
       await saveBankRowToAPI(ex);
     } catch (err) {
       console.error('Muscle save failed:', err);
-      showToast('Save failed — check your connection and try again');
+      showToast('Save failed, check your connection and try again');
       return; // leave modal open so the user can retry
     }
   }
@@ -2698,7 +2698,7 @@ async function addBankRow() {
   // Don't save placeholder - wait until user sets a real name
   renderBankTable();
   rebuildExerciseDropdowns();
-  // Scroll to and focus the new name cell — find it by default name since table is sorted alphabetically
+  // Scroll to and focus the new name cell, find it by default name since table is sorted alphabetically
   const nameInputs = document.querySelectorAll('#bank-body input[data-field="name"]');
   const newInput = Array.from(nameInputs).find(el => el.value === 'New Exercise');
   if (newInput) {
@@ -2766,7 +2766,7 @@ function updateBankField(idx, field, val) {
   const exSnapshot = {...exToSave};
   clearTimeout(window._bankSaveTimer);
   window._bankSaveTimer = setTimeout(() => {
-    saveBankRowToAPI(exSnapshot).catch(err => { console.error('Bank save failed:', err); showToast('Exercise save failed — ' + (err.message||'check connection')); });
+    saveBankRowToAPI(exSnapshot).catch(err => { console.error('Bank save failed:', err); showToast('Exercise save failed, ' + (err.message||'check connection')); });
   }, 800);
   rebuildExerciseDropdowns();
   // Re-render the whole table so mult/isBW fields and formula preview update
@@ -5151,32 +5151,32 @@ function switchGuideTab(tab) {
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
   '0.10.10': [
-    'UX: Session RD display and Save button moved above Exercises section — visible before scrolling through exercise list',
+    'UX: Session RD display and Save button moved above Exercises section, visible before scrolling through exercise list',
   ],
   '0.10.9': [
     'API: sleep_hours and deep_sleep_pct now included in external /external/data session records',
   ],
   '0.10.8': [
-    'Fix: Low Bar Squat → Back Squat rename in exercise bank now handles pre-existing "Back Squat" entry — deletes duplicate instead of hitting unique constraint on startup',
+    'Fix: Low Bar Squat → Back Squat rename in exercise bank now handles pre-existing "Back Squat" entry, deletes duplicate instead of hitting unique constraint on startup',
   ],
   '0.10.7': [
     'Data: renamed all "Low Bar Squat" entries to "Back Squat" across exercise bank and full session history (JSONB)',
   ],
   '0.10.6': [
-    'Data: protocol notes normalized on startup — spaces after commas stripped (e.g. "KLOW, 5-AMINO" → "KLOW,5-AMINO")',
+    'Data: protocol notes normalized on startup, spaces after commas stripped (e.g. "KLOW, 5-AMINO" → "KLOW,5-AMINO")',
   ],
   '0.10.5': [
-    'Fix: sleep overlay and protocol overlays no longer clobber each other on Trend chart — _sleepAnnotations tracked as module-level var, merged into updateProtocolAnnotations(); active protocol bands restored after renderTrend() rebuilds chart',
+    'Fix: sleep overlay and protocol overlays no longer clobber each other on Trend chart, _sleepAnnotations tracked as module-level var, merged into updateProtocolAnnotations(); active protocol bands restored after renderTrend() rebuilds chart',
   ],
   '0.10.4': [
-    'Fix: exercises_id_seq sequence desync — PUT to existing exercise name hitting INSERT branch and colliding on primary key; added setval reset for all tables in _init_schema() and POST /admin/reset-sequences endpoint',
+    'Fix: exercises_id_seq sequence desync, PUT to existing exercise name hitting INSERT branch and colliding on primary key; added setval reset for all tables in _init_schema() and POST /admin/reset-sequences endpoint',
     'Fix: bank field save errors (debounced updateBankField) now surface as a toast instead of silently logging to console',
   ],
   '0.10.3': [
-    'Fix: muscle picker Save button now works — confirmMusclePicker looks up exercise by name instead of array index (stale-index bug after re-sort), adds try/catch on API save, skips API call for unsaved placeholder exercises',
+    'Fix: muscle picker Save button now works, confirmMusclePicker looks up exercise by name instead of array index (stale-index bug after re-sort), adds try/catch on API save, skips API call for unsaved placeholder exercises',
   ],
   '0.10.2': [
-    'Fix: Bank muscle group picker now opens correctly — openMusclePicker() function and MUSCLE_GROUPS constant were missing',
+    'Fix: Bank muscle group picker now opens correctly, openMusclePicker() function and MUSCLE_GROUPS constant were missing',
     'Fix: _musclePickerName properly declared as module-level variable',
   ],
   '0.10.1': [
@@ -5187,26 +5187,26 @@ const CHANGELOG = {
     'Session result bar: total volume now displayed first, followed by exercise density breakdown',
   ],
   '0.9.6': [
-    'Profile: user-configurable set time (default 1.5 min) — stored in profile, pre-fills every new set in the workout logger',
-    'Fix: AI Insights 500 error — date comparison TypeError when protocols have start/end dates set (Postgres DATE vs string coercion)',
+    'Profile: user-configurable set time (default 1.5 min), stored in profile, pre-fills every new set in the workout logger',
+    'Fix: AI Insights 500 error, date comparison TypeError when protocols have start/end dates set (Postgres DATE vs string coercion)',
   ],
   '0.9.5': [
-    'Trend: protocol pills now clickable — toggles a shaded band on the RD chart showing the protocol window',
+    'Trend: protocol pills now clickable, toggles a shaded band on the RD chart showing the protocol window',
     'Trend: discontinued protocols now generate pills (dimmed) so past peptide cycles are visible on chart',
     'Trend: Track column moved to first position in protocols table, removed question mark',
-    'Trend: all tracked protocols now get a distinct color — palette cycling for unmatched names',
+    'Trend: all tracked protocols now get a distinct color, palette cycling for unmatched names',
     'Trend: duplicate "+ Add protocol" button removed',
   ],
   '0.9.3': [
     'Trend: chart note moved above legend for clarity',
-    'Trend: protocol pills added below chart — toggle cyclic windows to correlate RD against cycle timing',
+    'Trend: protocol pills added below chart, toggle cyclic windows to correlate RD against cycle timing',
     'Trend: Protocols panel added between Phases and Macro calculator (editable, live-synced)',
     'Trend: "Training phases" renamed to "Phases"',
     'Trend: "Macro targets by phase" renamed to "Macro targets"',
     'Guide: Trend section updated to reflect all renames and new Protocols overlay feature',
   ],
   '0.9.2': [
-    'Stability: connections now reclaimed per-request — fixes the pool drain that caused intermittent "Cannot reach the API"',
+    'Stability: connections now reclaimed per-request, fixes the pool drain that caused intermittent "Cannot reach the API"',
     'Database: rebuilt the from-scratch schema to match the live app (users, MFA, AI, external-key columns; added phases, events, insights_messages tables; protocol start/end dates) so a fresh deploy or disaster-recovery build works',
     'Security: removed hardcoded default admin password from source; refuses to boot on the known default',
     'Security: external data API key is header-only now (no ?key= query param leaking into logs)',
@@ -5215,46 +5215,46 @@ const CHANGELOG = {
   '0.9.1': [
     'Ollama: added to old AI settings modal dropdown with dynamic help text',
     'Settings: AI provider help text now clickable links (Gemini, Claude, Ollama)',
-    'Guide: expanded Method section — exemptions (10+ sets, kettlebells), rep trigger mechanics, BW multipliers, deload philosophy, anatomy heatmap interpretation',
+    'Guide: expanded Method section, exemptions (10+ sets, kettlebells), rep trigger mechanics, BW multipliers, deload philosophy, anatomy heatmap interpretation',
     'Guide: clarified Block Rep Curve exemption for 10+ set exercises in Progress section',
     'Database: fixed session save with UPDATE-then-INSERT upsert pattern (eliminates duplicate key errors)',
     'Database: added unique constraint on sessions(user_id, date) for proper conflict detection',
-    'Fix: PostgreSQL compatibility — CURRENT_TIMESTAMP instead of datetime(\'now\') in all endpoints',
+    'Fix: PostgreSQL compatibility, CURRENT_TIMESTAMP instead of datetime(\'now\') in all endpoints',
   ],
   '0.9.0': [
-    'AI Insights: Ollama support — self-hosted LLM option for privacy-first users',
+    'AI Insights: Ollama support, self-hosted LLM option for privacy-first users',
     'Settings: new "Ollama base URL" field in AI Insights section',
     'AI router: detects model prefix and routes to Claude, Gemini, or Ollama (OpenAI-compatible)',
     'Onboarding: Step 1 collects gender and birthdate (MM/DD/YYYY) for AI context injection',
     'Profile: fixed save_profile to properly handle partial updates without data loss',
   ],
   '0.8.5': [
-    'Phases: optional Label field added — name phases "GLP-1 Phase 2", "Pre-contest", etc.',
-    'Phase dropdown (heatmap): now shows type + label + date range — disambiguates same-type phases',
+    'Phases: optional Label field added, name phases "GLP-1 Phase 2", "Pre-contest", etc.',
+    'Phase dropdown (heatmap): now shows type + label + date range, disambiguates same-type phases',
     'Phase list: label shown as italic badge, dates and notes on second line',
     'AI context: active phase label passed through when present',
   ],
   '0.8.4': [
-    'Heatmap: period options changed to weeks (4w / 6w / 3m / 6m / 1y) — 7-day option removed',
+    'Heatmap: period options changed to weeks (4w / 6w / 3m / 6m / 1y), 7-day option removed',
   ],
   '0.8.3': [
-    'Heatmap: minimum 4 sessions required before showing signal — short windows no longer show misleading colors',
+    'Heatmap: minimum 4 sessions required before showing signal, short windows no longer show misleading colors',
     'Heatmap: subtitle corrected to "% change in relative density (RD) per muscle group"',
     'Heatmap: tooltip shows "Not enough data" when session count is below threshold',
     'Heatmap: insufficient flag correctly passed through tooltip call chain',
   ],
   '0.8.2': [
-    'Anatomy heatmap: now shows RD delta per muscle group (primary muscle only) instead of load delta — green = RD improving, blue = stable, red = declining',
+    'Anatomy heatmap: now shows RD delta per muscle group (primary muscle only) instead of load delta, green = RD improving, blue = stable, red = declining',
     'Heatmap tooltip updated: shows RD improving / stable / declining label with magnitude',
   ],
   '0.8.1': [
     'Protocols: active entries shown first, discontinued grouped below with a separator; sorted by end date within each group',
   ],
   '0.8.0': [
-    'Fix: new users could not save profile — INSERT was missing columns added in v0.7.x (last_seen_version, rep_trigger)',
+    'Fix: new users could not save profile, INSERT was missing columns added in v0.7.x (last_seen_version, rep_trigger)',
   ],
   '0.7.9': [
-    'Block rep curve: bar chart label alignment fixed — all set labels now correctly positioned above their bars',
+    'Block rep curve: bar chart label alignment fixed, all set labels now correctly positioned above their bars',
   ],
   '0.7.8': [
     'Progress: defaults to most recently trained exercise on first load',
@@ -5263,37 +5263,37 @@ const CHANGELOG = {
     'README: updated to v0.7.8 with full feature list, security model, and rate limit validation instructions',
   ],
   '0.7.7': [
-    'Guide: accessory block section reframed around escalating density principle — set count removed',
+    'Guide: accessory block section reframed around escalating density principle, set count removed',
   ],
   '0.7.6': [
-    'CI/CD: Claude can now commit and push directly — no manual git commands needed',
+    'CI/CD: Claude can now commit and push directly, no manual git commands needed',
   ],
   '0.7.5': [
-    'Exercises: sort_order ignored — all exercises now purely alphabetical everywhere',
+    'Exercises: sort_order ignored, all exercises now purely alphabetical everywhere',
   ],
   '0.7.4': [
-    'Exercises: sort applied at render time in all contexts — panel, workout dropdowns, edit dropdowns',
+    'Exercises: sort applied at render time in all contexts, panel, workout dropdowns, edit dropdowns',
   ],
   '0.7.3': [
     'Exercises: all dropdowns and the Exercises panel now sort alphabetically (case-insensitive)',
   ],
   '0.7.2': [
-    'AI Insights: protocols now segmented as active, past (discontinued), and upcoming — with start/end dates passed to the AI',
+    'AI Insights: protocols now segmented as active, past (discontinued), and upcoming, with start/end dates passed to the AI',
   ],
   '0.7.1': [
     'Fix: favicon and all icon sizes now correctly served (were missing from Docker image)',
     'Fix: export custom date range now hidden unless "Custom range" is selected',
-    'Fix: AI Insights now correctly includes protocol list in context — was reading session notes instead',
+    'Fix: AI Insights now correctly includes protocol list in context, was reading session notes instead',
   ],
   '0.7.0': [
-    'Progress: Block Rep Curve panel — fatigue decay bars, total reps trend, Set 1 adaptation trend, load reset arc',
-    'Settings: configurable rep accumulation trigger (default 50) — applies globally, overridable per exercise',
-    'Guide: two-tab layout — How to use + The Method (density block science, GLP-1 context, reading the curve)',
+    'Progress: Block Rep Curve panel, fatigue decay bars, total reps trend, Set 1 adaptation trend, load reset arc',
+    'Settings: configurable rep accumulation trigger (default 50), applies globally, overridable per exercise',
+    'Guide: two-tab layout, How to use + The Method (density block science, GLP-1 context, reading the curve)',
     'Crown icon now respects per-user and per-exercise trigger thresholds',
   ],
   '0.6.1': [
     'Code: imports consolidated to top-level (re, date), dead fallback query removed from AI context builder',
-    'Security: self-service password change now uses dedicated /auth/password endpoint — guests can now change their own password without admin privileges',
+    'Security: self-service password change now uses dedicated /auth/password endpoint, guests can now change their own password without admin privileges',
     'Code: change_password endpoint uses proper Pydantic model instead of raw dict',
   ],
   '0.6.0': [
@@ -5303,10 +5303,10 @@ const CHANGELOG = {
     'Admin: cannot delete admin accounts or your own account; password reset verifies user exists',
   ],
   '0.5.5': [
-    'Mobile: landscape mode uses matchMedia change listener — reliably fires on rotation without repaint flash',
+    'Mobile: landscape mode uses matchMedia change listener, reliably fires on rotation without repaint flash',
   ],
   '0.5.4': [
-    'Mobile: landscape mode now triggers reliably on device rotation — JS orientation listener added as fallback for Chrome Android',
+    'Mobile: landscape mode now triggers reliably on device rotation, JS orientation listener added as fallback for Chrome Android',
   ],
   '0.5.3': [
     'Header: username now displayed in a pill matching the other header buttons',
@@ -5328,42 +5328,42 @@ const CHANGELOG = {
     'Auth: email addresses now accepted as usernames during registration',
   ],
   '0.4.8': [
-    'Auth: registration requires admin approval — new accounts land in pending state until approved',
+    'Auth: registration requires admin approval, new accounts land in pending state until approved',
     'Admin: pending approval queue shown at top of Admin panel with Approve and Reject buttons',
   ],
   '0.4.7': [
-    'Auth: public registration toggle — set ALLOW_REGISTRATION=true in docker-compose to open sign-ups',
+    'Auth: public registration toggle, set ALLOW_REGISTRATION=true in docker-compose to open sign-ups',
     'Login: "Create an account" link appears automatically when registration is enabled',
   ],
   '0.4.6': [
-    'PWA: service worker registered — Android Chrome install prompt now works',
+    'PWA: service worker registered, Android Chrome install prompt now works',
   ],
   '0.4.5': [
-    'Branding: new Agon icon — lambda A over white flame, PWA manifest updated',
+    'Branding: new Agon icon, lambda A over white flame, PWA manifest updated',
   ],
   '0.4.4': [
     'Exercises: lock icon moved to the action column (right side) for protected exercises',
     'Trend: "Build a meal plan with AI" button aligned to the right of the macro calculator',
   ],
   '0.4.3': [
-    'Docs: user guide updated — Settings section now covers two-factor authentication setup and recovery',
+    'Docs: user guide updated, Settings section now covers two-factor authentication setup and recovery',
   ],
   '0.4.2': [
-    'Settings: Two-factor authentication section — any user can enable or disable MFA from Settings without admin intervention',
+    'Settings: Two-factor authentication section, any user can enable or disable MFA from Settings without admin intervention',
   ],
   '0.4.1': [
-    'Security: password complexity enforced — 10+ chars, uppercase, lowercase, number, special character',
+    'Security: password complexity enforced, 10+ chars, uppercase, lowercase, number, special character',
   ],
   '0.4.0': [
-    'Security: TOTP two-factor authentication — enable via Admin panel, scan QR in any authenticator app',
+    'Security: TOTP two-factor authentication, enable via Admin panel, scan QR in any authenticator app',
     'Admin: Users tab renamed to Admin with shield icon; 2FA status column and per-user controls added',
   ],
   '0.3.24': [
-    'Progress: chest hotspot repositioned and resized using interactive preview — two ellipses at confirmed coordinates',
+    'Progress: chest hotspot repositioned and resized using interactive preview, two ellipses at confirmed coordinates',
   ],
   '0.3.23': [
     'Progress: chest hotspot repositioned onto torso using body outline coordinates',
-    'Settings: protocol inline editing restored — ✎ on each row edits all fields including end date',
+    'Settings: protocol inline editing restored, ✎ on each row edits all fields including end date',
   ],
   '0.3.21': [
     'Protocols: start/end dates now correctly saved and displayed',
@@ -5381,18 +5381,18 @@ const CHANGELOG = {
     'Phase dropdown in scoped export now populates correctly on Data tab open',
   ],
   '0.2.0': [
-    'Scoped export — filter downloads by date range and phase',
-    'External API key — generate a read-only key to share your data with any AI or tool',
+    'Scoped export, filter downloads by date range and phase',
+    'External API key, generate a read-only key to share your data with any AI or tool',
     "What's new modal shows changes since your last login",
-    'Activity logging — admin can see logins, sessions, and AI queries per user',
+    'Activity logging, admin can see logins, sessions, and AI queries per user',
   ],
   '0.1.4': [
-    'Users tab restructured — activity summary and event log now inside main layout',
+    'Users tab restructured, activity summary and event log now inside main layout',
     'Footer and Users panel placement fixed',
     'Exercise bank: admin exercises now properly protected for guest users',
   ],
   '0.1.3': [
-    'Exercise bank: guests can only edit/delete their own exercises — admin exercises show a lock icon',
+    'Exercise bank: guests can only edit/delete their own exercises, admin exercises show a lock icon',
     'Username comparison is now case-insensitive',
   ],
   '0.1.2': [
@@ -5400,9 +5400,9 @@ const CHANGELOG = {
     'localStorage keys renamed from prometheus-* to agon-* with automatic migration',
   ],
   '0.1.1': [
-    'Activity log added to Users tab — logins, sessions saved, AI queries, and imports tracked per user',
+    'Activity log added to Users tab, logins, sessions saved, AI queries, and imports tracked per user',
     'Version number added to login screen and app footer',
-    'Mobile landscape mode optimised — tab labels collapse, header and cards tighten',
+    'Mobile landscape mode optimised, tab labels collapse, header and cards tighten',
   ],
   '0.1.0': [
     'Initial release: Workout logging, RD tracking, History, Trend, Progress, Insights, Data import/export',
@@ -5489,7 +5489,7 @@ async function generateExtKey() {
     const d = await aiFetch('/external/key/generate', { method:'POST' });
     valEl.textContent = d.key;
     valEl.style.display = 'block';
-    statusEl.textContent = 'New key generated — copy it now, it will not be shown again in full.';
+    statusEl.textContent = 'New key generated, copy it now, it will not be shown again in full.';
     const endpoint = window.location.origin + '/api/external/data';
     if (urlEl) {
       urlEl.innerHTML =
@@ -5585,7 +5585,7 @@ function getStrengthDelta(muscleGroup, days, phaseId) {
     if (phase) { phaseStart = phase.start_date; phaseEnd = phase.end_date || '9999-12-31'; }
   }
 
-  // Primary muscle only (option 1) — first tag on the exercise
+  // Primary muscle only (option 1), first tag on the exercise
   const muscleExercises = EXERCISE_BANK
     .filter(ex => {
       const muscles = Array.isArray(ex.muscles) ? ex.muscles
@@ -5644,14 +5644,14 @@ function getStrengthDelta(muscleGroup, days, phaseId) {
 function getMuscleColor(pct) {
   const clamped = Math.max(-50, Math.min(50, pct));
   if (clamped >= 1) {
-    // Green: +1% and above — scale intensity up to +15%
+    // Green: +1% and above, scale intensity up to +15%
     const intensity = Math.min(clamped / 15, 1);
     const r = Math.round(0 + (100 - 0) * (1 - intensity));
     const g = Math.round(180 + (230 - 180) * intensity);
     const b = Math.round(60 - 60 * intensity);
     return `rgb(${r}, ${g}, ${b})`;
   } else if (clamped <= -1) {
-    // Red: -1% and below — scale intensity up to -15%
+    // Red: -1% and below, scale intensity up to -15%
     const intensity = Math.min(Math.abs(clamped) / 15, 1);
     const r = Math.round(200 + (255 - 200) * intensity);
     const g = Math.round(80 - 80 * intensity);
@@ -5675,7 +5675,7 @@ function showAnatomyTooltip(e, muscle, pct, insufficient) {
   const color = pct > 3 ? '#4ade80' : pct < -3 ? '#ff6b6b' : '#3b82f6';
   const label = insufficient ? 'Not enough data for this period'
     : pct > 3 ? 'RD improving' : pct < -3 ? 'RD declining' : 'RD stable';
-  tip.innerHTML = `<div style="font-weight:600;color:var(--text);margin-bottom:2px;">${muscle}</div><div style="font-size:15px;font-weight:700;color:${color};">${insufficient ? '—' : sign + pct + '%'}</div><div style="font-size:11px;color:var(--text3);">${label}</div>`;
+  tip.innerHTML = `<div style="font-weight:600;color:var(--text);margin-bottom:2px;">${muscle}</div><div style="font-size:15px;font-weight:700;color:${color};">${insufficient ? ',' : sign + pct + '%'}</div><div style="font-size:11px;color:var(--text3);">${label}</div>`;
   tip.style.display = 'block';
   tip.style.left = (e.clientX + 14) + 'px';
   tip.style.top = (e.clientY - 10) + 'px';
@@ -5810,7 +5810,7 @@ function parseMarkdown(text) {
 <div class="modal-overlay" id="guide-modal" style="display:none;" onclick="if(event.target===this)closeGuide()">
   <div class="modal" style="max-width:640px;max-height:90vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;">Agon — Guide</h3>
+      <h3 style="margin:0;">Agon, Guide</h3>
       <button class="btn btn-sm" onclick="closeGuide()">Close</button>
     </div>
 
@@ -5829,12 +5829,12 @@ function parseMarkdown(text) {
     <!-- How to use tab -->
     <div id="guide-content-howto">
       <div style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.6;">
-        Agon tracks <strong>Relative Density (RD)</strong> — your total session volume divided by total time multiplied by bodyweight. A rising RD means you are getting stronger relative to your bodyweight, regardless of whether that weight is going up or down.
+        Agon tracks <strong>Relative Density (RD)</strong>: your total session volume divided by total time multiplied by bodyweight. A rising RD means you are getting stronger relative to your bodyweight, regardless of whether that weight is going up or down.
       </div>
 
       <div class="guide-section">
         <div class="guide-tab-label"><i class="ti ti-barbell"></i> Workout</div>
-        <p>Log each training session here. Set the date, your bodyweight, and optional session notes. Log sleep for the night before — total hours and deep sleep hours — to track recovery alongside training. Add exercises one by one - each set gets its own load, reps, and time. The app calculates volume, density, and RD automatically as you build the session. Hit Save to commit. Saved sessions appear in History.</p>
+        <p>Log each training session here. Set the date, your bodyweight, and optional session notes. Log sleep for the night before, total hours and deep sleep hours, to track recovery alongside training. Add exercises one by one - each set gets its own load, reps, and time. The app calculates volume, density, and RD automatically as you build the session. Hit Save to commit. Saved sessions appear in History.</p>
         <ul>
           <li><strong>Bar type</strong> - toggle between Standard (total weight) and Vitruvian (weight per side ×2)</li>
           <li><strong>Bodyweight exercises</strong> - choose Normal, Vest (adds lbs), or Assisted (subtracts %)</li>
@@ -5896,7 +5896,7 @@ function parseMarkdown(text) {
         <div class="guide-tab-label">Settings (click your username)</div>
         <p>Opens via clicking your username in the top-right corner.</p>
         <ul>
-          <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, week start, activity level, rep accumulation trigger (default 50), and set time (default 1.5 min — pre-fills the time field on every new set and drives RD calculation)</li>
+          <li><strong>Profile</strong> - name, DOB, gender, height, target bodyweight, week start, activity level, rep accumulation trigger (default 50), and set time (default 1.5 min, pre-fills the time field on every new set and drives RD calculation)</li>
           <li><strong>Account</strong> - change your password</li>
           <li><strong>Two-factor authentication</strong> - enable TOTP-based 2FA. Scan the QR code with any authenticator app. Admins can reset it via the Admin panel if you lose your device</li>
           <li><strong>External API</strong> - generate a read-only API key for your data for use with external AI tools</li>
@@ -5914,57 +5914,57 @@ function parseMarkdown(text) {
 
       <div class="guide-section">
         <div class="guide-tab-label">Why Relative Density?</div>
-        <p>Conventional strength trackers reward absolute load on the bar. But when you are actively losing weight — through dieting, a cut phase, or GLP-1 medication — your bodyweight is a variable. A 200 lb person lifting 100 lbs is doing more relative work than a 220 lb person lifting the same weight. RD captures this: <strong>RD = volume ÷ (time × bodyweight)</strong>. A rising RD alongside a falling bodyweight is the signal that you are preserving or building strength while losing mass.</p>
+        <p>Conventional strength trackers reward absolute load on the bar. But when you are actively losing weight, through dieting, a cut phase, or GLP-1 medication, your bodyweight is a variable. A 200 lb person lifting 100 lbs is doing more relative work than a 220 lb person lifting the same weight. RD captures this: <strong>RD = volume ÷ (time × bodyweight)</strong>. A rising RD alongside a falling bodyweight is the signal that you are preserving or building strength while losing mass.</p>
         <p>This matters most for people on GLP-1 medications (semaglutide, tirzepatide, retatrutide), where weight loss can be rapid and the risk of losing lean mass alongside fat is real. If your RD is rising, your muscle is being preserved. If it is falling while your weight falls, you need to adjust training or nutrition before a body composition scan would show it.</p>
       </div>
 
       <div class="guide-section">
-        <div class="guide-tab-label">Accessory blocks — escalating density, fixed time, cumulative reps</div>
+        <div class="guide-tab-label">Accessory blocks, escalating density, fixed time, cumulative reps</div>
         <p>Accessory exercises (bicep curls, lateral raises, flyes, tricep extensions, etc.) are trained in fixed-load density blocks: multiple sets at the same weight, AMRAP each set, with a fixed rest interval between sets. The goal is to accumulate a target number of total reps across the block before increasing the load.</p>
-        <p>The principle is <strong>escalating density within a fixed time block</strong>. By keeping the load constant and the rest interval fixed, your body is forced to do more total work as it adapts — your rep counts climb session over session at the same weight until you hit the trigger and move up. This is a direct application of progressive overload at the volume level rather than the load level.</p>
-        <p>Taking each set close to muscular failure is the primary driver of both hypertrophy and strength across a wide rep range (Schoenfeld et al., 2017). Fixed load with timed rest creates a predictable fatigue curve — your first sets will be higher rep, your later sets lower as fatigue accumulates. This is expected and correct. The rest window sits squarely in the research-supported range for hypertrophy-focused work (Schoenfeld, 2010).</p>
+        <p>The principle is <strong>escalating density within a fixed time block</strong>. By keeping the load constant and the rest interval fixed, your body is forced to do more total work as it adapts, your rep counts climb session over session at the same weight until you hit the trigger and move up. This is a direct application of progressive overload at the volume level rather than the load level.</p>
+        <p>Taking each set close to muscular failure is the primary driver of both hypertrophy and strength across a wide rep range (Schoenfeld et al., 2017). Fixed load with timed rest creates a predictable fatigue curve, your first sets will be higher rep, your later sets lower as fatigue accumulates. This is expected and correct. The rest window sits squarely in the research-supported range for hypertrophy-focused work (Schoenfeld, 2010).</p>
         <p>The rep accumulation target acts as a readiness signal: once you are producing enough total reps in your fatigued state, the load is no longer a sufficient stimulus and it is time to progress. A typical progression looks like:</p>
         <ul>
-          <li>Session 1 at new load: 10, 8, 6, 6, 5, 5 = 40 reps — still building</li>
-          <li>Session 3: 12, 10, 8, 7, 7, 6 = 50 reps — trigger hit, load up next session</li>
+          <li>Session 1 at new load: 10, 8, 6, 6, 5, 5 = 40 reps, still building</li>
+          <li>Session 3: 12, 10, 8, 7, 7, 6 = 50 reps, trigger hit, load up next session</li>
         </ul>
-        <p>Load increments are deliberately small — 1 lb for smaller muscle groups (biceps, triceps, shoulders), up to 1.5 lb for larger ones — because microloading allows near-continuous progression without the stalls common with larger jumps. Your <strong>rep trigger</strong> is configurable in Settings (default 50). Your <strong>set time</strong> is also configurable in Settings (default 1.5 min) — this value pre-fills the time field on every new set and is the denominator in the RD and density calculations. Adjust it to match your actual rest-plus-effort window. You can also set a per-exercise rep trigger override in the Exercise bank.</p>
+        <p>Load increments are deliberately small, 1 lb for smaller muscle groups (biceps, triceps, shoulders), up to 1.5 lb for larger ones, because microloading allows near-continuous progression without the stalls common with larger jumps. Your <strong>rep trigger</strong> is configurable in Settings (default 50). Your <strong>set time</strong> is also configurable in Settings (default 1.5 min), this value pre-fills the time field on every new set and is the denominator in the RD and density calculations. Adjust it to match your actual rest-plus-effort window. You can also set a per-exercise rep trigger override in the Exercise bank.</p>
       </div>
 
       <div class="guide-section">
         <div class="guide-tab-label">Reading the Block Rep Curve</div>
         <p>The Block Rep Curve panel appears in the Progress tab when you select a fixed-load accessory exercise. It shows three signals:</p>
         <ul>
-          <li><strong>Set-by-set bars</strong> — the fatigue decay from your last session. Set 1 is shown in green, subsequent sets in orange. A healthy curve slopes downward. A flat curve means the load is too light. A red bar flags any set below 4 reps — the load may have jumped too far.</li>
-          <li><strong>Total reps trend</strong> — cumulative reps per session over time, with your trigger threshold as a dashed reference line. Green bars have hit the trigger; orange bars have not.</li>
-          <li><strong>Set 1 reps trend</strong> — your opening set performance across sessions. This is the cleanest signal for systemic fatigue. If Set 1 reps start declining session-over-session at the same load, you may be under-recovered or under-fueled. Rising or stable Set 1 reps means the adaptation is on track.</li>
+          <li><strong>Set-by-set bars</strong>: the fatigue decay from your last session. Set 1 is shown in green, subsequent sets in orange. A healthy curve slopes downward. A flat curve means the load is too light. A red bar flags any set below 4 reps, the load may have jumped too far.</li>
+          <li><strong>Total reps trend</strong>: cumulative reps per session over time, with your trigger threshold as a dashed reference line. Green bars have hit the trigger; orange bars have not.</li>
+          <li><strong>Set 1 reps trend</strong>: your opening set performance across sessions. This is the cleanest signal for systemic fatigue. If Set 1 reps start declining session-over-session at the same load, you may be under-recovered or under-fueled. Rising or stable Set 1 reps means the adaptation is on track.</li>
         </ul>
         <p>If a load reset is detected (your logged load dropped from a previous peak), the Reset Arc shows where you reset from, your current load, and a progress bar back toward your previous peak.</p>
       </div>
 
       <div class="guide-section">
-        <div class="guide-tab-label">Compound lifts — dual wave, weekly +1</div>
+        <div class="guide-tab-label">Compound lifts, dual wave, weekly +1</div>
         <p>Compound movements (deadlifts, squats, bench press, rows, shoulder press) use a different structure: 10–12 sets across two ascending waves, with the starting weight increasing by 1 lb each week regardless of rep performance.</p>
-        <p>Dual-wave loading alternates between two ascending load sequences within the same session. The first wave warms up the nervous system and accumulates submaximal volume. The second wave, starting slightly heavier, exploits post-activation potentiation — the CNS is already primed, so outputs are higher than they would be cold. The fixed +1 lb/week progression on the starting weight provides a simple, non-negotiable overload mechanism. Three months of consistent training adds roughly 12 lbs to the starting weight of every compound.</p>
+        <p>Dual-wave loading alternates between two ascending load sequences within the same session. The first wave warms up the nervous system and accumulates submaximal volume. The second wave, starting slightly heavier, exploits post-activation potentiation, the CNS is already primed, so outputs are higher than they would be cold. The fixed +1 lb/week progression on the starting weight provides a simple, non-negotiable overload mechanism. Three months of consistent training adds roughly 12 lbs to the starting weight of every compound.</p>
       </div>
 
       <div class="guide-section">
         <div class="guide-tab-label">Timed efforts</div>
-        <p>Some exercises are trained as pure timed efforts — maximum reps in a fixed window (typically 20 minutes) with no fixed set count. Pull-up variations are a common example. As your bodyweight falls, the relative load per rep decreases automatically. Agon tracks total reps and your bodyweight so the RD calculation captures both dimensions.</p>
+        <p>Some exercises are trained as pure timed efforts, maximum reps in a fixed window (typically 20 minutes) with no fixed set count. Pull-up variations are a common example. As your bodyweight falls, the relative load per rep decreases automatically. Agon tracks total reps and your bodyweight so the RD calculation captures both dimensions.</p>
       </div>
 
       <div class="guide-section">
         <div class="guide-tab-label">Voluntary load resets</div>
-        <p>If you grind badly on an exercise — Sets 5 and 6 dropping to 3–4 reps — the right move is to reset the load and rebuild. This is calibration, not failure. Agon's load reset tracker detects this and shows the rebuild arc: where you reset from, your current load, and how close you are to your previous peak.</p>
-        <p>Global deloads from travel or time off are handled the same way — come back, reset, rebuild. The data stays and the RD trend will show the recovery arc.</p>
+        <p>If you grind badly on an exercise, Sets 5 and 6 dropping to 3–4 reps, the right move is to reset the load and rebuild. This is calibration, not failure. Agon's load reset tracker detects this and shows the rebuild arc: where you reset from, your current load, and how close you are to your previous peak.</p>
+        <p>Global deloads from travel or time off are handled the same way, come back, reset, rebuild. The data stays and the RD trend will show the recovery arc.</p>
       </div>
 
       <div class="guide-section">
         <div class="guide-tab-label">Exemptions: Wave protocols and kettlebells</div>
         <p>Two exercise patterns are exempt from Block Rep Curve tracking and rep trigger accumulation:</p>
         <ul>
-          <li><strong>Wave and varied protocols (10+ sets per session)</strong> — exercises trained with 10 or more sets in a single session are assumed to be undulating periodization or wave loading. These don't follow fixed-load density escalation. Block Rep Curve won't appear for these exercises, and they won't trigger rep accumulation signals. Track them separately via your session notes or the Progress tab's overall trend chart.</li>
-          <li><strong>Kettlebell exercises</strong> — kettlebells are exempt from rep triggers entirely. The asymmetric load, inherent instability, and technique sensitivity make rep-count based progressions less reliable than fixed barbells or dumbbells. Progress kettlebells by feel, technique quality, or load when it suits the session.</li>
+          <li><strong>Wave and varied protocols (10+ sets per session)</strong>: exercises trained with 10 or more sets in a single session are assumed to be undulating periodization or wave loading. These don't follow fixed-load density escalation. Block Rep Curve won't appear for these exercises, and they won't trigger rep accumulation signals. Track them separately via your session notes or the Progress tab's overall trend chart.</li>
+          <li><strong>Kettlebell exercises</strong>: kettlebells are exempt from rep triggers entirely. The asymmetric load, inherent instability, and technique sensitivity make rep-count based progressions less reliable than fixed barbells or dumbbells. Progress kettlebells by feel, technique quality, or load when it suits the session.</li>
         </ul>
       </div>
 
@@ -5972,8 +5972,8 @@ function parseMarkdown(text) {
         <div class="guide-tab-label">Rep trigger mechanics: Load increments and muscle-dependent thresholds</div>
         <p>The rep accumulation system is sensitive to muscle group size. Smaller muscles (biceps, triceps, shoulders) recover and adapt faster, so their load increments are smaller. Larger muscle groups (chest, back, legs, glutes) need bigger jumps to remain challenging as they adapt.</p>
         <ul>
-          <li><strong>Small muscles</strong> — 1 lb increments (biceps, triceps, shoulders, calves)</li>
-          <li><strong>Large muscles</strong> — 1.5 lb increments (chest, back, legs, glutes)</li>
+          <li><strong>Small muscles</strong>: 1 lb increments (biceps, triceps, shoulders, calves)</li>
+          <li><strong>Large muscles</strong>: 1.5 lb increments (chest, back, legs, glutes)</li>
         </ul>
         <p><strong>Default rep trigger: 50 reps</strong> per block. This is total reps across all sets at the same load. Once you hit 50 (or your custom threshold), the next session moves up by the increment above.</p>
         <p><strong>Bodyweight exercises have a separate trigger: 100 reps.</strong> Bodyweight movements accumulate reps faster due to reduced neural demand per rep, so the threshold is doubled to keep stimulus progression reasonable.</p>
@@ -5984,10 +5984,10 @@ function parseMarkdown(text) {
         <div class="guide-tab-label">Bodyweight exercises: Multipliers and RD calculation</div>
         <p>Bodyweight exercises (pull-ups, dips, push-ups) are scaled by a muscle-group specific multiplier. This accounts for the fact that bodyweight work is highly correlated with your total body mass, not just local muscle. Agon uses these multipliers:</p>
         <ul>
-          <li><strong>Pull-ups / chin-ups</strong> — 0.6× your bodyweight. A 200 lb person pulling up moves ~120 lbs of effective load.</li>
-          <li><strong>Dips</strong> — 0.6× your bodyweight</li>
-          <li><strong>Push-ups</strong> — 0.4× your bodyweight</li>
-          <li><strong>Pistol squats / shrimp squats</strong> — 0.75× your bodyweight</li>
+          <li><strong>Pull-ups / chin-ups</strong>: 0.6× your bodyweight. A 200 lb person pulling up moves ~120 lbs of effective load.</li>
+          <li><strong>Dips</strong>: 0.6× your bodyweight</li>
+          <li><strong>Push-ups</strong>: 0.4× your bodyweight</li>
+          <li><strong>Pistol squats / shrimp squats</strong>: 0.75× your bodyweight</li>
         </ul>
         <p>When you log a bodyweight exercise, the app calculates the effective load (bodyweight × multiplier) and uses that in your RD calculation. As you lose weight on GLP-1 or a cut, the effective load per rep automatically decreases, but the RD calculation captures it. A rising RD on bodyweight work while your weight falls is a powerful signal of true strength preservation.</p>
         <p>You can also add weight via a vest (adds to BW) or subtract it via assistance (percentage reduction). These appear as modifiers in the set entry form.</p>
@@ -5995,11 +5995,11 @@ function parseMarkdown(text) {
 
       <div class="guide-section">
         <div class="guide-tab-label">Deload philosophy: Subjective, externally driven, not algorithmic</div>
-        <p><strong>Agon does not suggest deloads or algorithmic recovery windows.</strong> This is intentional. Deloads are a response to life stress, travel, illness, accumulated fatigue, or a grinding session — not a calendar event. Forcing a deload based on an algorithm often leads to unnecessary training loss or, conversely, training when you shouldn't.</p>
+        <p><strong>Agon does not suggest deloads or algorithmic recovery windows.</strong> This is intentional. Deloads are a response to life stress, travel, illness, accumulated fatigue, or a grinding session, not a calendar event. Forcing a deload based on an algorithm often leads to unnecessary training loss or, conversely, training when you shouldn't.</p>
         <p>Instead, <strong>you own the decision.</strong> If you need a deload:</p>
         <ul>
           <li>Reduce volume, load, or frequency for 3–7 days</li>
-          <li>Log the lighter sessions normally — Agon will show the dip in RD and volume</li>
+          <li>Log the lighter sessions normally, Agon will show the dip in RD and volume</li>
           <li>When you return to normal intensity, you'll see the recovery arc in the Trend chart and a reset arc in Block Rep Curves if you stepped back load-wise</li>
           <li>Use your AI Insights to ask: "Did my RD recover after my deload week?" or "How does my Set 1 rep performance look?"</li>
         </ul>
@@ -6011,9 +6011,9 @@ function parseMarkdown(text) {
         <p>The Progress tab shows an anatomy heatmap with muscle groups shaded by color intensity. <strong>This heatmap displays RD change per muscle, not load change.</strong> It answers: "Which muscles am I getting relatively stronger in, and which are lagging?"</p>
         <p>Interpretation:</p>
         <ul>
-          <li><strong>Green (bright)</strong> — RD is rising for that muscle group. You are accumulating strength in that area relative to your bodyweight.</li>
-          <li><strong>Yellow/orange (neutral to warm)</strong> — RD is flat or rising slowly. Maintenance or modest progress.</li>
-          <li><strong>Red (dark)</strong> — RD is falling for that muscle group. You may be losing relative strength there, or training frequency for that muscle is low.</li>
+          <li><strong>Green (bright)</strong>: RD is rising for that muscle group. You are accumulating strength in that area relative to your bodyweight.</li>
+          <li><strong>Yellow/orange (neutral to warm)</strong>: RD is flat or rising slowly. Maintenance or modest progress.</li>
+          <li><strong>Red (dark)</strong>: RD is falling for that muscle group. You may be losing relative strength there, or training frequency for that muscle is low.</li>
         </ul>
         <p>This is useful for spotting imbalances. If your back RD is rising but your chest RD is falling, it might signal an overemphasis on rows/pulls and underemphasis on pressing. Use this as input to adjust your next training phase.</p>
       </div>
@@ -6198,7 +6198,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Landscape mode — class-based, fires on rotation
+// Landscape mode, class-based, fires on rotation
 function applyOrientation() {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
   document.documentElement.classList.toggle('landscape', landscape);

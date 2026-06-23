@@ -2,7 +2,7 @@
 
 **strength through loss**
 
-Agon is a self-hosted relative density (RD) strength tracker built for people actively losing weight — whether through cut/bulk cycles, GLP-1 medications, or body recomposition. Unlike conventional strength trackers that measure absolute load, Agon measures how strong you are *relative to your current bodyweight*, making it the right tool when the scale is intentionally moving down.
+Agon is a self-hosted relative density (RD) strength tracker built for people actively losing weight, whether through cut/bulk cycles, GLP-1 medications, or body recomposition. Unlike conventional strength trackers that measure absolute load, Agon measures how strong you are *relative to your current bodyweight*, making it the right tool when the scale is intentionally moving down.
 
 ---
 
@@ -12,31 +12,31 @@ Agon is a self-hosted relative density (RD) strength tracker built for people ac
 RD = total session volume / (total session time × bodyweight)
 ```
 
-A rising RD means you are getting stronger per pound of bodyweight — the signal that matters most during a cut, recomp, or weight-loss phase. A flat or rising RD alongside falling bodyweight means muscle is being preserved. That's the whole point.
+A rising RD means you are getting stronger per pound of bodyweight, the signal that matters most during a cut, recomp, or weight-loss phase. A flat or rising RD alongside falling bodyweight means muscle is being preserved. That's the whole point.
 
 ---
 
 ## Features
 
-- **Workout logging** — sets, reps, load, per-set timing, bodyweight; exercises reorderable within a session
-- **RD calculation** — automatic, per session and weekly trend; recalculated server-side
-- **Sleep tracking** — log total sleep and deep sleep per session; color-coded weekly deep sleep bands overlaid on the Trend chart (green ≥25%, yellow ≥15%, red <15%); exposed in external API
-- **Training phases** — bulk, cut, recomp, deload, weight loss; chart shading and phase-aware macros
-- **Trend chart** — weekly RD and bodyweight on a dual-axis chart with phase band overlays
-- **Recomp score card** — at-a-glance read on whether you're building strength while losing weight
-- **Macro calculator** — BMR, TDEE, and daily macro targets based on profile and current phase
-- **Block Rep Curve** — per-exercise fatigue decay visualization, total reps trend, Set 1 adaptation trend, load reset arc; for fixed-load accessory blocks
-- **AI Insights** — plain-English questions answered using your actual training data (Gemini and Claude API); protocols with active/past/upcoming status passed as context
-- **Meal plan builder** — sends your current macro targets to AI Insights for a personalized plan
-- **Progress anatomy** — interactive body figure showing muscle group training frequency
-- **Exercise bank** — shared library with muscle tagging, multipliers, formula hints; alphabetically sorted everywhere
-- **Protocols / supplements** — log with start/end dates; AI receives active vs discontinued vs upcoming context
-- **Import / export** — scoped XLSX export with date range presets and phase filters; full data import
-- **External API** — per-user read-only API key, header-authenticated (`Authorization: Bearer`)
-- **Multi-user** — admin, guest, and demo roles with per-user data isolation
-- **Public registration** — optional, with admin approval queue; email address as username
-- **Two-factor authentication** — TOTP-based 2FA, any authenticator app
-- **PWA** — installable on Android and iOS, runs full-screen, supports rotation; auto-updates on deploy without reinstall
+- **Workout logging**: sets, reps, load, per-set timing, bodyweight; exercises reorderable within a session
+- **RD calculation**: automatic, per session and weekly trend; recalculated server-side
+- **Sleep tracking**: log total sleep and deep sleep per session; color-coded weekly deep sleep bands overlaid on the Trend chart (green ≥25%, yellow ≥15%, red <15%); exposed in external API
+- **Training phases**: bulk, cut, recomp, deload, weight loss; chart shading and phase-aware macros
+- **Trend chart**: weekly RD and bodyweight on a dual-axis chart with phase band overlays
+- **Recomp score card**: at-a-glance read on whether you're building strength while losing weight
+- **Macro calculator**: BMR, TDEE, and daily macro targets based on profile and current phase
+- **Block Rep Curve**: per-exercise fatigue decay visualization, total reps trend, Set 1 adaptation trend, load reset arc; for fixed-load accessory blocks
+- **AI Insights**: plain-English questions answered using your actual training data (Gemini and Claude API); protocols with active/past/upcoming status passed as context
+- **Meal plan builder**: sends your current macro targets to AI Insights for a personalized plan
+- **Progress anatomy**: interactive body figure showing muscle group training frequency
+- **Exercise bank**: shared library with muscle tagging, multipliers, formula hints; alphabetically sorted everywhere
+- **Protocols / supplements**: log with start/end dates; AI receives active vs discontinued vs upcoming context
+- **Import / export**: scoped XLSX export with date range presets and phase filters; full data import
+- **External API**: per-user read-only API key, header-authenticated (`Authorization: Bearer`)
+- **Multi-user**: admin, guest, and demo roles with per-user data isolation
+- **Public registration**: optional, with admin approval queue; email address as username
+- **Two-factor authentication**: TOTP-based 2FA, any authenticator app
+- **PWA**: installable on Android and iOS, runs full-screen, supports rotation; auto-updates on deploy without reinstall
 
 ---
 
@@ -60,7 +60,7 @@ Agon is designed for self-hosted deployment via Docker.
 
 ```bash
 curl -O https://raw.githubusercontent.com/shredness/rd-tracker/master/docker-compose.yml
-# Edit environment variables — set a strong SECRET_KEY
+# Edit environment variables, set a strong SECRET_KEY
 docker-compose up -d
 ```
 
@@ -69,12 +69,12 @@ docker-compose up -d
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | *(required)* | PostgreSQL connection string: `postgresql://user:password@host:5432/dbname` |
-| `SECRET_KEY` | *(insecure default)* | JWT signing key — **must be changed**; app refuses to start with the default |
+| `SECRET_KEY` | *(insecure default)* | JWT signing key, **must be changed**; app refuses to start with the default |
 | `ADMIN_USER` | `admin` | Admin account username |
-| `ADMIN_PASS` | *(insecure default)* | Admin account password — **change this** |
+| `ADMIN_PASS` | *(insecure default)* | Admin account password, **change this** |
 | `ALLOWED_ORIGINS` | `https://your-domain.com,...` | Comma-separated CORS origins |
 | `ALLOW_REGISTRATION` | `false` | Set `true` to enable public sign-up (pending admin approval) |
-| `ALLOW_DEFAULT_SECRET` | `false` | Local-dev only — never set in production |
+| `ALLOW_DEFAULT_SECRET` | `false` | Local-dev only, never set in production |
 
 ---
 
@@ -84,9 +84,9 @@ docker-compose up -d
 
 As of v0.9.0, Agon uses PostgreSQL instead of SQLite. This migration improves **stability** and **security** in three critical ways:
 
-1. **Concurrent access** — SQLite's file-level locking prevents simultaneous write operations. PostgreSQL supports true concurrent transactions, eliminating lock contention and enabling safe multi-user workloads.
-2. **Data integrity** — ACID guarantees with proper isolation levels. PostgreSQL enforces referential integrity and multi-row transactions atomically; SQLite's journal mode is less robust under edge conditions.
-3. **Attack surface reduction** — No file-based database on disk. SQLite stores all data in a single file that must be readable by the app process; Postgres uses a separate service with credential-based authentication and network-level isolation. Credentials are managed through environment variables, never committed to source.
+1. **Concurrent access**: SQLite's file-level locking prevents simultaneous write operations. PostgreSQL supports true concurrent transactions, eliminating lock contention and enabling safe multi-user workloads.
+2. **Data integrity**: ACID guarantees with proper isolation levels. PostgreSQL enforces referential integrity and multi-row transactions atomically; SQLite's journal mode is less robust under edge conditions.
+3. **Attack surface reduction**: No file-based database on disk. SQLite stores all data in a single file that must be readable by the app process; Postgres uses a separate service with credential-based authentication and network-level isolation. Credentials are managed through environment variables, never committed to source.
 
 The Docker Compose file includes a dedicated Postgres service (`agon-postgres`) running as a separate container with encrypted passwords and internal networking.
 
@@ -125,10 +125,10 @@ Expect `401` for the first ~15 requests, then `503` once the burst is exceeded.
 
 Agon is built around two training approaches:
 
-**Accessory blocks — escalating density, fixed time, cumulative reps**
-Fixed load across multiple sets, AMRAP each set, fixed rest interval. The goal is to accumulate a target number of total reps (default 50, configurable per user and per exercise) before increasing the load. Load increments are small — 1 lb for smaller muscle groups, up to 1.5 lb for larger ones. The **set time** (default 1.5 min, configurable per user) pre-fills the time field on every new set and is the denominator in the RD and density calculations — set it to match your actual rest-plus-effort window. Based on Schoenfeld's work on rep ranges and fatigue-based progressive overload.
+**Accessory blocks, escalating density, fixed time, cumulative reps**
+Fixed load across multiple sets, AMRAP each set, fixed rest interval. The goal is to accumulate a target number of total reps (default 50, configurable per user and per exercise) before increasing the load. Load increments are small, 1 lb for smaller muscle groups, up to 1.5 lb for larger ones. The **set time** (default 1.5 min, configurable per user) pre-fills the time field on every new set and is the denominator in the RD and density calculations, set it to match your actual rest-plus-effort window. Based on Schoenfeld's work on rep ranges and fatigue-based progressive overload.
 
-**Compound lifts — dual wave, weekly +1**
+**Compound lifts, dual wave, weekly +1**
 10–12 sets across two ascending load waves, starting weight increasing +1 lb per week. Wave 2 exploits post-activation potentiation from Wave 1.
 
 **Timed efforts**
