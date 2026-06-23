@@ -150,7 +150,7 @@ When `ALLOW_REGISTRATION=true`, new users register with an email address and lan
 curl -H "Authorization: Bearer agon_YOUR_KEY" https://your-domain.com/api/external/data
 ```
 
-`X-API-Key: agon_YOUR_KEY` also accepted. The legacy `?key=` query param still works but is deprecated.
+`X-API-Key: agon_YOUR_KEY` header also accepted. The key is never accepted as a query parameter.
 
 ---
 
