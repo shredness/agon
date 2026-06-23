@@ -20,6 +20,7 @@ A rising RD means you are getting stronger per pound of bodyweight — the signa
 
 - **Workout logging** — sets, reps, load, per-set timing, bodyweight; exercises reorderable within a session
 - **RD calculation** — automatic, per session and weekly trend; recalculated server-side
+- **Sleep tracking** — log total sleep and deep sleep per session; color-coded weekly deep sleep bands overlaid on the Trend chart (green ≥25%, yellow ≥15%, red <15%); exposed in external API
 - **Training phases** — bulk, cut, recomp, deload, weight loss; chart shading and phase-aware macros
 - **Trend chart** — weekly RD and bodyweight on a dual-axis chart with phase band overlays
 - **Recomp score card** — at-a-glance read on whether you're building strength while losing weight
@@ -168,9 +169,12 @@ CI/CD: pushes to `master` build and push Docker images to GHCR. The service work
 
 ## Current Version
 
-**v0.9.6**
-- User-configurable set time (default 1.5 min) in profile settings — pre-fills every new set and drives RD calculation
-- Fix: AI Insights 500 error on protocol date comparison (Postgres DATE vs string coercion)
+**v0.10.10**
+- Sleep tracking: total and deep sleep logged per session, color-coded Trend chart overlay, external API exposure
+- Protocol start/end dates and track field exposed in external API
+- Session RD and Save button repositioned above Exercises for faster access
+- Trend chart: sleep and protocol overlays coexist without clobbering each other
+- Data migrations: protocol notes normalized (spaces after commas stripped); exercise rename handled constraint-safely on startup
 
 See the in-app What's New modal for the full changelog.
 
