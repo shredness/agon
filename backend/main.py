@@ -2153,6 +2153,9 @@ def get_external_data(request: Request,
 
     # Build structured response
     session_list = []
+    # Build name -> muscles lookup for inline enrichment
+    muscles_map = {row["name"]: row["muscles"] for row in bank}
+
     for s in sessions:
         exs = s["exercises"] if isinstance(s["exercises"], list) else json.loads(s["exercises"])
         session_list.append({
@@ -2165,6 +2168,7 @@ def get_external_data(request: Request,
             "exercises": [{
                 "name":     ex.get("name"),
                 "tool":     ex.get("tool"),
+                "muscles":  muscles_map.get(ex.get("name")),
                 "totalVol": ex.get("totalVol", 0),
                 "density":  ex.get("density", 0),
                 "sets": [{
