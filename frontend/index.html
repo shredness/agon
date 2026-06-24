@@ -1164,7 +1164,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.10';
+const APP_VERSION = '0.10.11';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -5150,6 +5150,9 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.11': [
+    'API: exercise_bank now exposed in external data payload (name, tool, muscles, mult, is_bw), enables muscle group resolution from session exercise names',
+  ],
   '0.10.10': [
     'UX: Session RD display and Save button moved above Exercises section, visible before scrolling through exercise list',
   ],
