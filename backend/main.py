@@ -2144,6 +2144,11 @@ def get_external_data(request: Request,
         (uid,)
     ).fetchall()
 
+    # Exercise bank
+    bank = conn.execute(
+        "SELECT name, tool, muscles, mult, is_bw FROM exercises ORDER BY name ASC"
+    ).fetchall()
+
     conn.close()
 
     # Build structured response
@@ -2194,5 +2199,6 @@ def get_external_data(request: Request,
         } if prof else {},
         "phases":    [dict(p) for p in phases],
         "protocols": [dict(p) for p in protocols],
+        "exercise_bank": [dict(b) for b in bank],
         "sessions":  session_list
     }
