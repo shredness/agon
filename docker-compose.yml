@@ -11,7 +11,7 @@ services:
     networks:
       - "internal"
     volumes:
-      - rdtracker:/data
+      - agon-data:/data
     environment:
       - PGDATA=/data/postgres
       - POSTGRES_DB=agon
@@ -56,5 +56,5 @@ services:
         condition: service_healthy
 
 volumes:
-  rdtracker:
+  agon-data:
     external: true
