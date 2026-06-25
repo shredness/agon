@@ -2351,7 +2351,7 @@ async function renderTrend() {
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{display:false},
-        annotation:{annotations: {...phaseAnnotations, ...sleepAnnotations}},
+        annotation:{annotations: {...(showSleep ? {} : phaseAnnotations), ...sleepAnnotations}},
         tooltip:{callbacks:{
           afterBody:ctx=>{
             const dataIndex = ctx[0].dataIndex;
@@ -2517,8 +2517,9 @@ function toggleProtocolPill(id) {
 
 function updateProtocolAnnotations() {
   if (!tC) return;
-  // Start from the already-computed phase bands + sleep bands, add/replace protocol bands
-  const annotations = Object.assign({}, _phaseAnnotations, _sleepAnnotations);
+  // Start from phase bands (hidden when sleep overlay is active) + sleep bands, add/replace protocol bands
+  const sleepActive = localStorage.getItem('agon-show-sleep') === 'true';
+  const annotations = Object.assign({}, sleepActive ? {} : _phaseAnnotations, _sleepAnnotations);
 
   _cachedProtocols.filter(p => _activeProtocolIds.has(p.id)).forEach(p => {
     const color = getProtocolColor(p);
