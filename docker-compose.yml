@@ -29,11 +29,8 @@ services:
     restart: unless-stopped
     networks:
       - "internal"
-    volumes:
-      - rdtracker:/data
     environment:
       - DATABASE_URL=postgresql://agon:PgAg0n_K7xM2pV9qW3rS_t5uL8nBc@agon-postgres:5432/agon
-      - DB_PATH=/data/sessions.db
       - SECRET_KEY=f7K#mP2$nX9qRvL4wZ8jYtB6cHsE3uA5dGiNpW1oF0yCkVbMeQhTxJlUzDrS
       - ALLOWED_ORIGINS=https://agon.savo.us,http://localhost,http://localhost:3800
       - ALLOW_REGISTRATION=false
