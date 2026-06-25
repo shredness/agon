@@ -1164,7 +1164,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.11';
+const APP_VERSION = '0.10.12';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1475,16 +1475,11 @@ function switchTab(name) {
     if (cb && cb.style.display !== 'none' && !window._editSessionActive) { cancelEdit(); return; }
   }
   if (name==='history') {
-    // Default to current month if no filter set
-    const fromEl = document.getElementById('hist-from');
-    if (fromEl && !fromEl.value) {
-      const preset = document.getElementById('hist-preset');
-      if (preset && !preset.value) preset.value = '30';
-      applyHistPreset();
-    } else {
-      populateHistoryExerciseFilter();
-      renderHistory();
-    }
+    // Populate exercise dropdown and apply whatever filter state is current.
+    // Preset defaults to '30' via the HTML selected attribute, so applyHistPreset()
+    // handles first-visit defaulting without clobbering a user-set custom range.
+    populateHistoryExerciseFilter();
+    applyHistPreset();
   }
   if (name==='bank') renderBankTable();
   if (name==='trend') renderTrend();
@@ -5151,6 +5146,9 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.12': [
+    'Fix: History custom date range "to" filter now preserved when navigating away and back to History tab, exercise filter dropdown now always populated on tab switch',
+  ],
   '0.10.11': [
     'API: exercise_bank now exposed in external data payload (name, tool, muscles, mult, is_bw), enables muscle group resolution from session exercise names',
   ],
