@@ -649,6 +649,49 @@
       </div>
     </div>
 
+    <!-- RD Trend by exercise / muscle group -->
+    <div class="card" style="padding:16px 20px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:600;margin-bottom:3px;">Relative density over time</div>
+          <div id="rd-trend-sub" style="font-size:13px;color:var(--text2);">RD per session for selected exercise</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+          <div style="display:flex;background:var(--bg3);border:0.5px solid var(--border2);border-radius:8px;padding:3px;gap:2px;">
+            <button id="rd-btn-ex" onclick="setRdMode('exercise')" style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;">Exercise</button>
+            <button id="rd-btn-mg" onclick="setRdMode('muscle')" style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">Muscle group</button>
+          </div>
+          <select id="rd-sel" onchange="renderRdTrend()" style="font-size:13px;padding:6px 10px;min-width:160px;"></select>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Current</div>
+              <div id="rd-p-cur" style="font-size:13px;font-weight:700;color:var(--text);">-</div>
+            </div>
+            <div style="background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Avg</div>
+              <div id="rd-p-avg" style="font-size:13px;font-weight:700;color:var(--text);">-</div>
+            </div>
+            <div style="background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Peak</div>
+              <div id="rd-p-peak" style="font-size:13px;font-weight:700;color:var(--text);">-</div>
+            </div>
+            <div style="background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:5px 10px;text-align:center;">
+              <div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">4wk trend</div>
+              <div id="rd-p-trend" style="font-size:13px;font-weight:700;color:var(--text);">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--text2);margin-bottom:10px;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:3px;background:var(--accent);border-radius:2px;"></span>Session RD</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:3px;background:var(--accent);opacity:0.4;border-radius:2px;"></span>4-session avg</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--text3);"></span>All-time avg</span>
+      </div>
+      <div style="position:relative;width:100%;height:260px;">
+        <canvas id="rdTrendChart" role="img" aria-label="Relative density over time by exercise or muscle group"></canvas>
+      </div>
+    </div>
+
     <!-- Exercise selector and sub-panels -->
     <div class="card" style="padding:16px 20px;">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -1164,7 +1207,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.13';
+const APP_VERSION = '0.10.14';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -3162,6 +3205,117 @@ function getCurrentLoad(exName) {
 // ── Progress tab ──
 let progressLoadChart = null;
 let progressVolChart  = null;
+let rdTrendChart      = null;
+let _rdMode           = 'exercise';
+
+function setRdMode(m) {
+  _rdMode = m;
+  const btnEx = document.getElementById('rd-btn-ex');
+  const btnMg = document.getElementById('rd-btn-mg');
+  if (btnEx) { btnEx.style.background = m==='exercise' ? 'var(--accent)' : 'transparent'; btnEx.style.color = m==='exercise' ? '#fff' : 'var(--text2)'; }
+  if (btnMg) { btnMg.style.background = m==='muscle'   ? 'var(--accent)' : 'transparent'; btnMg.style.color = m==='muscle'   ? '#fff' : 'var(--text2)'; }
+  const sub = document.getElementById('rd-trend-sub');
+  if (sub) sub.textContent = m==='exercise' ? 'RD per session for selected exercise' : 'Aggregated RD across all exercises targeting this muscle group';
+  populateRdSel();
+  renderRdTrend();
+}
+
+function populateRdSel() {
+  const sel = document.getElementById('rd-sel');
+  if (!sel) return;
+  const prev = sel.value;
+  if (_rdMode === 'exercise') {
+    const names = [...new Set(sessions.flatMap(s => (s.exercises||[]).map(e => e.name)))].sort();
+    sel.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"${n===prev?' selected':''}>${escapeHtml(n)}</option>`).join('');
+  } else {
+    const muscles = [...new Set(sessions.flatMap(s => (s.exercises||[]).flatMap(e => Array.isArray(e.muscles) ? e.muscles : [])))].sort();
+    sel.innerHTML = muscles.map(m => `<option value="${escapeHtml(m)}"${m===prev?' selected':''}>${escapeHtml(m)}</option>`).join('');
+  }
+}
+
+function getRdExerciseData(name) {
+  const byDate = {};
+  sessions.forEach(s => {
+    if (!s.bw) return;
+    const ex = (s.exercises||[]).find(e => e.name === name);
+    if (!ex) return;
+    const vol  = (ex.sets||[]).reduce((a, set) => a + (set.vol||0), 0);
+    const time = (ex.sets||[]).reduce((a, set) => a + (set.time||ex.time||1.5), 0);
+    if (vol > 0 && time > 0) byDate[s.date] = +(vol / (time * s.bw)).toFixed(3);
+  });
+  const sorted = Object.entries(byDate).sort((a,b) => a[0].localeCompare(b[0]));
+  return { dates: sorted.map(r=>r[0]), rd: sorted.map(r=>r[1]) };
+}
+
+function getRdMuscleData(group) {
+  const byDate = {};
+  sessions.forEach(s => {
+    if (!s.bw) return;
+    let vol = 0, time = 0;
+    (s.exercises||[]).forEach(ex => {
+      if (!(Array.isArray(ex.muscles) ? ex.muscles : []).includes(group)) return;
+      (ex.sets||[]).forEach(set => { vol += set.vol||0; time += set.time||ex.time||1.5; });
+    });
+    if (vol > 0 && time > 0) byDate[s.date] = +(vol / (time * s.bw)).toFixed(3);
+  });
+  const sorted = Object.entries(byDate).sort((a,b) => a[0].localeCompare(b[0]));
+  return { dates: sorted.map(r=>r[0]), rd: sorted.map(r=>r[1]) };
+}
+
+function updateRdPills(rd) {
+  const avg = rd.reduce((a,v)=>a+v,0)/rd.length;
+  const recent = rd.slice(-4), prior = rd.slice(-8,-4);
+  let trend = '-', trendColor = 'var(--text2)';
+  if (prior.length >= 2) {
+    const d = (recent.reduce((a,v)=>a+v,0)/recent.length) - (prior.reduce((a,v)=>a+v,0)/prior.length);
+    trend = (d >= 0 ? '▲ +' : '▼ ') + Math.abs(d).toFixed(2);
+    trendColor = d >= 0 ? 'var(--green)' : 'var(--accent)';
+  }
+  const el = id => document.getElementById(id);
+  if (el('rd-p-cur'))   el('rd-p-cur').textContent  = rd[rd.length-1].toFixed(2);
+  if (el('rd-p-avg'))   el('rd-p-avg').textContent  = avg.toFixed(2);
+  if (el('rd-p-peak'))  el('rd-p-peak').textContent = Math.max(...rd).toFixed(2);
+  if (el('rd-p-trend')) el('rd-p-trend').innerHTML  = `<span style="color:${trendColor}">${trend}</span>`;
+}
+
+function renderRdTrend() {
+  const sel = document.getElementById('rd-sel');
+  if (!sel || !sel.value) return;
+  const { dates, rd } = _rdMode==='exercise' ? getRdExerciseData(sel.value) : getRdMuscleData(sel.value);
+  if (!rd.length) { if (rdTrendChart) { rdTrendChart.destroy(); rdTrendChart = null; } return; }
+  const avg = rd.reduce((a,v)=>a+v,0)/rd.length;
+  const ma  = rd.map((_,i) => { const w=rd.slice(Math.max(0,i-3),i+1); return +(w.reduce((a,v)=>a+v,0)/w.length).toFixed(3); });
+  updateRdPills(rd);
+  const cs  = prop => getComputedStyle(document.documentElement).getPropertyValue(prop).trim();
+  const acc = cs('--accent')||'#E05A20', t3 = cs('--text3')||'#5A5650';
+  const bg2 = cs('--bg2')||'#1C1C1A', txt = cs('--text')||'#E8E4DC', t2 = cs('--text2')||'#8A8478';
+  if (rdTrendChart) { rdTrendChart.destroy(); rdTrendChart = null; }
+  const ctx = document.getElementById('rdTrendChart');
+  if (!ctx) return;
+  rdTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates.map(d => d.slice(5)),
+      datasets: [
+        { label:'Session RD',  data:rd, borderColor:acc, backgroundColor:acc+'1A', pointBackgroundColor:acc, pointRadius:4, pointHoverRadius:6, borderWidth:2, fill:true,  tension:0.3, order:1 },
+        { label:'4-session avg', data:ma, borderColor:acc+'66', pointRadius:0, borderWidth:2, fill:false, tension:0.4, order:2 },
+        { label:'All-time avg',  data:rd.map(()=>+avg.toFixed(3)), borderColor:t3, borderDash:[5,4], pointRadius:0, borderWidth:1.5, fill:false, order:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { backgroundColor:bg2, borderColor:'rgba(255,255,255,0.12)', borderWidth:1, titleColor:t2, bodyColor:txt,
+          callbacks: { label: c => c.datasetIndex===0 ? ` RD ${c.parsed.y.toFixed(2)}` : '' } }
+      },
+      scales: {
+        x: { ticks:{color:t3,font:{size:11},maxRotation:0,autoSkip:true,maxTicksLimit:8}, grid:{color:'rgba(128,128,128,0.08)'}, border:{color:'rgba(128,128,128,0.15)'} },
+        y: { ticks:{color:t3,font:{size:11},callback:v=>v.toFixed(1)},                   grid:{color:'rgba(128,128,128,0.08)'}, border:{color:'rgba(128,128,128,0.15)'} }
+      }
+    }
+  });
+}
 
 
 async function initProgress() {
@@ -3173,6 +3327,8 @@ async function initProgress() {
       names.map(n => `<option value="${escapeHtml(n)}"${n===current?' selected':''}>${escapeHtml(n)}</option>`).join('');
   } catch(e) {}
   if (sel.value) loadProgress();
+  populateRdSel();
+  renderRdTrend();
 }
 
 function renderCustomStats() {
@@ -5150,6 +5306,9 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.14': [
+    'Progress: RD trend chart with exercise/muscle group toggle, 4-session rolling average, all-time avg baseline, and inline stat pills (current, avg, peak, 4wk trend)',
+  ],
   '0.10.13': [
     'Export: Flag column added to Log sheet, value 1 on the first set row of each session date, 0 on all subsequent rows, enabling correct session-averaged SUMIFS/COUNTIFS in downstream spreadsheets',
   ],
