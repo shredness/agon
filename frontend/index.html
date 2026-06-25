@@ -1164,7 +1164,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.12';
+const APP_VERSION = '0.10.13';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2928,11 +2928,15 @@ function buildLogRows() {
     }
   }
   const rows=[];
+  const seenDates=new Set();
   sessions.forEach(s=>{
     const phase = exportPhaseMap[s.date] || '';
+    let sessionFlagged = false;
     (s.exercises||[]).forEach(ex=>{
       (ex.sets||[]).forEach(set=>{
-        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||1.5,'Density':+((set.vol/(set.time||ex.time||1.5))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':s.notes||'','Phase':phase});
+        const flag = (!seenDates.has(s.date) && !sessionFlagged) ? 1 : 0;
+        if (flag) { seenDates.add(s.date); sessionFlagged = true; }
+        rows.push({'Date':s.date,'Weight (lbs)':s.bw,'Exercise':ex.name,'Load (lbs)':+set.rawLoad.toFixed(1),'Reps':set.reps,'True (lbs)':+set.trueLbs.toFixed(1),'Vol (lbs)':+set.vol.toFixed(1),'Time (min)':set.time||ex.time||1.5,'Density':+((set.vol/(set.time||ex.time||1.5))).toFixed(2),'Rel Density':+s.rd.toFixed(2),'Notes':s.notes||'','Phase':phase,'Flag':flag});
       });
     });
   });
@@ -2972,7 +2976,7 @@ async function updateExportSummary() {
   const bankCt=document.getElementById('exp-bank-ct'); if(bankCt) bankCt.textContent=EXERCISE_BANK.length+' rows';
   populateExportPhaseDropdown();
   updateExportScopeCount();
-  const cols=['Date','Weight (lbs)','Exercise','Load (lbs)','Reps','True (lbs)','Vol (lbs)','Time (min)','Density','Rel Density','Notes','Phase'];
+  const cols=['Date','Weight (lbs)','Exercise','Load (lbs)','Reps','True (lbs)','Vol (lbs)','Time (min)','Density','Rel Density','Notes','Phase','Flag'];
   const previewCols=cols.filter(c=>c!=='Notes' && c!=='Phase');
   const table=document.getElementById('log-preview');
   const preview=lr.slice(-5);
@@ -2996,8 +3000,8 @@ async function doExport() {
     sessions = scopedSessions; // temporarily scope
     const lr=buildLogRows();
     sessions = savedSessions; // restore
-    const wsL=XLSX.utils.json_to_sheet(lr.length?lr:[{'Date':'','Weight (lbs)':'','Exercise':'','Load (lbs)':'','Reps':'','True (lbs)':'','Vol (lbs)':'','Time (min)':'','Density':'','Rel Density':'','Notes':'','Phase':''}]);
-    wsL['!cols']=[12,13,24,12,12,8,12,11,10,12,18,14].map(w=>({wch:w}));
+    const wsL=XLSX.utils.json_to_sheet(lr.length?lr:[{'Date':'','Weight (lbs)':'','Exercise':'','Load (lbs)':'','Reps':'','True (lbs)':'','Vol (lbs)':'','Time (min)':'','Density':'','Rel Density':'','Notes':'','Phase':'','Flag':''}]);
+    wsL['!cols']=[12,13,24,12,12,8,12,11,10,12,18,14,6].map(w=>({wch:w}));
     const tr=await buildTrendRows();
     const wsT=XLSX.utils.json_to_sheet(tr);
     wsT['!cols']=[14,22,24].map(w=>({wch:w}));
@@ -5146,6 +5150,9 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.13': [
+    'Export: Flag column added to Log sheet, value 1 on the first set row of each session date, 0 on all subsequent rows, enabling correct session-averaged SUMIFS/COUNTIFS in downstream spreadsheets',
+  ],
   '0.10.12': [
     'Fix: History custom date range "to" filter now preserved when navigating away and back to History tab, exercise filter dropdown now always populated on tab switch',
   ],
