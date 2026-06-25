@@ -11,6 +11,7 @@ services:
     networks:
       - "internal"
     volumes:
+      - agon-data:/data
       - agon-data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=agon
