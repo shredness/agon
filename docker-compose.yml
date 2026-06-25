@@ -11,9 +11,8 @@ services:
     networks:
       - "internal"
     volumes:
-      - agon-data:/data
+      - agon-data:/var/lib/postgresql/data
     environment:
-      - PGDATA=/data/postgres
       - POSTGRES_DB=agon
       - POSTGRES_USER=agon
       - POSTGRES_PASSWORD=PgAg0n_K7xM2pV9qW3rS_t5uL8nBc
