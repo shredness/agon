@@ -3228,7 +3228,12 @@ function populateRdSel() {
     const names = [...new Set(sessions.flatMap(s => (s.exercises||[]).map(e => e.name)))].sort();
     sel.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"${n===prev?' selected':''}>${escapeHtml(n)}</option>`).join('');
   } else {
-    const muscles = [...new Set(sessions.flatMap(s => (s.exercises||[]).flatMap(e => Array.isArray(e.muscles) ? e.muscles : [])))].sort();
+    const muscles = [...new Set(sessions.flatMap(s =>
+      (s.exercises||[]).flatMap(e => {
+        const b = EXERCISE_BANK.find(x => x.name === e.name);
+        return b?.muscles || [];
+      })
+    ))].sort();
     sel.innerHTML = muscles.map(m => `<option value="${escapeHtml(m)}"${m===prev?' selected':''}>${escapeHtml(m)}</option>`).join('');
   }
 }
@@ -3253,7 +3258,8 @@ function getRdMuscleData(group) {
     if (!s.bw) return;
     let vol = 0, time = 0;
     (s.exercises||[]).forEach(ex => {
-      if (!(Array.isArray(ex.muscles) ? ex.muscles : []).includes(group)) return;
+      const b = EXERCISE_BANK.find(x => x.name === ex.name);
+      if (!(b?.muscles || []).includes(group)) return;
       (ex.sets||[]).forEach(set => { vol += set.vol||0; time += set.time||ex.time||1.5; });
     });
     if (vol > 0 && time > 0) byDate[s.date] = +(vol / (time * s.bw)).toFixed(3);
