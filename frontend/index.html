@@ -1223,7 +1223,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.15';
+const APP_VERSION = '0.10.16';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2353,11 +2353,26 @@ async function renderTrend() {
       const xMin = dateToLabelIndex(ph.start_date);
       const xMax = ph.end_date ? dateToLabelIndex(ph.end_date) : labels.length - 1;
       phaseAnnotations['phase_' + i] = {
-        type: 'box',
-        xMin, xMax,
-        backgroundColor: color,
-        borderWidth: 0,
+        type: 'box', xMin, xMax,
+        backgroundColor: color, borderWidth: 0,
       };
+      // Label at top of band, only when band spans at least 1 data point
+      if (xMax > xMin && rdV.length) {
+        const labelColor = color.replace('0.10)', '0.55)');
+        phaseAnnotations['phase_lbl_' + i] = {
+          type: 'label',
+          xValue: xMin + 0.3,
+          xScaleID: 'x',
+          yScaleID: 'yRD',
+          yValue: Math.max(...rdV) * 0.97,
+          content: [ph.phase_type],
+          font: { size: 9, weight: '600' },
+          color: labelColor,
+          backgroundColor: 'transparent',
+          borderWidth: 0,
+          textAlign: 'start',
+        };
+      }
     });
     _phaseAnnotations = phaseAnnotations;
   } catch(e) { /* phases non-fatal */ }
@@ -5166,6 +5181,66 @@ const PHASE_COLORS = {
   'Bulk':'#3B82F6', 'Maintain':'#888780', 'Peak':'#F59E0B', 'Deload':'#8B5CF6'
 };
 
+// ── Phase intent analytics ────────────────────────────────────
+function getPhaseStats(phase) {
+  if (!sessions || !sessions.length) return null;
+  const start = phase.start_date;
+  const end   = phase.end_date || new Date().toISOString().split('T')[0];
+  const inRange = sessions.filter(s => s.bw && s.rd && s.date >= start && s.date <= end);
+  if (inRange.length < 2) return null;
+  const startSess = inRange.sort((a,b)=>a.date.localeCompare(b.date)).slice(0, 3);
+  const endSess   = [...inRange].sort((a,b)=>b.date.localeCompare(a.date)).slice(0, 3);
+  // need distinct start/end sets
+  const startIds = new Set(startSess.map(s=>s.id));
+  if (endSess.every(s => startIds.has(s.id))) return null;
+  const avg = arr => arr.reduce((a,s)=>a+s,0)/arr.length;
+  const startBW = avg(startSess.map(s=>s.bw));
+  const startRD = avg(startSess.map(s=>s.rd));
+  const endBW   = avg(endSess.map(s=>s.bw));
+  const endRD   = avg(endSess.map(s=>s.rd));
+  return { startBW, startRD, endBW, endRD, bwDelta: endBW-startBW, rdDelta: endRD-startRD };
+}
+
+function phaseVerdict(type, bwDelta, rdDelta) {
+  if (type === 'Weight Loss' || type === 'Cut') {
+    if (bwDelta < -1 && rdDelta >= -0.05) return { text:'Strength preserved', color:'var(--green)' };
+    if (bwDelta < -1 && rdDelta >= -0.25) return { text:'Minor strength loss', color:'#F59E0B' };
+    if (bwDelta < -1)                      return { text:'Notable strength loss', color:'var(--accent)' };
+    return { text:'Weight holding', color:'var(--text2)' };
+  }
+  if (type === 'Bulk') {
+    if (bwDelta > 1 && rdDelta > 0.1)   return { text:'Quality mass gain', color:'var(--green)' };
+    if (bwDelta > 1 && rdDelta >= -0.1) return { text:'Mass up, strength steady', color:'#F59E0B' };
+    if (bwDelta > 1)                     return { text:'Mass without strength', color:'var(--accent)' };
+    return { text:'Insufficient mass gain', color:'var(--text2)' };
+  }
+  if (type === 'Recomp') {
+    if (Math.abs(bwDelta) <= 4 && rdDelta > 0.1) return { text:'Strength up, weight stable', color:'var(--green)' };
+    if (Math.abs(bwDelta) <= 4 && rdDelta >= 0)  return { text:'Holding steady', color:'#F59E0B' };
+    return { text:'Strength declined', color:'var(--accent)' };
+  }
+  if (type === 'Maintain') {
+    if (Math.abs(bwDelta) <= 4 && rdDelta >= 0)    return { text:'Maintained well', color:'var(--green)' };
+    if (Math.abs(bwDelta) <= 4 && rdDelta >= -0.1) return { text:'Mostly maintained', color:'#F59E0B' };
+    return { text:'BW or strength drifted', color:'var(--accent)' };
+  }
+  if (type === 'Deload') return { text:'Recovery phase', color:'var(--text2)' };
+  if (type === 'Peak')   return { text:'Peak phase', color:'#F59E0B' };
+  return null;
+}
+
+function phaseBWColor(type, delta) {
+  if (type === 'Weight Loss' || type === 'Cut') return delta < -0.5 ? 'var(--green)' : delta > 0.5 ? 'var(--accent)' : 'var(--text2)';
+  if (type === 'Bulk') return delta > 0.5 ? 'var(--green)' : delta < -0.5 ? 'var(--accent)' : 'var(--text2)';
+  return Math.abs(delta) > 5 ? 'var(--accent)' : 'var(--text2)';
+}
+
+function phaseRDColor(delta) {
+  if (delta > 0.05)  return 'var(--green)';
+  if (delta >= -0.1) return '#F59E0B';
+  return 'var(--accent)';
+}
+
 async function loadPhases() {
   const list = document.getElementById('phases-list');
   if (!list) return;
@@ -5176,17 +5251,32 @@ async function loadPhases() {
       return;
     }
     list.innerHTML = phases.map(p => {
-      const color  = PHASE_COLORS[p.phase_type] || 'var(--text2)';
-      const endStr = p.end_date || '<span style="color:#10B981;">Ongoing</span>';
+      const color      = PHASE_COLORS[p.phase_type] || 'var(--text2)';
+      const endStr     = p.end_date || '<span style="color:#10B981;">Ongoing</span>';
       const labelBadge = p.label ? `<span style="font-size:11px;color:var(--text3);font-style:italic;">${escapeHtml(p.label)}</span>` : '';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border);">
-        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+      const stats      = getPhaseStats(p);
+      let statsHtml    = '';
+      if (stats) {
+        const verdict  = phaseVerdict(p.phase_type, stats.bwDelta, stats.rdDelta);
+        const bwSign   = stats.bwDelta >= 0 ? '+' : '';
+        const rdSign   = stats.rdDelta >= 0 ? '+' : '';
+        const bwColor  = phaseBWColor(p.phase_type, stats.bwDelta);
+        const rdColor  = phaseRDColor(stats.rdDelta);
+        statsHtml = `<div style="margin-top:5px;font-size:11px;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+          <span>BW: ${stats.startBW.toFixed(1)} → ${stats.endBW.toFixed(1)} <span style="color:${bwColor};">(${bwSign}${stats.bwDelta.toFixed(1)} lbs)</span></span>
+          <span>RD: ${stats.startRD.toFixed(2)} → ${stats.endRD.toFixed(2)} <span style="color:${rdColor};">(${rdSign}${stats.rdDelta.toFixed(2)})</span></span>
+          ${verdict ? `<span style="font-size:10px;font-weight:700;letter-spacing:.02em;color:${verdict.color};">${verdict.text}</span>` : ''}
+        </div>`;
+      }
+      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border);">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0;margin-top:4px;"></span>
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-weight:600;color:${color};">${escapeHtml(p.phase_type)}</span>
             ${labelBadge}
           </div>
           <div style="font-size:12px;color:var(--text2);">${p.start_date} – ${endStr}${p.notes ? ' · ' + escapeHtml(p.notes) : ''}</div>
+          ${statsHtml}
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0;">
           ${!p.end_date ? `<button class="btn btn-sm" onclick="closePhase(${p.id})" style="font-size:11px;">Close</button>` : ''}
@@ -5374,6 +5464,10 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.16': [
+    'Trend: phase type labels overlaid on chart bands at top of each shaded region',
+    'Phases: each entry now shows start/end BW, start/end RD, deltas, and a context-aware verdict (Strength preserved, Quality mass gain, etc.) based on phase type and actual BW/RD trajectory',
+  ],
   '0.10.15': [
     'Trend: 3M/6M/1Y/All time window controls on main Trend chart and per-exercise RD chart; defaults to 6M; stat pills always reflect full history',
   ],
