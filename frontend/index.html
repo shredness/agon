@@ -2347,6 +2347,9 @@ async function renderTrend() {
   try {
     const phases = await apiFetch('/phases');
     _allPhases = phases || [];
+    const maxRD = rdV.length ? Math.max(...rdV) : 4;
+    const LABEL_Y = [0.97, 0.87]; // alternate two rows to avoid horizontal overlap
+    let labelIdx = 0;
     phases.forEach((ph, i) => {
       const color = PHASE_BAND_COLORS[ph.phase_type];
       if (!color) return;
@@ -2356,22 +2359,23 @@ async function renderTrend() {
         type: 'box', xMin, xMax,
         backgroundColor: color, borderWidth: 0,
       };
-      // Label at top of band, only when band spans at least 1 data point
-      if (xMax > xMin && rdV.length) {
+      // Only label bands wide enough to hold text; center horizontally
+      if (xMax - xMin >= 2 && maxRD) {
         const labelColor = color.replace('0.10)', '0.55)');
         phaseAnnotations['phase_lbl_' + i] = {
           type: 'label',
-          xValue: xMin + 0.3,
+          xValue: (xMin + xMax) / 2,
           xScaleID: 'x',
           yScaleID: 'yRD',
-          yValue: Math.max(...rdV) * 0.97,
+          yValue: maxRD * LABEL_Y[labelIdx % 2],
           content: [ph.phase_type],
           font: { size: 9, weight: '600' },
           color: labelColor,
           backgroundColor: 'transparent',
           borderWidth: 0,
-          textAlign: 'start',
+          textAlign: 'center',
         };
+        labelIdx++;
       }
     });
     _phaseAnnotations = phaseAnnotations;
