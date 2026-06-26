@@ -5201,7 +5201,8 @@ function getPhaseStats(phase) {
   return { startBW, startRD, endBW, endRD, bwDelta: endBW-startBW, rdDelta: endRD-startRD };
 }
 
-function phaseVerdict(type, bwDelta, rdDelta) {
+function phaseVerdict(type, bwDelta, rdDelta, startBW) {
+  const bwStable = Math.abs(bwDelta) <= (startBW || 200) * 0.02;
   if (type === 'Weight Loss' || type === 'Cut') {
     if (bwDelta < -1 && rdDelta >= -0.05) return { text:'Strength preserved', color:'var(--green)' };
     if (bwDelta < -1 && rdDelta >= -0.25) return { text:'Minor strength loss', color:'#F59E0B' };
@@ -5215,19 +5216,18 @@ function phaseVerdict(type, bwDelta, rdDelta) {
     return { text:'Insufficient mass gain', color:'var(--text2)' };
   }
   if (type === 'Recomp') {
-    // Check RD direction first — never call "declined" when RD went up
-    if (rdDelta < -0.1)                            return { text:'Strength declined', color:'var(--accent)' };
-    if (Math.abs(bwDelta) <= 4 && rdDelta > 0.1)  return { text:'Strength up, weight stable', color:'var(--green)' };
-    if (Math.abs(bwDelta) <= 4)                    return { text:'Holding steady', color:'#F59E0B' };
-    if (bwDelta > 4  && rdDelta > 0.1)             return { text:'Strength up, weight creeping', color:'#F59E0B' };
-    if (bwDelta < -4 && rdDelta > 0.1)             return { text:'Strength up, weight dropping', color:'#F59E0B' };
+    if (rdDelta < -0.1)                    return { text:'Strength declined', color:'var(--accent)' };
+    if (bwStable && rdDelta > 0.1)         return { text:'Strength up, weight stable', color:'var(--green)' };
+    if (bwStable)                          return { text:'Holding steady', color:'#F59E0B' };
+    if (bwDelta > 0  && rdDelta > 0.1)    return { text:'Strength up, weight creeping', color:'#F59E0B' };
+    if (bwDelta < 0  && rdDelta > 0.1)    return { text:'Strength up, weight dropping', color:'#F59E0B' };
     return { text:'BW shifting, strength steady', color:'#F59E0B' };
   }
   if (type === 'Maintain') {
-    if (rdDelta < -0.15)                           return { text:'Strength drifted', color:'var(--accent)' };
-    if (Math.abs(bwDelta) <= 4 && rdDelta >= 0)   return { text:'Maintained well', color:'var(--green)' };
-    if (Math.abs(bwDelta) <= 4)                    return { text:'Mostly maintained', color:'#F59E0B' };
-    if (rdDelta >= 0)                              return { text:'BW shifted, strength held', color:'#F59E0B' };
+    if (rdDelta < -0.15)                   return { text:'Strength drifted', color:'var(--accent)' };
+    if (bwStable && rdDelta >= 0)          return { text:'Maintained well', color:'var(--green)' };
+    if (bwStable)                          return { text:'Mostly maintained', color:'#F59E0B' };
+    if (rdDelta >= 0)                      return { text:'BW shifted, strength held', color:'#F59E0B' };
     return { text:'BW and strength drifted', color:'var(--accent)' };
   }
   if (type === 'Deload') return { text:'Recovery phase', color:'var(--text2)' };
@@ -5263,7 +5263,7 @@ async function loadPhases() {
       const stats      = getPhaseStats(p);
       let statsHtml    = '';
       if (stats) {
-        const verdict  = phaseVerdict(p.phase_type, stats.bwDelta, stats.rdDelta);
+        const verdict  = phaseVerdict(p.phase_type, stats.bwDelta, stats.rdDelta, stats.startBW);
         const bwSign   = stats.bwDelta >= 0 ? '+' : '';
         const rdSign   = stats.rdDelta >= 0 ? '+' : '';
         const bwColor  = phaseBWColor(p.phase_type, stats.bwDelta);
