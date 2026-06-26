@@ -5215,14 +5215,20 @@ function phaseVerdict(type, bwDelta, rdDelta) {
     return { text:'Insufficient mass gain', color:'var(--text2)' };
   }
   if (type === 'Recomp') {
-    if (Math.abs(bwDelta) <= 4 && rdDelta > 0.1) return { text:'Strength up, weight stable', color:'var(--green)' };
-    if (Math.abs(bwDelta) <= 4 && rdDelta >= 0)  return { text:'Holding steady', color:'#F59E0B' };
-    return { text:'Strength declined', color:'var(--accent)' };
+    // Check RD direction first — never call "declined" when RD went up
+    if (rdDelta < -0.1)                            return { text:'Strength declined', color:'var(--accent)' };
+    if (Math.abs(bwDelta) <= 4 && rdDelta > 0.1)  return { text:'Strength up, weight stable', color:'var(--green)' };
+    if (Math.abs(bwDelta) <= 4)                    return { text:'Holding steady', color:'#F59E0B' };
+    if (bwDelta > 4  && rdDelta > 0.1)             return { text:'Strength up, weight creeping', color:'#F59E0B' };
+    if (bwDelta < -4 && rdDelta > 0.1)             return { text:'Strength up, weight dropping', color:'#F59E0B' };
+    return { text:'BW shifting, strength steady', color:'#F59E0B' };
   }
   if (type === 'Maintain') {
-    if (Math.abs(bwDelta) <= 4 && rdDelta >= 0)    return { text:'Maintained well', color:'var(--green)' };
-    if (Math.abs(bwDelta) <= 4 && rdDelta >= -0.1) return { text:'Mostly maintained', color:'#F59E0B' };
-    return { text:'BW or strength drifted', color:'var(--accent)' };
+    if (rdDelta < -0.15)                           return { text:'Strength drifted', color:'var(--accent)' };
+    if (Math.abs(bwDelta) <= 4 && rdDelta >= 0)   return { text:'Maintained well', color:'var(--green)' };
+    if (Math.abs(bwDelta) <= 4)                    return { text:'Mostly maintained', color:'#F59E0B' };
+    if (rdDelta >= 0)                              return { text:'BW shifted, strength held', color:'#F59E0B' };
+    return { text:'BW and strength drifted', color:'var(--accent)' };
   }
   if (type === 'Deload') return { text:'Recovery phase', color:'var(--text2)' };
   if (type === 'Peak')   return { text:'Peak phase', color:'#F59E0B' };
