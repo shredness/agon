@@ -5204,6 +5204,7 @@ function getPhaseStats(phase) {
 function phaseVerdict(type, bwDelta, rdDelta, startBW) {
   const bwStable = Math.abs(bwDelta) <= (startBW || 200) * 0.02;
   if (type === 'Weight Loss' || type === 'Cut') {
+    if (bwDelta < -1 && rdDelta > 0.1)    return { text:'Strength gained', color:'var(--green)' };
     if (bwDelta < -1 && rdDelta >= -0.05) return { text:'Strength preserved', color:'var(--green)' };
     if (bwDelta < -1 && rdDelta >= -0.25) return { text:'Minor strength loss', color:'#F59E0B' };
     if (bwDelta < -1)                      return { text:'Notable strength loss', color:'var(--accent)' };
