@@ -459,16 +459,24 @@
 
     <div class="card" style="padding:16px;">
       <p style="font-size:11px;color:var(--text3);margin:0 0 10px 0;">Weekly averages. RD higher = stronger relative to bodyweight.</p>
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
-        <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
-          <span style="display:inline-block;width:24px;height:3px;background:var(--chart-rd);border-radius:2px;"></span> Relative Density (left)
-        </span>
-        <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
-          <span style="display:inline-block;width:24px;height:2px;border-top:2px dashed #888780;"></span> Monthly avg RD
-        </span>
-        <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
-          <span style="display:inline-block;width:24px;height:3px;background:var(--chart-wt);border-radius:2px;"></span> Bodyweight lbs (right)
-        </span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:24px;height:3px;background:var(--chart-rd);border-radius:2px;"></span> Relative Density (left)
+          </span>
+          <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:24px;height:2px;border-top:2px dashed #888780;"></span> Monthly avg RD
+          </span>
+          <span style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;">
+            <span style="display:inline-block;width:24px;height:3px;background:var(--chart-wt);border-radius:2px;"></span> Bodyweight lbs (right)
+          </span>
+        </div>
+        <div style="display:flex;background:var(--bg3);border:0.5px solid var(--border2);border-radius:8px;padding:3px;gap:2px;">
+          <button id="tw-3M"  onclick="setTrendWindow('3M')"  style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">3M</button>
+          <button id="tw-6M"  onclick="setTrendWindow('6M')"  style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;">6M</button>
+          <button id="tw-1Y"  onclick="setTrendWindow('1Y')"  style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">1Y</button>
+          <button id="tw-all" onclick="setTrendWindow('all')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">All</button>
+        </div>
       </div>
       <div style="position:relative;width:100%;height:320px;">
         <canvas id="trendChart" role="img" aria-label="RD and bodyweight trend overlaid"></canvas>
@@ -682,10 +690,18 @@
           </div>
         </div>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--text2);margin-bottom:10px;">
-        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:3px;background:var(--accent);border-radius:2px;"></span>Session RD</span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:3px;background:var(--accent);opacity:0.4;border-radius:2px;"></span>4-session avg</span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--text3);"></span>All-time avg</span>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--text2);margin-bottom:10px;justify-content:space-between;align-items:center;">
+        <div style="display:flex;flex-wrap:wrap;gap:16px;">
+          <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:3px;background:var(--accent);border-radius:2px;"></span>Session RD</span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:3px;background:var(--accent);opacity:0.4;border-radius:2px;"></span>4-session avg</span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--text3);"></span>All-time avg</span>
+        </div>
+        <div style="display:flex;background:var(--bg3);border:0.5px solid var(--border2);border-radius:8px;padding:3px;gap:2px;">
+          <button id="rw-3M"  onclick="setRdWindow('3M')"  style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">3M</button>
+          <button id="rw-6M"  onclick="setRdWindow('6M')"  style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;">6M</button>
+          <button id="rw-1Y"  onclick="setRdWindow('1Y')"  style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">1Y</button>
+          <button id="rw-all" onclick="setRdWindow('all')" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:transparent;color:var(--text2);cursor:pointer;">All</button>
+        </div>
       </div>
       <div style="position:relative;width:100%;height:260px;">
         <canvas id="rdTrendChart" role="img" aria-label="Relative density over time by exercise or muscle group"></canvas>
@@ -1207,7 +1223,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.14';
+const APP_VERSION = '0.10.15';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -2236,6 +2252,14 @@ async function renderTrend() {
   let trendData=[];
   try { trendData=await apiFetch('/trend'); } catch(e){return;}
   window._trendData = trendData;
+
+  // Filter to selected time window for chart display; stat pills use full trendData
+  const cutoffW = windowCutoff(_trendWindow);
+  const displayData = cutoffW ? trendData.filter(d => {
+    const p = d.week.split('/');
+    return new Date(parseInt(p[2]), parseInt(p[0])-1, parseInt(p[1])) >= cutoffW;
+  }) : trendData;
+  applyWindowBtns('tw-', _trendWindow);
   
   // Calculate rolling 7-day average deep sleep % for each week (Saturday-Friday boundary)
   const sleepByDate = {};
@@ -2249,7 +2273,7 @@ async function renderTrend() {
   const weekEndDay = (weekStartDay - 1 + 7) % 7;
   
   const sleepAvgByWeek = {};
-  trendData.forEach((td, i) => {
+  displayData.forEach((td, i) => {
     const parts = td.week.split('/');
     const weekEnd = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
     const weekStart = new Date(weekEnd);
@@ -2263,9 +2287,9 @@ async function renderTrend() {
     sleepAvgByWeek[i] = sleepVals.length ? Math.round(sleepVals.reduce((a,v)=>a+v,0)/sleepVals.length) : null;
   });
   
-  const labels=trendData.map(d=>{ const p=d.week.split('/'); return p[0]+'/'+p[1]; });
-  const rdV=trendData.map(d=>+d.rd.toFixed(2));
-  const wtV=trendData.map(d=>+d.wt.toFixed(1));
+  const labels=displayData.map(d=>{ const p=d.week.split('/'); return p[0]+'/'+p[1]; });
+  const rdV=displayData.map(d=>+d.rd.toFixed(2));
+  const wtV=displayData.map(d=>+d.wt.toFixed(1));
   const now = new Date();
   const cutoff60 = new Date(now - 60*24*60*60*1000);
   const cutoff28 = new Date(now - 28*24*60*60*1000);
@@ -2310,7 +2334,7 @@ async function renderTrend() {
     if (!dateStr) return labels.length - 1;
     const d = new Date(dateStr);
     let best = 0, bestDiff = Infinity;
-    trendData.forEach((td, i) => {
+    displayData.forEach((td, i) => {
       const parts = td.week.split('/');
       const w = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
       const diff = Math.abs(w - d);
@@ -2368,7 +2392,7 @@ async function renderTrend() {
       {label:'Monthly avg RD',data:(()=>{
         // Build month->avgRD map from trendData
         const monthMap = {};
-        trendData.forEach((td, i) => {
+        displayData.forEach((td, i) => {
           const parts = td.week.split('/');
           const monthKey = parts[2] + '-' + parts[0].padStart(2,'0'); // YYYY-MM
           if (!monthMap[monthKey]) monthMap[monthKey] = [];
@@ -2376,7 +2400,7 @@ async function renderTrend() {
         });
         const monthAvg = {};
         Object.entries(monthMap).forEach(([k,v]) => monthAvg[k] = v.reduce((a,b)=>a+b,0)/v.length);
-        return trendData.map(td => {
+        return displayData.map(td => {
           const parts = td.week.split('/');
           const monthKey = parts[2] + '-' + parts[0].padStart(2,'0');
           return +(monthAvg[monthKey]||0).toFixed(2);
@@ -3207,6 +3231,37 @@ let progressLoadChart = null;
 let progressVolChart  = null;
 let rdTrendChart      = null;
 let _rdMode           = 'exercise';
+let _trendWindow      = '6M';
+let _rdWindow         = '6M';
+
+function windowCutoff(w) {
+  if (w === 'all') return null;
+  const months = {'3M':3,'6M':6,'1Y':12}[w] || 6;
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d;
+}
+
+function applyWindowBtns(prefix, active) {
+  ['3M','6M','1Y','all'].forEach(x => {
+    const btn = document.getElementById(prefix + x);
+    if (!btn) return;
+    btn.style.background = x === active ? 'var(--accent)' : 'transparent';
+    btn.style.color      = x === active ? '#fff'          : 'var(--text2)';
+  });
+}
+
+function setTrendWindow(w) {
+  _trendWindow = w;
+  applyWindowBtns('tw-', w);
+  renderTrend();
+}
+
+function setRdWindow(w) {
+  _rdWindow = w;
+  applyWindowBtns('rw-', w);
+  renderRdTrend();
+}
 
 function setRdMode(m) {
   _rdMode = m;
@@ -3287,7 +3342,14 @@ function updateRdPills(rd) {
 function renderRdTrend() {
   const sel = document.getElementById('rd-sel');
   if (!sel || !sel.value) return;
-  const { dates, rd } = _rdMode==='exercise' ? getRdExerciseData(sel.value) : getRdMuscleData(sel.value);
+  const { dates: allDates, rd: allRd } = _rdMode==='exercise' ? getRdExerciseData(sel.value) : getRdMuscleData(sel.value);
+  // Apply time window
+  const rdCutoff = windowCutoff(_rdWindow);
+  const rdCutoffStr = rdCutoff ? rdCutoff.toISOString().split('T')[0] : null;
+  const rdPairs = allDates.map((d,i) => [d, allRd[i]]).filter(([d]) => !rdCutoffStr || d >= rdCutoffStr);
+  const dates = rdPairs.map(p => p[0]);
+  const rd    = rdPairs.map(p => p[1]);
+  applyWindowBtns('rw-', _rdWindow);
   if (!rd.length) { if (rdTrendChart) { rdTrendChart.destroy(); rdTrendChart = null; } return; }
   const avg = rd.reduce((a,v)=>a+v,0)/rd.length;
   const ma  = rd.map((_,i) => { const w=rd.slice(Math.max(0,i-3),i+1); return +(w.reduce((a,v)=>a+v,0)/w.length).toFixed(3); });
@@ -5312,6 +5374,9 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.15': [
+    'Trend: 3M/6M/1Y/All time window controls on main Trend chart and per-exercise RD chart; defaults to 6M; stat pills always reflect full history',
+  ],
   '0.10.14': [
     'Progress: RD trend chart with exercise/muscle group toggle, 4-session rolling average, all-time avg baseline, and inline stat pills (current, avg, peak, 4wk trend)',
   ],
