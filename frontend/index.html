@@ -482,7 +482,7 @@
         <canvas id="trendChart" role="img" aria-label="RD and bodyweight trend overlaid"></canvas>
       </div>
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
-        <p style="font-size:11px;color:var(--text3);margin:0 0 8px 0;">Toggle protocol cycle windows on chart, shaded = ON cycle, gap = OFF cycle.</p>
+        <p style="font-size:11px;color:var(--text3);margin:0 0 8px 0;">Toggle protocol windows on chart. Shaded band = active period from start to end date.</p>
         <div id="trend-protocol-pills" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
       <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
@@ -2259,6 +2259,7 @@ async function renderTrend() {
     const p = d.week.split('/');
     return new Date(parseInt(p[2]), parseInt(p[0])-1, parseInt(p[1])) >= cutoffW;
   }) : trendData;
+  window._displayData = displayData;
   applyWindowBtns('tw-', _trendWindow);
   
   // Calculate rolling 7-day average deep sleep % for each week (Saturday-Friday boundary)
@@ -2539,8 +2540,8 @@ function _dateToLabelIndex(dateStr) {
   if (!dateStr) return labels.length - 1;
   const d = new Date(dateStr);
   let best = 0, bestDiff = Infinity;
-  // trendData is the raw weekly array used to build the chart
-  (window._trendData || []).forEach((td, i) => {
+  // Use displayData (filtered to current time window) so indices match chart labels
+  (window._displayData || window._trendData || []).forEach((td, i) => {
     const parts = td.week.split('/');
     const w = new Date(parseInt(parts[2]), parseInt(parts[0])-1, parseInt(parts[1]));
     const diff = Math.abs(w - d);
@@ -5475,6 +5476,10 @@ function switchGuideTab(tab) {
 
 // ── Version & Changelog ───────────────────────────────────────
 const CHANGELOG = {
+  '0.10.17': [
+    'Fix: protocol overlay bands now correctly positioned on Trend chart when a time window (3M/6M/1Y) is active; _dateToLabelIndex now uses window._displayData (the filtered display set) instead of window._trendData (full history), so xMin/xMax indices match the actual chart label range; protocols starting within the current window no longer render as a hairline at the right edge',
+    'Trend: updated protocol toggle description, removed stale "ON cycle / OFF cycle" language since no cycling logic exists',
+  ],
   '0.10.16': [
     'Trend: phase type labels overlaid on chart bands at top of each shaded region',
     'Phases: each entry now shows start/end BW, start/end RD, deltas, and a context-aware verdict (Strength preserved, Quality mass gain, etc.) based on phase type and actual BW/RD trajectory',
