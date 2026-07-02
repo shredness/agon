@@ -2282,6 +2282,146 @@ def revoke_external_key(user=Depends(current_user)):
     conn.close()
     return {"status": "revoked"}
 
+def _resolve_external_key(authorization, x_api_key):
+    """Resolve an external API key (Bearer or X-API-Key) to a user row, or raise 401."""
+    api_key = None
+    if authorization and authorization.lower().startswith("bearer "):
+        api_key = authorization[7:].strip()
+    elif x_api_key:
+        api_key = x_api_key.strip()
+    if not api_key:
+        raise HTTPException(status_code=401, detail="API key required (use Authorization: Bearer header)")
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT u.id, u.username FROM users u "
+            "JOIN user_settings us ON us.user_id = u.id "
+            "WHERE us.external_api_key=%s", (api_key,)
+        ).fetchone()
+    except Exception:
+        row = None
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+    return dict(row)
+
+class ExternalDoseIn(BaseModel):
+    compound:    str                          # free-text compound name (log is self-describing)
+    amount:      Optional[float] = None
+    unit:        Optional[str] = None
+    taken_at:    Optional[str] = None         # ISO datetime; defaults to now
+    site:        Optional[str] = None
+    notes:       Optional[str] = None
+    protocol_id: Optional[int] = None
+    item_id:     Optional[int] = None         # if set, decrements inventory (live logging)
+    status:      Optional[str] = "Logged"
+
+@app.post("/api/external/doses")
+def external_log_dose(body: ExternalDoseIn,
+                      x_api_key: Optional[str] = Header(default=None),
+                      authorization: Optional[str] = Header(default=None)):
+    """Write a single dose via external API key (for the Telegram bot / automations).
+    If item_id is supplied, inventory is decremented and a low-stock flag returned."""
+    ext = _resolve_external_key(authorization, x_api_key)
+    uid = ext["id"]
+    conn = get_db()
+    try:
+        amount, unit, low_stock = body.amount, body.unit, None
+        if body.item_id:
+            item = conn.execute(
+                "SELECT remaining, per_dose, unit, status FROM inventory_items WHERE id=%s AND user_id=%s",
+                (body.item_id, uid)
+            ).fetchone()
+            if item:
+                if amount is None and item["per_dose"] is not None:
+                    amount = float(item["per_dose"])
+                if unit is None:
+                    unit = item["unit"]
+                if amount is not None and item["remaining"] is not None:
+                    new_rem = max(float(item["remaining"]) - amount, 0)
+                    new_status = "empty" if new_rem <= 0 else ("active" if item["status"] == "sealed" else item["status"])
+                    conn.execute("UPDATE inventory_items SET remaining=%s, status=%s WHERE id=%s AND user_id=%s",
+                                 (new_rem, new_status, body.item_id, uid))
+                    pd = float(item["per_dose"]) if item["per_dose"] else None
+                    if pd and new_rem / pd <= 5:
+                        low_stock = {"remaining": new_rem, "doses_remaining": int(new_rem // pd)}
+        note = body.notes
+        if body.compound:
+            tag = f"[{body.compound}]"
+            note = f"{tag} {note}" if note else tag
+        conn.execute(
+            """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes)
+               VALUES (%s,%s,%s,%s,%s,COALESCE(%s, CURRENT_TIMESTAMP),%s,%s)""",
+            (uid, body.protocol_id, body.item_id, amount, unit, body.taken_at or None, body.site, note)
+        )
+        conn.commit()
+        resp = {"status": "logged"}
+        if low_stock:
+            resp["low_stock"] = low_stock
+        return resp
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"External dose log failed: {str(e)}")
+    finally:
+        conn.close()
+
+@app.post("/api/external/doses/import")
+def external_import_doses(payload: dict,
+                          x_api_key: Optional[str] = Header(default=None),
+                          authorization: Optional[str] = Header(default=None)):
+    """Bulk historical dose import via external API key. Body: {"doses": [ExternalDoseIn...]}.
+    Historical rows never touch inventory (item_id ignored) — stock is counted fresh.
+    Auto-links protocol_id by exact protocol-name match when a 'protocol' field is given.
+    Idempotent per (taken_at, compound, amount) so re-running won't duplicate."""
+    ext = _resolve_external_key(authorization, x_api_key)
+    uid = ext["id"]
+    doses = payload.get("doses", [])
+    if not isinstance(doses, list):
+        raise HTTPException(status_code=400, detail="Body must be {'doses': [...]}")
+    conn = get_db()
+    try:
+        # protocol name -> id map for linking
+        prows = conn.execute("SELECT id, name FROM protocols WHERE user_id=%s", (uid,)).fetchall()
+        pmap = { (r["name"] or "").strip().lower(): r["id"] for r in prows }
+        inserted, skipped, linked = 0, 0, 0
+        for d in doses:
+            compound = (d.get("compound") or "").strip()
+            if not compound:
+                skipped += 1; continue
+            taken_at = d.get("taken_at")
+            amount = d.get("amount")
+            # idempotency guard
+            existing = conn.execute(
+                """SELECT 1 FROM dose_events
+                   WHERE user_id=%s AND taken_at=%s AND COALESCE(notes,'') LIKE %s
+                   LIMIT 1""",
+                (uid, taken_at, f"[{compound}]%")
+            ).fetchone()
+            if existing:
+                skipped += 1; continue
+            pid = d.get("protocol_id")
+            pname = (d.get("protocol") or "").strip().lower()
+            if pid is None and pname and pname in pmap:
+                pid = pmap[pname]; linked += 1
+            note = d.get("notes")
+            tag = f"[{compound}]"
+            if d.get("status") and d.get("status") != "Logged":
+                tag += f"[{d.get('status')}]"
+            note = f"{tag} {note}" if note else tag
+            conn.execute(
+                """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes)
+                   VALUES (%s,%s,NULL,%s,%s,%s,%s,%s)""",
+                (uid, pid, amount, d.get("unit"), taken_at, d.get("site"), note)
+            )
+            inserted += 1
+        conn.commit()
+        return {"status": "ok", "inserted": inserted, "skipped_existing": skipped, "protocol_linked": linked}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    finally:
+        conn.close()
+
 @app.get("/external/data")
 def get_external_data(request: Request,
                       x_api_key: Optional[str] = Header(default=None),
