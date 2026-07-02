@@ -2305,6 +2305,59 @@ def _resolve_external_key(authorization, x_api_key):
         raise HTTPException(status_code=401, detail="Invalid or revoked API key")
     return dict(row)
 
+@app.post("/external/inventory/import")
+def external_import_inventory(payload: dict,
+                              x_api_key: Optional[str] = Header(default=None),
+                              authorization: Optional[str] = Header(default=None)):
+    """Bulk create inventory item shells via external API key. Body: {"items": [...]}.
+    Each item: name (required), item_type, unit, per_dose, protocol (name, for auto-link),
+    total_amount/remaining/bac_water_ml (optional — left null when the physical stock is
+    unknown; the person fills these in after a manual count).
+    Skips (by name, case-insensitive) if a non-empty item with that name already exists,
+    so re-running is safe."""
+    ext = _resolve_external_key(authorization, x_api_key)
+    uid = ext["id"]
+    items = payload.get("items", [])
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="Body must be {'items': [...]}")
+    conn = get_db()
+    try:
+        prows = conn.execute("SELECT id, name FROM protocols WHERE user_id=%s", (uid,)).fetchall()
+        pmap = { (r["name"] or "").strip().lower(): r["id"] for r in prows }
+        existing = conn.execute("SELECT name FROM inventory_items WHERE user_id=%s", (uid,)).fetchall()
+        existing_names = { (r["name"] or "").strip().lower() for r in existing }
+
+        created, skipped, linked = 0, 0, 0
+        for it in items:
+            name = (it.get("name") or "").strip()
+            if not name:
+                skipped += 1; continue
+            if name.lower() in existing_names:
+                skipped += 1; continue
+            pid = it.get("protocol_id")
+            pname = (it.get("protocol") or "").strip().lower()
+            if pid is None and pname and pname in pmap:
+                pid = pmap[pname]; linked += 1
+            conn.execute(
+                """INSERT INTO inventory_items
+                   (user_id, protocol_id, name, item_type, total_amount, unit, bac_water_ml,
+                    remaining, per_dose, opened_date, status, vendor, cost, notes)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (uid, pid, name, it.get("item_type", "vial"), it.get("total_amount"),
+                 it.get("unit", "mg"), it.get("bac_water_ml"), it.get("remaining"),
+                 it.get("per_dose"), it.get("opened_date"), it.get("status", "active"),
+                 it.get("vendor"), it.get("cost"), it.get("notes"))
+            )
+            created += 1
+            existing_names.add(name.lower())
+        conn.commit()
+        return {"status": "ok", "created": created, "skipped_existing": skipped, "protocol_linked": linked}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Inventory import failed: {str(e)}")
+    finally:
+        conn.close()
+
 class ExternalDoseIn(BaseModel):
     compound:    str                          # free-text compound name (log is self-describing)
     amount:      Optional[float] = None
