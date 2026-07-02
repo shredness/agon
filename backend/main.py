@@ -2316,7 +2316,7 @@ class ExternalDoseIn(BaseModel):
     item_id:     Optional[int] = None         # if set, decrements inventory (live logging)
     status:      Optional[str] = "Logged"
 
-@app.post("/api/external/doses")
+@app.post("/external/doses")
 def external_log_dose(body: ExternalDoseIn,
                       x_api_key: Optional[str] = Header(default=None),
                       authorization: Optional[str] = Header(default=None)):
@@ -2365,7 +2365,7 @@ def external_log_dose(body: ExternalDoseIn,
     finally:
         conn.close()
 
-@app.post("/api/external/doses/import")
+@app.post("/external/doses/import")
 def external_import_doses(payload: dict,
                           x_api_key: Optional[str] = Header(default=None),
                           authorization: Optional[str] = Header(default=None)):
