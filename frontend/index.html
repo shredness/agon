@@ -685,6 +685,33 @@
     </div>
   </div>
 
+  <!-- Backfill / recalculate inventory modal -->
+  <div class="modal-overlay" id="recalc-modal" style="display:none;" onclick="if(event.target===this)closeRecalcModal()">
+    <div class="modal" style="max-width:420px;">
+      <h3>Backfill <span id="recalc-item-name" style="color:var(--accent);"></span></h3>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 14px;">Enter what you had on hand as of a date. Every dose logged for this item since then — including historical imports matched by name or protocol — gets subtracted automatically.</p>
+      <div id="recalc-vial-fields" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div class="form-group" style="margin:0;"><label>Amount per vial</label><input type="number" id="recalc-per-vial" step="0.001" style="width:100%;" oninput="recalcInitialStockPreview()"></div>
+          <div class="form-group" style="margin:0;"><label>Vials on hand (as of date)</label><input type="number" id="recalc-vials" step="1" min="0" style="width:100%;" oninput="recalcInitialStockPreview()"></div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label id="recalc-stock-label">Initial stock</label>
+        <input type="number" id="recalc-initial-stock" step="0.001" style="width:100%;" oninput="document.getElementById('recalc-preview').textContent='';">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>As of date</label>
+        <input type="date" id="recalc-date" style="width:100%;">
+      </div>
+      <div id="recalc-preview" style="font-size:12px;color:var(--text3);margin-bottom:10px;min-height:16px;"></div>
+      <div class="modal-footer">
+        <button class="btn btn-sm" onclick="closeRecalcModal()">Close</button>
+        <button class="btn btn-primary btn-sm" onclick="saveRecalc()">Recalculate</button>
+      </div>
+    </div>
+  </div>
+
   <!-- BANK -->
   <div id="tab-bank" class="tab-panel">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
@@ -1324,7 +1351,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.11.7';
+const APP_VERSION = '0.11.8';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4954,6 +4981,7 @@ function _invRow(i) {
     <td style="padding:4px 6px;color:var(--text2);">${dosesLeft}</td>
     <td style="padding:4px 6px;"><span style="color:${_statusColor(i.status)};font-size:11px;font-weight:600;text-transform:capitalize;">${escapeHtml(i.status||'')}</span></td>
     <td style="padding:4px 6px;white-space:nowrap;">
+      <button onclick="openRecalcModal(${i.id})" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;padding:0 5px 0 0;" title="Backfill from initial stock">↺</button>
       <button onclick="_editInv(${i.id},decodeURIComponent('${data}'))" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;padding:0 5px 0 0;" title="Edit">✎</button>
       <button onclick="deleteInventoryItem(${i.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;" title="Delete">✕</button>
     </td>
@@ -5120,6 +5148,53 @@ async function deleteInventoryItem(id) {
   try {
     await aiFetch(`/inventory/${id}`, { method: 'DELETE' });
     await loadInventory();
+  } catch(e) { showToast(e.message); }
+}
+
+let _recalcItemId = null;
+
+function openRecalcModal(id) {
+  const item = _stackItems.find(i => i.id === id);
+  if (!item) return;
+  _recalcItemId = id;
+  const isVial = (item.item_type||'').toLowerCase() === 'vial';
+  document.getElementById('recalc-item-name').textContent = item.name;
+  document.getElementById('recalc-vial-fields').style.display = isVial ? '' : 'none';
+  document.getElementById('recalc-stock-label').textContent = isVial ? 'Initial stock (mg, auto-filled below)' : 'Count on hand';
+  document.getElementById('recalc-per-vial').value = item.total_amount ?? '';
+  document.getElementById('recalc-vials').value = '';
+  document.getElementById('recalc-initial-stock').value = item.initial_stock ?? '';
+  document.getElementById('recalc-date').value = item.initial_stock_date || new Date().toISOString().slice(0,10);
+  document.getElementById('recalc-preview').textContent = '';
+  document.getElementById('recalc-modal').style.display = 'flex';
+}
+
+function closeRecalcModal() {
+  document.getElementById('recalc-modal').style.display = 'none';
+}
+
+function recalcInitialStockPreview() {
+  const perVial = parseFloat(document.getElementById('recalc-per-vial').value);
+  const vials = parseFloat(document.getElementById('recalc-vials').value);
+  if (!isNaN(perVial) && !isNaN(vials)) {
+    document.getElementById('recalc-initial-stock').value = (perVial * vials).toString();
+  }
+}
+
+async function saveRecalc() {
+  const id = _recalcItemId;
+  const initialStock = parseFloat(document.getElementById('recalc-initial-stock').value);
+  const sinceDate = document.getElementById('recalc-date').value;
+  if (isNaN(initialStock) || !sinceDate) { showToast('Initial stock and date are required'); return; }
+  try {
+    const resp = await aiFetch(`/inventory/${id}/recalculate`, {
+      method: 'POST',
+      body: JSON.stringify({ initial_stock: initialStock, since_date: sinceDate })
+    });
+    document.getElementById('recalc-preview').textContent =
+      `${resp.doses_matched} dose${resp.doses_matched===1?'':'s'} subtracted (${_fmtQty(resp.total_dosed)}) → ${_fmtQty(resp.remaining)} remaining`;
+    await loadInventory();
+    showToast('Inventory recalculated');
   } catch(e) { showToast(e.message); }
 }
 

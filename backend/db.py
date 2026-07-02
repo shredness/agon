@@ -277,9 +277,14 @@ def _init_schema(conn):
             vendor VARCHAR(100),
             cost NUMERIC(8,2),
             notes TEXT,
+            initial_stock NUMERIC(10,3),
+            initial_stock_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration: add initial-stock reference columns if they don't exist yet
+    cursor.execute("ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS initial_stock NUMERIC(10,3)")
+    cursor.execute("ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS initial_stock_date DATE")
 
     # Dose events — actual execution log (vs. protocols = schedule/intent)
     cursor.execute("""

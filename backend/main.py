@@ -2086,7 +2086,8 @@ def _item_extras(d):
 def get_inventory(include_empty: bool = False, user=Depends(current_user)):
     conn = get_db()
     sql = """SELECT id, protocol_id, name, item_type, total_amount, unit, bac_water_ml,
-                    remaining, per_dose, opened_date, status, vendor, cost, notes, created_at
+                    remaining, per_dose, opened_date, status, vendor, cost, notes,
+                    initial_stock, initial_stock_date, created_at
              FROM inventory_items WHERE user_id=%s"""
     if not include_empty:
         sql += " AND status != 'empty'"
@@ -2131,6 +2132,61 @@ def update_inventory_item(item_id: int, body: InventoryItemIn, user=Depends(curr
     conn.commit()
     conn.close()
     return {"status": "updated"}
+
+class InventoryRecalcIn(BaseModel):
+    initial_stock: float           # stock on hand as of since_date, in the item's tracked unit
+    since_date:    str             # ISO date — only doses on/after this date are subtracted
+
+@app.post("/inventory/{item_id}/recalculate")
+def recalculate_inventory(item_id: int, body: InventoryRecalcIn, user=Depends(current_user)):
+    """Backfill: given a known stock count as of a date, subtract every dose logged
+    since then to compute current remaining. Matches doses to this item three ways —
+    direct item_id link, matching compound name, or matching linked protocol — so it
+    also works against historical rows that predate item-level dose logging."""
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot modify inventory")
+    conn = get_db()
+    try:
+        item = conn.execute(
+            "SELECT id, name, protocol_id, per_dose FROM inventory_items WHERE id=%s AND user_id=%s",
+            (item_id, user["id"])
+        ).fetchone()
+        if not item:
+            raise HTTPException(status_code=404, detail="Inventory item not found")
+
+        row = conn.execute(
+            """SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS n
+               FROM dose_events
+               WHERE user_id=%s AND taken_at >= %s
+                 AND (item_id=%s
+                      OR LOWER(compound)=LOWER(%s)
+                      OR (protocol_id=%s AND %s IS NOT NULL))""",
+            (user["id"], body.since_date, item_id, item["name"], item["protocol_id"], item["protocol_id"])
+        ).fetchone()
+        dosed = float(row["total"] or 0)
+        matched = int(row["n"] or 0)
+        new_remaining = max(body.initial_stock - dosed, 0)
+        new_status = "empty" if new_remaining <= 0 else "active"
+
+        conn.execute(
+            """UPDATE inventory_items
+               SET remaining=%s, status=%s, initial_stock=%s, initial_stock_date=%s
+               WHERE id=%s AND user_id=%s""",
+            (new_remaining, new_status, body.initial_stock, body.since_date, item_id, user["id"])
+        )
+        conn.commit()
+        resp = {"status": "ok", "remaining": new_remaining, "doses_matched": matched, "total_dosed": dosed}
+        if item["per_dose"]:
+            resp["doses_remaining"] = int(new_remaining // float(item["per_dose"]))
+        return resp
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Recalculate failed: {str(e)}")
+    finally:
+        conn.close()
 
 @app.delete("/inventory/{item_id}")
 def delete_inventory_item(item_id: int, user=Depends(current_user)):
