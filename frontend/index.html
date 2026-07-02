@@ -353,6 +353,7 @@
     <button class="tab active" onclick="switchTab('log')"><i class="ti ti-barbell" aria-hidden="true"></i><span class="tab-label">Workout</span></button>
     <button class="tab" onclick="switchTab('history')"><i class="ti ti-history" aria-hidden="true"></i><span class="tab-label">History</span></button>
     <button class="tab" onclick="switchTab('trend')"><i class="ti ti-trending-up" aria-hidden="true"></i><span class="tab-label">Trend</span></button>
+    <button class="tab" onclick="switchTab('stack')"><i class="ti ti-vaccine" aria-hidden="true"></i><span class="tab-label">Stack</span></button>
     <button class="tab" onclick="switchTab('progress')"><i class="ti ti-target" aria-hidden="true"></i><span class="tab-label">Progress</span></button>
     <button class="tab" onclick="switchTab('insights')"><i class="ti ti-sparkles" aria-hidden="true"></i><span class="tab-label">Insights</span></button>
     <button class="tab" onclick="switchTab('bank')"><i class="ti ti-list-details" aria-hidden="true"></i><span class="tab-label">Exercises</span></button>
@@ -540,6 +541,81 @@
       <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Macro targets</div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
         <div id="phase-macro-output" style="font-size:13px;color:var(--text3);min-width:480px;">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STACK (inventory + dose tracking) -->
+  <div id="tab-stack" class="tab-panel">
+
+    <!-- Quick log -->
+    <div class="card" style="padding:16px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Quick log</div>
+      <p style="font-size:11px;color:var(--text3);margin:0 0 12px 0;">Tap to log today's dose at the item's default amount. Stock decrements automatically.</p>
+      <div id="quick-log-grid" style="display:flex;flex-wrap:wrap;gap:8px;">Loading...</div>
+    </div>
+
+    <!-- Inventory -->
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:13px;font-weight:600;">Inventory</div>
+        <label style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;cursor:pointer;">
+          <input type="checkbox" id="inv-show-empty" onchange="loadInventory()" style="cursor:pointer;"> Show empty
+        </label>
+      </div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="inventory-list" style="font-size:13px;color:var(--text3);margin-bottom:16px;">Loading...</div>
+      </div>
+
+      <!-- Add item form -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <input type="text" id="inv-name" placeholder="Name (e.g. KLOW)" style="font-size:12px;">
+        <select id="inv-type" style="font-size:12px;">
+          <option value="vial">Vial (injectable)</option>
+          <option value="capsule">Capsule</option>
+          <option value="powder">Powder</option>
+          <option value="nasal">Nasal spray</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+        <input type="number" id="inv-total" placeholder="Total amount" step="0.001" style="font-size:12px;">
+        <select id="inv-unit" style="font-size:12px;">
+          <option value="mg">mg</option>
+          <option value="mcg">mcg</option>
+          <option value="iu">iu</option>
+          <option value="g">g</option>
+          <option value="ml">ml</option>
+          <option value="caps">caps</option>
+          <option value="sprays">sprays</option>
+        </select>
+        <input type="number" id="inv-bacwater" placeholder="BAC water (mL, vials)" step="0.01" style="font-size:12px;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <input type="number" id="inv-remaining" placeholder="Remaining (blank = unknown)" step="0.001" style="font-size:12px;">
+        <input type="number" id="inv-perdose" placeholder="Per-dose amount" step="0.001" style="font-size:12px;">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <select id="inv-protocol" style="font-size:12px;"><option value="">Link to protocol (optional)</option></select>
+        <select id="inv-status" style="font-size:12px;">
+          <option value="active">Active</option>
+          <option value="sealed">Sealed</option>
+          <option value="empty">Empty</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <input type="text" id="inv-vendor" placeholder="Vendor (optional)" style="font-size:12px;">
+        <input type="text" id="inv-notes" placeholder="Notes (optional)" style="font-size:12px;">
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="addInventoryItem()">+ Add item</button>
+    </div>
+
+    <!-- Recent doses -->
+    <div class="card" style="padding:16px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Recent doses</div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <div id="dose-history-list" style="font-size:13px;color:var(--text3);">Loading...</div>
       </div>
     </div>
 
@@ -1223,7 +1299,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.10.16';
+const APP_VERSION = '0.11.4';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -1524,7 +1600,7 @@ async function init() {
 }
 
 function switchTab(name) {
-  const names = ['log','history','trend','progress','insights','bank','export','users'];
+  const names = ['log','history','trend','stack','progress','insights','bank','export','users'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   names.forEach(n => document.getElementById('tab-'+n).classList.toggle('active', n===name));
   if (name==='log') {
@@ -1552,6 +1628,7 @@ function switchTab(name) {
     }
   }
   if (name==='trend') { loadRecompScore(); loadPhases(); loadMacroData(); loadProtocols(); }
+  if (name==='stack') { loadStack(); }
   if (name==='insights') openInsights();
   if (name==='users') { loadUsers(); loadActivityLog(); }
 }
@@ -4756,6 +4833,248 @@ async function toggleProtocolTrack(id, tracked) {
     if (!tracked) _activeProtocolIds.delete(id);
     await renderProtocolPills();
     updateProtocolAnnotations();
+  } catch(e) { showToast(e.message); }
+}
+
+// ── Stack: inventory + dose tracking ────────────────────────────
+let _stackProtocols = [];
+
+async function loadStack() {
+  try {
+    _stackProtocols = await aiFetch('/protocols');
+  } catch(e) { _stackProtocols = []; }
+  populateStackProtocolDropdown();
+  await Promise.all([loadInventory(), loadDoseHistory()]);
+}
+
+function populateStackProtocolDropdown() {
+  const sel = document.getElementById('inv-protocol');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Link to protocol (optional)</option>' +
+    _stackProtocols.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  sel.value = current;
+}
+
+function _fmtQty(n) {
+  if (n === null || n === undefined) return '—';
+  const v = Number(n);
+  return (Math.round(v * 1000) / 1000).toString();
+}
+
+async function loadInventory() {
+  const target = document.getElementById('inventory-list');
+  const quickTarget = document.getElementById('quick-log-grid');
+  if (!target) return;
+  try {
+    const showEmpty = document.getElementById('inv-show-empty')?.checked;
+    const items = await aiFetch('/inventory' + (showEmpty ? '?include_empty=true' : ''));
+    _stackItems = items;
+
+    // Quick-log grid: one tap button per non-empty item with a per_dose set
+    const loggable = items.filter(i => i.status !== 'empty' && i.per_dose);
+    if (!loggable.length) {
+      quickTarget.innerHTML = '<div style="font-size:12px;color:var(--text3);">No items with a per-dose amount set yet — add one below.</div>';
+    } else {
+      quickTarget.innerHTML = loggable.map(i => {
+        const sub = i.doses_remaining != null ? `${i.doses_remaining} doses left` : `${_fmtQty(i.per_dose)} ${escapeHtml(i.unit||'')}`;
+        const low = i.doses_remaining != null && i.doses_remaining <= 5;
+        return `<button class="btn btn-sm" onclick="quickLogDose(${i.id})" style="${low ? 'border-color:var(--red-text);color:var(--red-text);' : ''}display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 12px;min-width:110px;">
+          <span style="font-weight:600;font-size:12px;">${escapeHtml(i.name)}</span>
+          <span style="font-size:10px;color:${low ? 'var(--red-text)' : 'var(--text3)'};">${sub}</span>
+        </button>`;
+      }).join('');
+    }
+
+    if (!items.length) {
+      target.innerHTML = '<div style="font-size:12px;color:var(--text3);margin-bottom:4px;">No inventory items yet — add one below.</div>';
+      return;
+    }
+    const th = 'padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;font-size:11px;';
+    const tableHead = `<thead><tr style="border-bottom:1px solid var(--border);">
+        <th style="${th}">Name</th>
+        <th style="${th}">Type</th>
+        <th style="${th}">Remaining</th>
+        <th style="${th}">Per dose</th>
+        <th style="${th}">Doses left</th>
+        <th style="${th}">Status</th>
+        <th style="width:48px;"></th>
+      </tr></thead>`;
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px;">${tableHead}<tbody id="inventory-tbody">`;
+    html += items.map(i => _invRow(i)).join('');
+    html += '</tbody></table>';
+    target.innerHTML = html;
+  } catch(e) {
+    target.innerHTML = '<div style="font-size:12px;color:var(--red-text);">Could not load inventory.</div>';
+  }
+}
+
+let _stackItems = [];
+
+function _statusColor(s) {
+  if (s === 'empty') return 'var(--red-text)';
+  if (s === 'active') return 'var(--accent)';
+  return 'var(--text3)';
+}
+
+function _invRow(i) {
+  const data = encodeURIComponent(JSON.stringify(i));
+  const remainCell = i.remaining != null ? `${_fmtQty(i.remaining)} ${escapeHtml(i.unit||'')}` : '<span style="color:var(--text3);">— set count —</span>';
+  const dosesLeft = i.doses_remaining != null ? i.doses_remaining : '—';
+  return `<tr id="inv-row-${i.id}" style="border-bottom:0.5px solid var(--border);">
+    <td style="padding:4px 6px;color:var(--text);">${escapeHtml(i.name)}</td>
+    <td style="padding:4px 6px;color:var(--text2);">${escapeHtml(i.item_type||'')}</td>
+    <td style="padding:4px 6px;color:var(--text2);">${remainCell}</td>
+    <td style="padding:4px 6px;color:var(--text2);">${i.per_dose != null ? _fmtQty(i.per_dose) + ' ' + escapeHtml(i.unit||'') : '—'}</td>
+    <td style="padding:4px 6px;color:var(--text2);">${dosesLeft}</td>
+    <td style="padding:4px 6px;"><span style="color:${_statusColor(i.status)};font-size:11px;font-weight:600;text-transform:capitalize;">${escapeHtml(i.status||'')}</span></td>
+    <td style="padding:4px 6px;white-space:nowrap;">
+      <button onclick="_editInv(${i.id},decodeURIComponent('${data}'))" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;padding:0 5px 0 0;" title="Edit">✎</button>
+      <button onclick="deleteInventoryItem(${i.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;" title="Delete">✕</button>
+    </td>
+  </tr>`;
+}
+
+function _editInv(id, dataStr) {
+  const r = JSON.parse(dataStr);
+  const row = document.getElementById('inv-row-' + id);
+  if (!row) return;
+  const inp = 'style="width:100%;font-size:11px;padding:2px 4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box;"';
+  const statusOpts = ['active','sealed','empty'].map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('');
+  row.innerHTML = `
+    <td style="padding:3px 3px;"><input id="ie-name-${id}" value="${escapeHtml(r.name||'')}" ${inp}></td>
+    <td style="padding:3px 3px;"><input id="ie-type-${id}" value="${escapeHtml(r.item_type||'')}" ${inp}></td>
+    <td style="padding:3px 3px;"><input id="ie-remaining-${id}" type="number" step="0.001" value="${r.remaining ?? ''}" ${inp}></td>
+    <td style="padding:3px 3px;"><input id="ie-perdose-${id}" type="number" step="0.001" value="${r.per_dose ?? ''}" ${inp}></td>
+    <td style="padding:3px 3px;"><input id="ie-total-${id}" type="number" step="0.001" value="${r.total_amount ?? ''}" placeholder="total" ${inp}></td>
+    <td style="padding:3px 3px;"><select id="ie-status-${id}" ${inp}>${statusOpts}</select></td>
+    <td style="padding:3px 3px;white-space:nowrap;">
+      <button onclick="_saveInv(${id})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;padding:0 5px 0 0;" title="Save">✓</button>
+      <button onclick="loadInventory()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0;" title="Cancel">✕</button>
+    </td>`;
+}
+
+async function _saveInv(id) {
+  const orig = _stackItems.find(i => i.id === id) || {};
+  const g = f => document.getElementById('ie-' + f + '-' + id)?.value;
+  if (!g('name').trim()) { showToast('Name is required'); return; }
+  try {
+    await aiFetch('/inventory/' + id, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name:         g('name').trim(),
+        item_type:    g('type').trim() || 'vial',
+        unit:         orig.unit || 'mg',
+        total_amount: g('total') !== '' ? parseFloat(g('total')) : null,
+        bac_water_ml: orig.bac_water_ml,
+        remaining:    g('remaining') !== '' ? parseFloat(g('remaining')) : null,
+        per_dose:     g('perdose') !== '' ? parseFloat(g('perdose')) : null,
+        status:       g('status'),
+        vendor:       orig.vendor,
+        cost:         orig.cost,
+        notes:        orig.notes,
+      })
+    });
+    await loadInventory();
+    showToast('Inventory item updated');
+  } catch(e) { showToast(e.message); }
+}
+
+async function addInventoryItem() {
+  const name = document.getElementById('inv-name').value.trim();
+  if (!name) { showToast('Name is required'); return; }
+  const g = id => document.getElementById(id).value;
+  const num = v => v !== '' ? parseFloat(v) : null;
+  try {
+    await aiFetch('/inventory', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        item_type:    g('inv-type'),
+        total_amount: num(g('inv-total')),
+        unit:         g('inv-unit'),
+        bac_water_ml: num(g('inv-bacwater')),
+        remaining:    num(g('inv-remaining')),
+        per_dose:     num(g('inv-perdose')),
+        protocol_id:  g('inv-protocol') ? parseInt(g('inv-protocol')) : null,
+        status:       g('inv-status'),
+        vendor:       g('inv-vendor').trim() || null,
+        notes:        g('inv-notes').trim() || null,
+      })
+    });
+    ['inv-name','inv-total','inv-bacwater','inv-remaining','inv-perdose','inv-vendor','inv-notes'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('inv-protocol').value = '';
+    await loadInventory();
+    showToast('Item added');
+  } catch(e) { showToast(e.message); }
+}
+
+async function deleteInventoryItem(id) {
+  try {
+    await aiFetch(`/inventory/${id}`, { method: 'DELETE' });
+    await loadInventory();
+  } catch(e) { showToast(e.message); }
+}
+
+async function quickLogDose(itemId) {
+  try {
+    const resp = await aiFetch('/doses', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: itemId })
+    });
+    await Promise.all([loadInventory(), loadDoseHistory()]);
+    if (resp.low_stock) {
+      showToast(`Logged. Low stock: ${resp.low_stock.doses_remaining} doses left`);
+    } else {
+      showToast('Dose logged');
+    }
+  } catch(e) { showToast(e.message); }
+}
+
+async function loadDoseHistory() {
+  const target = document.getElementById('dose-history-list');
+  if (!target) return;
+  try {
+    const doses = await aiFetch('/doses?limit=30');
+    if (!doses.length) {
+      target.innerHTML = '<div style="font-size:12px;color:var(--text3);">No doses logged yet.</div>';
+      return;
+    }
+    const th = 'padding:5px 6px;text-align:left;color:var(--text2);font-weight:600;font-size:11px;';
+    const tableHead = `<thead><tr style="border-bottom:1px solid var(--border);">
+        <th style="${th}">When</th>
+        <th style="${th}">Item</th>
+        <th style="${th}">Amount</th>
+        <th style="${th}">Site</th>
+        <th style="width:36px;"></th>
+      </tr></thead>`;
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;">${tableHead}<tbody>`;
+    html += doses.map(d => {
+      const when = (d.taken_at || '').replace('T', ' ').slice(0, 16);
+      const label = d.item_name || d.protocol_name || '—';
+      const amt = d.amount != null ? `${_fmtQty(d.amount)} ${escapeHtml(d.unit||'')}` : '—';
+      return `<tr style="border-bottom:0.5px solid var(--border);">
+        <td style="padding:4px 6px;color:var(--text3);font-size:11px;white-space:nowrap;">${escapeHtml(when)}</td>
+        <td style="padding:4px 6px;color:var(--text);">${escapeHtml(label)}</td>
+        <td style="padding:4px 6px;color:var(--text2);">${amt}</td>
+        <td style="padding:4px 6px;color:var(--text3);font-size:11px;">${escapeHtml(d.site||'')}</td>
+        <td style="padding:4px 6px;"><button onclick="deleteDoseEvent(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;" title="Delete (restocks item)">✕</button></td>
+      </tr>`;
+    }).join('');
+    html += '</tbody></table>';
+    target.innerHTML = html;
+  } catch(e) {
+    target.innerHTML = '<div style="font-size:12px;color:var(--red-text);">Could not load dose history.</div>';
+  }
+}
+
+async function deleteDoseEvent(id) {
+  try {
+    await aiFetch(`/doses/${id}?restock=true`, { method: 'DELETE' });
+    await Promise.all([loadInventory(), loadDoseHistory()]);
+    showToast('Dose deleted, stock restored');
   } catch(e) { showToast(e.message); }
 }
 
