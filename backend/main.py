@@ -2358,6 +2358,42 @@ def external_import_inventory(payload: dict,
     finally:
         conn.close()
 
+@app.post("/external/inventory/link")
+def external_link_inventory(payload: dict,
+                            x_api_key: Optional[str] = Header(default=None),
+                            authorization: Optional[str] = Header(default=None)):
+    """Patch protocol_id on existing inventory items by name match (case-insensitive
+    on both sides). Body: {"links": [{"item": "KLOW", "protocol": "KLOW"}, ...]}.
+    Fixes mislinks from /external/inventory/import without needing delete+recreate."""
+    ext = _resolve_external_key(authorization, x_api_key)
+    uid = ext["id"]
+    links = payload.get("links", [])
+    if not isinstance(links, list):
+        raise HTTPException(status_code=400, detail="Body must be {'links': [...]}")
+    conn = get_db()
+    try:
+        items = conn.execute("SELECT id, name FROM inventory_items WHERE user_id=%s", (uid,)).fetchall()
+        imap = { (r["name"] or "").strip().lower(): r["id"] for r in items }
+        prows = conn.execute("SELECT id, name FROM protocols WHERE user_id=%s", (uid,)).fetchall()
+        pmap = { (r["name"] or "").strip().lower(): r["id"] for r in prows }
+        linked, missed = 0, []
+        for l in links:
+            iname = (l.get("item") or "").strip().lower()
+            pname = (l.get("protocol") or "").strip().lower()
+            if iname in imap and pname in pmap:
+                conn.execute("UPDATE inventory_items SET protocol_id=%s WHERE id=%s AND user_id=%s",
+                             (pmap[pname], imap[iname], uid))
+                linked += 1
+            else:
+                missed.append(l)
+        conn.commit()
+        return {"status": "ok", "linked": linked, "missed": missed}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Link failed: {str(e)}")
+    finally:
+        conn.close()
+
 class ExternalDoseIn(BaseModel):
     compound:    str                          # free-text compound name (log is self-describing)
     amount:      Optional[float] = None
