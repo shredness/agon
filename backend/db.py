@@ -259,6 +259,44 @@ def _init_schema(conn):
         ALTER TABLE protocols ADD COLUMN IF NOT EXISTS track BOOLEAN DEFAULT FALSE
     """)
 
+    # Inventory items (vials, capsules, powders) — tracks physical stock
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_items (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            protocol_id INTEGER REFERENCES protocols(id) ON DELETE SET NULL,
+            name VARCHAR(100) NOT NULL,
+            item_type VARCHAR(20) DEFAULT 'vial',
+            total_amount NUMERIC(10,3),
+            unit VARCHAR(20) DEFAULT 'mg',
+            bac_water_ml NUMERIC(6,2),
+            remaining NUMERIC(10,3),
+            per_dose NUMERIC(10,3),
+            opened_date DATE,
+            status VARCHAR(20) DEFAULT 'sealed',
+            vendor VARCHAR(100),
+            cost NUMERIC(8,2),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Dose events — actual execution log (vs. protocols = schedule/intent)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS dose_events (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            protocol_id INTEGER REFERENCES protocols(id) ON DELETE SET NULL,
+            item_id INTEGER REFERENCES inventory_items(id) ON DELETE SET NULL,
+            amount NUMERIC(10,3),
+            unit VARCHAR(20),
+            taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            site VARCHAR(50),
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Phases (training blocks: weight-loss, recomp, etc.)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS phases (
@@ -301,6 +339,9 @@ def _init_schema(conn):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_protocols_user_id ON protocols(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_inventory_user_id ON inventory_items(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_dose_events_user_id ON dose_events(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_dose_events_taken_at ON dose_events(taken_at)")
     
     # Fix protocols sequence if out of sync
     cursor.execute("SELECT MAX(id) FROM protocols")

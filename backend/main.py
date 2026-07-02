@@ -251,6 +251,30 @@ class ProtocolTrack(BaseModel):
     track: Optional[bool] = None
     end_date: Optional[str] = None
 
+class InventoryItemIn(BaseModel):
+    name:         str
+    item_type:    Optional[str] = "vial"     # vial | capsule | powder | nasal | other
+    protocol_id:  Optional[int] = None
+    total_amount: Optional[float] = None      # e.g. 80 (mg), 60 (caps), 500 (g)
+    unit:         Optional[str] = "mg"        # mg | iu | caps | g | sprays
+    bac_water_ml: Optional[float] = None      # vials only; enables units-math
+    remaining:    Optional[float] = None      # defaults to total_amount
+    per_dose:     Optional[float] = None      # default deduction per dose event
+    opened_date:  Optional[str] = None
+    status:       Optional[str] = "sealed"    # sealed | active | empty
+    vendor:       Optional[str] = None
+    cost:         Optional[float] = None
+    notes:        Optional[str] = None
+
+class DoseEventIn(BaseModel):
+    protocol_id: Optional[int] = None
+    item_id:     Optional[int] = None         # if set, decrements item remaining
+    amount:      Optional[float] = None       # falls back to item per_dose
+    unit:        Optional[str] = None         # falls back to item unit
+    taken_at:    Optional[str] = None         # ISO timestamp; defaults to now
+    site:        Optional[str] = None         # injection site, optional
+    notes:       Optional[str] = None
+
 class PhaseIn(BaseModel):
     phase_type: str
     start_date: str
@@ -2040,6 +2064,181 @@ def delete_protocol(protocol_id: int, user=Depends(current_user)):
     conn.close()
     return {"status": "deleted"}
 
+# ── Inventory & dose tracking ─────────────────────────────────
+
+def _item_extras(d):
+    """Computed fields: reconstitution math + doses remaining."""
+    try:
+        if d.get("bac_water_ml") and d.get("total_amount") and d.get("unit") == "mg":
+            total_units = float(d["bac_water_ml"]) * 100  # U-100 syringe units
+            d["mcg_per_unit"] = round(float(d["total_amount"]) * 1000 / total_units, 2)
+            if d.get("per_dose"):
+                d["units_per_dose"] = round(float(d["per_dose"]) * 1000 / d["mcg_per_unit"], 1)
+        if d.get("per_dose") and d.get("remaining") is not None and float(d["per_dose"]) > 0:
+            d["doses_remaining"] = int(float(d["remaining"]) // float(d["per_dose"]))
+    except (TypeError, ValueError, ZeroDivisionError):
+        pass
+    return d
+
+@app.get("/inventory")
+def get_inventory(include_empty: bool = False, user=Depends(current_user)):
+    conn = get_db()
+    sql = """SELECT id, protocol_id, name, item_type, total_amount, unit, bac_water_ml,
+                    remaining, per_dose, opened_date, status, vendor, cost, notes, created_at
+             FROM inventory_items WHERE user_id=%s"""
+    if not include_empty:
+        sql += " AND status != 'empty'"
+    sql += " ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'sealed' THEN 1 ELSE 2 END, name"
+    rows = conn.execute(sql, (user["id"],)).fetchall()
+    conn.close()
+    return [_item_extras(dict(r)) for r in rows]
+
+@app.post("/inventory")
+def add_inventory_item(body: InventoryItemIn, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot modify inventory")
+    remaining = body.remaining if body.remaining is not None else body.total_amount
+    conn = get_db()
+    conn.execute(
+        """INSERT INTO inventory_items
+           (user_id, protocol_id, name, item_type, total_amount, unit, bac_water_ml,
+            remaining, per_dose, opened_date, status, vendor, cost, notes)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (user["id"], body.protocol_id, body.name.strip(), body.item_type, body.total_amount,
+         body.unit, body.bac_water_ml, remaining, body.per_dose,
+         body.opened_date or None, body.status, body.vendor, body.cost, body.notes)
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "added"}
+
+@app.put("/inventory/{item_id}")
+def update_inventory_item(item_id: int, body: InventoryItemIn, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot modify inventory")
+    conn = get_db()
+    conn.execute(
+        """UPDATE inventory_items SET protocol_id=%s, name=%s, item_type=%s, total_amount=%s,
+           unit=%s, bac_water_ml=%s, remaining=%s, per_dose=%s, opened_date=%s, status=%s,
+           vendor=%s, cost=%s, notes=%s
+           WHERE id=%s AND user_id=%s""",
+        (body.protocol_id, body.name.strip(), body.item_type, body.total_amount, body.unit,
+         body.bac_water_ml, body.remaining, body.per_dose, body.opened_date or None,
+         body.status, body.vendor, body.cost, body.notes, item_id, user["id"])
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "updated"}
+
+@app.delete("/inventory/{item_id}")
+def delete_inventory_item(item_id: int, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot modify inventory")
+    conn = get_db()
+    conn.execute("DELETE FROM inventory_items WHERE id=%s AND user_id=%s", (item_id, user["id"]))
+    conn.commit()
+    conn.close()
+    return {"status": "deleted"}
+
+@app.get("/doses")
+def get_doses(date_from: Optional[str] = None, date_to: Optional[str] = None,
+              protocol_id: Optional[int] = None, limit: int = 200,
+              user=Depends(current_user)):
+    conn = get_db()
+    sql = """SELECT d.id, d.protocol_id, d.item_id, d.amount, d.unit, d.taken_at,
+                    d.site, d.notes, p.name AS protocol_name, i.name AS item_name
+             FROM dose_events d
+             LEFT JOIN protocols p ON p.id = d.protocol_id
+             LEFT JOIN inventory_items i ON i.id = d.item_id
+             WHERE d.user_id=%s"""
+    params = [user["id"]]
+    if date_from:
+        sql += " AND d.taken_at >= %s"; params.append(date_from)
+    if date_to:
+        sql += " AND d.taken_at < (%s::date + INTERVAL '1 day')"; params.append(date_to)
+    if protocol_id:
+        sql += " AND d.protocol_id = %s"; params.append(protocol_id)
+    sql += " ORDER BY d.taken_at DESC LIMIT %s"; params.append(min(limit, 1000))
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/doses")
+def log_dose(body: DoseEventIn, user=Depends(current_user)):
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot log doses")
+    conn = get_db()
+    try:
+        amount, unit, low_stock = body.amount, body.unit, None
+        if body.item_id:
+            item = conn.execute(
+                "SELECT remaining, per_dose, unit, status FROM inventory_items WHERE id=%s AND user_id=%s",
+                (body.item_id, user["id"])
+            ).fetchone()
+            if not item:
+                raise HTTPException(status_code=404, detail="Inventory item not found")
+            if amount is None:
+                amount = float(item["per_dose"]) if item["per_dose"] is not None else None
+            if unit is None:
+                unit = item["unit"]
+            if amount is not None and item["remaining"] is not None:
+                new_remaining = max(float(item["remaining"]) - amount, 0)
+                new_status = "empty" if new_remaining <= 0 else ("active" if item["status"] == "sealed" else item["status"])
+                conn.execute(
+                    "UPDATE inventory_items SET remaining=%s, status=%s WHERE id=%s AND user_id=%s",
+                    (new_remaining, new_status, body.item_id, user["id"])
+                )
+                per_dose = float(item["per_dose"]) if item["per_dose"] else None
+                if per_dose and new_remaining / per_dose <= 5:
+                    low_stock = {"remaining": new_remaining, "doses_remaining": int(new_remaining // per_dose)}
+        conn.execute(
+            """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes)
+               VALUES (%s,%s,%s,%s,%s,COALESCE(%s, CURRENT_TIMESTAMP),%s,%s)""",
+            (user["id"], body.protocol_id, body.item_id, amount, unit,
+             body.taken_at or None, body.site, body.notes)
+        )
+        conn.commit()
+        resp = {"status": "logged"}
+        if low_stock:
+            resp["low_stock"] = low_stock
+        return resp
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Dose log failed: {str(e)}")
+    finally:
+        conn.close()
+
+@app.delete("/doses/{dose_id}")
+def delete_dose(dose_id: int, restock: bool = True, user=Depends(current_user)):
+    """Delete a dose event; by default restores the amount to the linked item."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT item_id, amount FROM dose_events WHERE id=%s AND user_id=%s",
+            (dose_id, user["id"])
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Dose event not found")
+        if restock and row["item_id"] and row["amount"] is not None:
+            conn.execute(
+                """UPDATE inventory_items
+                   SET remaining = LEAST(COALESCE(remaining,0) + %s, COALESCE(total_amount, COALESCE(remaining,0) + %s)),
+                       status = CASE WHEN status='empty' THEN 'active' ELSE status END
+                   WHERE id=%s AND user_id=%s""",
+                (row["amount"], row["amount"], row["item_id"], user["id"])
+            )
+        conn.execute("DELETE FROM dose_events WHERE id=%s AND user_id=%s", (dose_id, user["id"]))
+        conn.commit()
+        return {"status": "deleted"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 # ── External API key management ───────────────────────────────
 import secrets as _secrets
 
@@ -2144,6 +2343,25 @@ def get_external_data(request: Request,
         (uid,)
     ).fetchall()
 
+    # Inventory (physical stock)
+    inventory = conn.execute(
+        """SELECT name, item_type, total_amount, unit, bac_water_ml, remaining, per_dose,
+                  opened_date, status, vendor FROM inventory_items
+           WHERE user_id=%s ORDER BY name""",
+        (uid,)
+    ).fetchall()
+
+    # Dose events (execution log, most recent 500)
+    doses = conn.execute(
+        """SELECT d.taken_at, d.amount, d.unit, d.site, d.notes,
+                  p.name AS protocol_name, i.name AS item_name
+           FROM dose_events d
+           LEFT JOIN protocols p ON p.id = d.protocol_id
+           LEFT JOIN inventory_items i ON i.id = d.item_id
+           WHERE d.user_id=%s ORDER BY d.taken_at DESC LIMIT 500""",
+        (uid,)
+    ).fetchall()
+
     # Exercise bank
     bank = conn.execute(
         "SELECT name, tool, muscles, mult, is_bw FROM exercises ORDER BY name ASC"
@@ -2203,6 +2421,8 @@ def get_external_data(request: Request,
         } if prof else {},
         "phases":    [dict(p) for p in phases],
         "protocols": [dict(p) for p in protocols],
+        "inventory": [dict(i) for i in inventory],
+        "dose_events": [dict(d) for d in doses],
         "exercise_bank": [dict(b) for b in bank],
         "sessions":  session_list
     }
