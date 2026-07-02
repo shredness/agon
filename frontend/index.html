@@ -641,7 +641,7 @@
       </div>
       <p style="font-size:11px;color:var(--text3);margin:-4px 0 10px;" id="inv-remaining-hint">Vials: track remaining in mg/mcg for reconstitution math. Capsules/sprays: track remaining as a piece count.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div class="form-group" style="margin:0;"><label>Total amount</label><input type="number" id="inv-total" step="0.001" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;"><label id="inv-total-label">Total amount</label><input type="number" id="inv-total" step="0.001" style="width:100%;" oninput="recalcVialRemaining()"></div>
         <div class="form-group" style="margin:0;">
           <label>Unit</label>
           <select id="inv-unit" style="width:100%;">
@@ -656,8 +656,11 @@
         </div>
         <div class="form-group" style="margin:0;"><label>BAC water (mL)</label><input type="number" id="inv-bacwater" step="0.01" style="width:100%;" placeholder="vials only"></div>
       </div>
+      <div id="inv-vialcount-row" style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px;">
+        <div class="form-group" style="margin:0;"><label>Number of vials on hand</label><input type="number" id="inv-vialcount" step="1" min="0" style="width:100%;" placeholder="e.g. 3" oninput="recalcVialRemaining()"></div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <div class="form-group" style="margin:0;"><label>Remaining</label><input type="number" id="inv-remaining" step="0.001" style="width:100%;" placeholder="blank = unknown"></div>
+        <div class="form-group" style="margin:0;"><label id="inv-remaining-label">Remaining</label><input type="number" id="inv-remaining" step="0.001" style="width:100%;" placeholder="blank = unknown"></div>
         <div class="form-group" style="margin:0;"><label>Per-dose amount</label><input type="number" id="inv-perdose" step="0.001" style="width:100%;"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
@@ -1321,7 +1324,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.11.6';
+const APP_VERSION = '0.11.7';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4963,17 +4966,32 @@ function _editInv(id, dataStr) {
   if (!row) return;
   const inp = 'style="width:100%;font-size:11px;padding:2px 4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box;"';
   const statusOpts = ['active','sealed','empty'].map(s => `<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('');
+  const isVial = (r.item_type||'').toLowerCase() === 'vial';
+  const remainingCell = isVial
+    ? `<input id="ie-remaining-${id}" type="number" step="0.001" value="${r.remaining ?? ''}" placeholder="mg" ${inp} style="width:60%;font-size:11px;padding:2px 4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box;display:inline-block;">
+       <input id="ie-vials-${id}" type="number" step="1" min="0" placeholder="#vials" title="Number of vials — fills Remaining as vials × total amount" oninput="_recalcInvRowRemaining(${id})" style="width:36%;font-size:11px;padding:2px 4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box;display:inline-block;margin-left:2px;">`
+    : `<input id="ie-remaining-${id}" type="number" step="0.001" value="${r.remaining ?? ''}" ${inp}>`;
   row.innerHTML = `
     <td style="padding:3px 3px;"><input id="ie-name-${id}" value="${escapeHtml(r.name||'')}" ${inp}></td>
     <td style="padding:3px 3px;"><input id="ie-type-${id}" value="${escapeHtml(r.item_type||'')}" ${inp}></td>
-    <td style="padding:3px 3px;"><input id="ie-remaining-${id}" type="number" step="0.001" value="${r.remaining ?? ''}" ${inp}></td>
+    <td style="padding:3px 3px;">${remainingCell}</td>
     <td style="padding:3px 3px;"><input id="ie-perdose-${id}" type="number" step="0.001" value="${r.per_dose ?? ''}" ${inp}></td>
-    <td style="padding:3px 3px;"><input id="ie-total-${id}" type="number" step="0.001" value="${r.total_amount ?? ''}" placeholder="total" ${inp}></td>
+    <td style="padding:3px 3px;"><input id="ie-total-${id}" type="number" step="0.001" value="${r.total_amount ?? ''}" placeholder="${isVial?'per vial':'total'}" oninput="_recalcInvRowRemaining(${id})" ${inp}></td>
     <td style="padding:3px 3px;"><select id="ie-status-${id}" ${inp}>${statusOpts}</select></td>
     <td style="padding:3px 3px;white-space:nowrap;">
       <button onclick="_saveInv(${id})" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;padding:0 5px 0 0;" title="Save">✓</button>
       <button onclick="loadInventory()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:0;" title="Cancel">✕</button>
     </td>`;
+}
+
+function _recalcInvRowRemaining(id) {
+  const vialsEl = document.getElementById('ie-vials-' + id);
+  if (!vialsEl) return;
+  const total = parseFloat(document.getElementById('ie-total-' + id)?.value);
+  const vials = parseFloat(vialsEl.value);
+  if (!isNaN(total) && !isNaN(vials)) {
+    document.getElementById('ie-remaining-' + id).value = (total * vials).toString();
+  }
 }
 
 async function _saveInv(id) {
@@ -5008,25 +5026,49 @@ function onInvTypeChange() {
   const remainingInp = document.getElementById('inv-remaining');
   const perDoseInp = document.getElementById('inv-perdose');
   const hint = document.getElementById('inv-remaining-hint');
+  const totalLabel = document.getElementById('inv-total-label');
+  const remainingLabel = document.getElementById('inv-remaining-label');
+  const vialRow = document.getElementById('inv-vialcount-row');
   if (type === 'capsule') {
     unitSel.value = 'caps';
+    totalLabel.textContent = 'Total amount';
     perDoseInp.placeholder = 'Capsules per dose (usually 1)';
+    remainingLabel.textContent = 'Remaining';
     remainingInp.placeholder = 'Capsules left in bottle';
     hint.textContent = 'Capsules: Remaining = how many capsules are left in the bottle, not mg.';
+    vialRow.style.display = 'none';
   } else if (type === 'nasal') {
     unitSel.value = 'sprays';
+    totalLabel.textContent = 'Total amount';
     perDoseInp.placeholder = 'Sprays per dose (usually 1)';
+    remainingLabel.textContent = 'Remaining';
     remainingInp.placeholder = 'Sprays left in bottle';
     hint.textContent = 'Nasal sprays: Remaining = sprays left in the bottle, not mcg.';
+    vialRow.style.display = 'none';
   } else if (type === 'vial') {
     unitSel.value = 'mg';
+    totalLabel.textContent = 'Amount per vial';
     perDoseInp.placeholder = 'Per-dose amount (mg)';
-    remainingInp.placeholder = 'mg remaining in the open vial';
-    hint.textContent = 'Vials: Remaining tracked in mg/mcg — enables reconstitution math and accurate doses-left.';
+    remainingLabel.textContent = 'Remaining (mg, auto-calculated)';
+    remainingInp.placeholder = 'Fills in from vials × amount per vial';
+    hint.textContent = 'Enter amount per vial + number of vials on hand — Remaining is calculated for you.';
+    vialRow.style.display = '';
   } else {
+    totalLabel.textContent = 'Total amount';
     perDoseInp.placeholder = 'Per-dose amount';
+    remainingLabel.textContent = 'Remaining';
     remainingInp.placeholder = 'Remaining (blank = unknown)';
     hint.textContent = 'Vials: track remaining in mg/mcg for reconstitution math. Capsules/sprays: track remaining as a piece count.';
+    vialRow.style.display = 'none';
+  }
+}
+
+function recalcVialRemaining() {
+  if (document.getElementById('inv-type').value !== 'vial') return;
+  const perVial = parseFloat(document.getElementById('inv-total').value);
+  const vials = parseFloat(document.getElementById('inv-vialcount').value);
+  if (!isNaN(perVial) && !isNaN(vials)) {
+    document.getElementById('inv-remaining').value = (perVial * vials).toString();
   }
 }
 
@@ -5059,7 +5101,7 @@ async function addInventoryItem() {
 }
 
 function openAddItemModal() {
-  ['inv-name','inv-total','inv-bacwater','inv-remaining','inv-perdose','inv-vendor','inv-notes'].forEach(id => {
+  ['inv-name','inv-total','inv-bacwater','inv-remaining','inv-vialcount','inv-perdose','inv-vendor','inv-notes'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('inv-type').value = 'vial';
