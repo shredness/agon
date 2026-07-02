@@ -560,56 +560,16 @@
     <div class="card" style="padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <div style="font-size:13px;font-weight:600;">Inventory</div>
-        <label style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;cursor:pointer;">
-          <input type="checkbox" id="inv-show-empty" onchange="loadInventory()" style="cursor:pointer;"> Show empty
-        </label>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <label style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px;cursor:pointer;">
+            <input type="checkbox" id="inv-show-empty" onchange="loadInventory()" style="cursor:pointer;"> Show empty
+          </label>
+          <button class="btn btn-sm" onclick="openAddItemModal()">+ Add item</button>
+        </div>
       </div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-        <div id="inventory-list" style="font-size:13px;color:var(--text3);margin-bottom:16px;">Loading...</div>
+        <div id="inventory-list" style="font-size:13px;color:var(--text3);">Loading...</div>
       </div>
-
-      <!-- Add item form -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <input type="text" id="inv-name" placeholder="Name (e.g. KLOW)" style="font-size:12px;">
-        <select id="inv-type" style="font-size:12px;" onchange="onInvTypeChange()">
-          <option value="vial">Vial (injectable)</option>
-          <option value="capsule">Capsule</option>
-          <option value="powder">Powder</option>
-          <option value="nasal">Nasal spray</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-      <p style="font-size:11px;color:var(--text3);margin:-4px 0 8px;" id="inv-remaining-hint">Vials: track remaining in mg/mcg for reconstitution math. Capsules/sprays: track remaining as a piece count.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-        <input type="number" id="inv-total" placeholder="Total amount" step="0.001" style="font-size:12px;">
-        <select id="inv-unit" style="font-size:12px;">
-          <option value="mg">mg</option>
-          <option value="mcg">mcg</option>
-          <option value="iu">iu</option>
-          <option value="g">g</option>
-          <option value="ml">ml</option>
-          <option value="caps">caps</option>
-          <option value="sprays">sprays</option>
-        </select>
-        <input type="number" id="inv-bacwater" placeholder="BAC water (mL, vials)" step="0.01" style="font-size:12px;">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <input type="number" id="inv-remaining" placeholder="Remaining (blank = unknown)" step="0.001" style="font-size:12px;">
-        <input type="number" id="inv-perdose" placeholder="Per-dose amount" step="0.001" style="font-size:12px;">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <select id="inv-protocol" style="font-size:12px;"><option value="">Link to protocol (optional)</option></select>
-        <select id="inv-status" style="font-size:12px;">
-          <option value="active">Active</option>
-          <option value="sealed">Sealed</option>
-          <option value="empty">Empty</option>
-        </select>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <input type="text" id="inv-vendor" placeholder="Vendor (optional)" style="font-size:12px;">
-        <input type="text" id="inv-notes" placeholder="Notes (optional)" style="font-size:12px;">
-      </div>
-      <button class="btn btn-sm btn-primary" onclick="addInventoryItem()">+ Add item</button>
     </div>
 
     <!-- Recent doses -->
@@ -657,6 +617,67 @@
       <div class="modal-footer">
         <button class="btn btn-sm" onclick="closePhaseModal()">Close</button>
         <button class="btn btn-primary btn-sm" onclick="savePhase()">Save phase</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add inventory item modal -->
+  <div class="modal-overlay" id="inv-modal" style="display:none;" onclick="if(event.target===this)closeAddItemModal()">
+    <div class="modal" style="max-width:440px;">
+      <h3>Add inventory item</h3>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Name</label>
+        <input type="text" id="inv-name" style="width:100%;" placeholder="e.g. KLOW">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>Type</label>
+        <select id="inv-type" style="width:100%;" onchange="onInvTypeChange()">
+          <option value="vial">Vial (injectable)</option>
+          <option value="capsule">Capsule</option>
+          <option value="powder">Powder</option>
+          <option value="nasal">Nasal spray</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <p style="font-size:11px;color:var(--text3);margin:-4px 0 10px;" id="inv-remaining-hint">Vials: track remaining in mg/mcg for reconstitution math. Capsules/sprays: track remaining as a piece count.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div class="form-group" style="margin:0;"><label>Total amount</label><input type="number" id="inv-total" step="0.001" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;">
+          <label>Unit</label>
+          <select id="inv-unit" style="width:100%;">
+            <option value="mg">mg</option>
+            <option value="mcg">mcg</option>
+            <option value="iu">iu</option>
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="caps">caps</option>
+            <option value="sprays">sprays</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;"><label>BAC water (mL)</label><input type="number" id="inv-bacwater" step="0.01" style="width:100%;" placeholder="vials only"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div class="form-group" style="margin:0;"><label>Remaining</label><input type="number" id="inv-remaining" step="0.001" style="width:100%;" placeholder="blank = unknown"></div>
+        <div class="form-group" style="margin:0;"><label>Per-dose amount</label><input type="number" id="inv-perdose" step="0.001" style="width:100%;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div class="form-group" style="margin:0;"><label>Link to protocol</label><select id="inv-protocol" style="width:100%;"><option value="">Optional</option></select></div>
+        <div class="form-group" style="margin:0;">
+          <label>Status</label>
+          <select id="inv-status" style="width:100%;">
+            <option value="active">Active</option>
+            <option value="sealed">Sealed</option>
+            <option value="empty">Empty</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
+        <div class="form-group" style="margin:0;"><label>Vendor <span style="color:var(--text3);font-weight:400;">(optional)</span></label><input type="text" id="inv-vendor" style="width:100%;"></div>
+        <div class="form-group" style="margin:0;"><label>Notes <span style="color:var(--text3);font-weight:400;">(optional)</span></label><input type="text" id="inv-notes" style="width:100%;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sm" onclick="closeAddItemModal()">Close</button>
+        <button class="btn btn-primary btn-sm" onclick="addInventoryItem()">+ Add item</button>
       </div>
     </div>
   </div>
@@ -1300,7 +1321,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.11.5';
+const APP_VERSION = '0.11.6';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -5031,13 +5052,26 @@ async function addInventoryItem() {
         notes:        g('inv-notes').trim() || null,
       })
     });
-    ['inv-name','inv-total','inv-bacwater','inv-remaining','inv-perdose','inv-vendor','inv-notes'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    document.getElementById('inv-protocol').value = '';
+    closeAddItemModal();
     await loadInventory();
     showToast('Item added');
   } catch(e) { showToast(e.message); }
+}
+
+function openAddItemModal() {
+  ['inv-name','inv-total','inv-bacwater','inv-remaining','inv-perdose','inv-vendor','inv-notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('inv-type').value = 'vial';
+  document.getElementById('inv-status').value = 'active';
+  populateStackProtocolDropdown();
+  document.getElementById('inv-protocol').value = '';
+  onInvTypeChange();
+  document.getElementById('inv-modal').style.display = 'flex';
+}
+
+function closeAddItemModal() {
+  document.getElementById('inv-modal').style.display = 'none';
 }
 
 async function deleteInventoryItem(id) {
