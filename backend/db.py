@@ -293,8 +293,21 @@ def _init_schema(conn):
             taken_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             site VARCHAR(50),
             notes TEXT,
+            compound VARCHAR(100),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    """)
+    # Migration: add compound column if it doesn't exist yet (dedicated field for the
+    # substance name, instead of burying it inside a "[Tag]" prefix on notes)
+    cursor.execute("ALTER TABLE dose_events ADD COLUMN IF NOT EXISTS compound VARCHAR(100)")
+
+    # One-time backfill: pull "[Compound]" out of notes into the new compound column
+    # for rows that predate it, then strip the now-redundant tag from notes.
+    cursor.execute("""
+        UPDATE dose_events
+        SET compound = TRIM(SUBSTRING(notes FROM '^\\[([^\\]]+)\\]')),
+            notes = NULLIF(TRIM(REGEXP_REPLACE(notes, '^\\[[^\\]]+\\]\\s*', '')), '')
+        WHERE compound IS NULL AND notes ~ '^\\[[^\\]]+\\]'
     """)
 
     # Phases (training blocks: weight-loss, recomp, etc.)

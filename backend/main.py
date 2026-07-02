@@ -274,6 +274,8 @@ class DoseEventIn(BaseModel):
     taken_at:    Optional[str] = None         # ISO timestamp; defaults to now
     site:        Optional[str] = None         # injection site, optional
     notes:       Optional[str] = None
+    compound:    Optional[str] = None         # free-text substance name (display fallback
+                                               # when there's no item/protocol link)
 
 class PhaseIn(BaseModel):
     phase_type: str
@@ -2146,7 +2148,7 @@ def get_doses(date_from: Optional[str] = None, date_to: Optional[str] = None,
               user=Depends(current_user)):
     conn = get_db()
     sql = """SELECT d.id, d.protocol_id, d.item_id, d.amount, d.unit, d.taken_at,
-                    d.site, d.notes, p.name AS protocol_name, i.name AS item_name
+                    d.site, d.notes, d.compound, p.name AS protocol_name, i.name AS item_name
              FROM dose_events d
              LEFT JOIN protocols p ON p.id = d.protocol_id
              LEFT JOIN inventory_items i ON i.id = d.item_id
@@ -2192,10 +2194,10 @@ def log_dose(body: DoseEventIn, user=Depends(current_user)):
                 if per_dose and new_remaining / per_dose <= 5:
                     low_stock = {"remaining": new_remaining, "doses_remaining": int(new_remaining // per_dose)}
         conn.execute(
-            """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes)
-               VALUES (%s,%s,%s,%s,%s,COALESCE(%s, CURRENT_TIMESTAMP),%s,%s)""",
+            """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes, compound)
+               VALUES (%s,%s,%s,%s,%s,COALESCE(%s, CURRENT_TIMESTAMP),%s,%s,%s)""",
             (user["id"], body.protocol_id, body.item_id, amount, unit,
-             body.taken_at or None, body.site, body.notes)
+             body.taken_at or None, body.site, body.notes, body.compound)
         )
         conn.commit()
         resp = {"status": "logged"}
@@ -2208,6 +2210,37 @@ def log_dose(body: DoseEventIn, user=Depends(current_user)):
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Dose log failed: {str(e)}")
+    finally:
+        conn.close()
+
+@app.put("/doses/{dose_id}")
+def update_dose(dose_id: int, body: DoseEventIn, user=Depends(current_user)):
+    """Edit a dose event's fields directly — for backfilling a compound name/link
+    onto historical rows, or correcting amount/time/site/notes. Never touches
+    inventory stock; that only happens on create (POST /doses) and delete."""
+    if user["role"] == "demo":
+        raise HTTPException(status_code=403, detail="Demo accounts cannot edit doses")
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT id FROM dose_events WHERE id=%s AND user_id=%s", (dose_id, user["id"])).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Dose event not found")
+        conn.execute(
+            """UPDATE dose_events
+               SET protocol_id=%s, item_id=%s, amount=%s, unit=%s,
+                   taken_at=COALESCE(%s, taken_at), site=%s, notes=%s, compound=%s
+               WHERE id=%s AND user_id=%s""",
+            (body.protocol_id, body.item_id, body.amount, body.unit,
+             body.taken_at or None, body.site, body.notes, body.compound, dose_id, user["id"])
+        )
+        conn.commit()
+        return {"status": "updated"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Dose update failed: {str(e)}")
     finally:
         conn.close()
 
@@ -2394,6 +2427,44 @@ def external_link_inventory(payload: dict,
     finally:
         conn.close()
 
+@app.post("/external/inventory/patch")
+def external_patch_inventory(payload: dict,
+                             x_api_key: Optional[str] = Header(default=None),
+                             authorization: Optional[str] = Header(default=None)):
+    """Patch arbitrary fields on existing inventory items by name match (case-insensitive).
+    Body: {"patches": [{"item": "5-Amino-1MQ", "unit": "caps", "per_dose": 1}, ...]}.
+    Allowed fields: unit, per_dose, total_amount, remaining, bac_water_ml, item_type,
+    status, vendor, cost, notes. Unlisted fields on an item are left untouched."""
+    ext = _resolve_external_key(authorization, x_api_key)
+    uid = ext["id"]
+    patches = payload.get("patches", [])
+    if not isinstance(patches, list):
+        raise HTTPException(status_code=400, detail="Body must be {'patches': [...]}")
+    allowed = {"unit","per_dose","total_amount","remaining","bac_water_ml","item_type","status","vendor","cost","notes"}
+    conn = get_db()
+    try:
+        items = conn.execute("SELECT id, name FROM inventory_items WHERE user_id=%s", (uid,)).fetchall()
+        imap = { (r["name"] or "").strip().lower(): r["id"] for r in items }
+        patched, missed = 0, []
+        for p in patches:
+            iname = (p.get("item") or "").strip().lower()
+            if iname not in imap:
+                missed.append(p); continue
+            fields = {k: v for k, v in p.items() if k in allowed}
+            if not fields:
+                missed.append(p); continue
+            set_clause = ", ".join(f"{k}=%s" for k in fields)
+            params = list(fields.values()) + [imap[iname], uid]
+            conn.execute(f"UPDATE inventory_items SET {set_clause} WHERE id=%s AND user_id=%s", params)
+            patched += 1
+        conn.commit()
+        return {"status": "ok", "patched": patched, "missed": missed}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Patch failed: {str(e)}")
+    finally:
+        conn.close()
+
 class ExternalDoseIn(BaseModel):
     compound:    str                          # free-text compound name (log is self-describing)
     amount:      Optional[float] = None
@@ -2435,13 +2506,10 @@ def external_log_dose(body: ExternalDoseIn,
                     if pd and new_rem / pd <= 5:
                         low_stock = {"remaining": new_rem, "doses_remaining": int(new_rem // pd)}
         note = body.notes
-        if body.compound:
-            tag = f"[{body.compound}]"
-            note = f"{tag} {note}" if note else tag
         conn.execute(
-            """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes)
-               VALUES (%s,%s,%s,%s,%s,COALESCE(%s, CURRENT_TIMESTAMP),%s,%s)""",
-            (uid, body.protocol_id, body.item_id, amount, unit, body.taken_at or None, body.site, note)
+            """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes, compound)
+               VALUES (%s,%s,%s,%s,%s,COALESCE(%s, CURRENT_TIMESTAMP),%s,%s,%s)""",
+            (uid, body.protocol_id, body.item_id, amount, unit, body.taken_at or None, body.site, note, body.compound)
         )
         conn.commit()
         resp = {"status": "logged"}
@@ -2479,12 +2547,12 @@ def external_import_doses(payload: dict,
                 skipped += 1; continue
             taken_at = d.get("taken_at")
             amount = d.get("amount")
-            # idempotency guard
+            # idempotency guard — matched against the dedicated compound column now
             existing = conn.execute(
                 """SELECT 1 FROM dose_events
-                   WHERE user_id=%s AND taken_at=%s AND COALESCE(notes,'') LIKE %s
+                   WHERE user_id=%s AND taken_at=%s AND compound=%s
                    LIMIT 1""",
-                (uid, taken_at, f"[{compound}]%")
+                (uid, taken_at, compound)
             ).fetchone()
             if existing:
                 skipped += 1; continue
@@ -2493,14 +2561,13 @@ def external_import_doses(payload: dict,
             if pid is None and pname and pname in pmap:
                 pid = pmap[pname]; linked += 1
             note = d.get("notes")
-            tag = f"[{compound}]"
             if d.get("status") and d.get("status") != "Logged":
-                tag += f"[{d.get('status')}]"
-            note = f"{tag} {note}" if note else tag
+                tag = f"[{d.get('status')}]"
+                note = f"{tag} {note}" if note else tag
             conn.execute(
-                """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes)
-                   VALUES (%s,%s,NULL,%s,%s,%s,%s,%s)""",
-                (uid, pid, amount, d.get("unit"), taken_at, d.get("site"), note)
+                """INSERT INTO dose_events (user_id, protocol_id, item_id, amount, unit, taken_at, site, notes, compound)
+                   VALUES (%s,%s,NULL,%s,%s,%s,%s,%s,%s)""",
+                (uid, pid, amount, d.get("unit"), taken_at, d.get("site"), note, compound)
             )
             inserted += 1
         conn.commit()
@@ -2582,7 +2649,7 @@ def get_external_data(request: Request,
 
     # Dose events (execution log, most recent 500)
     doses = conn.execute(
-        """SELECT d.taken_at, d.amount, d.unit, d.site, d.notes,
+        """SELECT d.taken_at, d.amount, d.unit, d.site, d.notes, d.compound,
                   p.name AS protocol_name, i.name AS item_name
            FROM dose_events d
            LEFT JOIN protocols p ON p.id = d.protocol_id

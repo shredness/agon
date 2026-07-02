@@ -571,7 +571,7 @@
       <!-- Add item form -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <input type="text" id="inv-name" placeholder="Name (e.g. KLOW)" style="font-size:12px;">
-        <select id="inv-type" style="font-size:12px;">
+        <select id="inv-type" style="font-size:12px;" onchange="onInvTypeChange()">
           <option value="vial">Vial (injectable)</option>
           <option value="capsule">Capsule</option>
           <option value="powder">Powder</option>
@@ -579,6 +579,7 @@
           <option value="other">Other</option>
         </select>
       </div>
+      <p style="font-size:11px;color:var(--text3);margin:-4px 0 8px;" id="inv-remaining-hint">Vials: track remaining in mg/mcg for reconstitution math. Capsules/sprays: track remaining as a piece count.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
         <input type="number" id="inv-total" placeholder="Total amount" step="0.001" style="font-size:12px;">
         <select id="inv-unit" style="font-size:12px;">
@@ -1299,7 +1300,7 @@
 <script>
 
 const API = '/api';
-const APP_VERSION = '0.11.4';
+const APP_VERSION = '0.11.5';
 
 // HTML escape helper for safely interpolating user data into innerHTML
 function escapeHtml(s) {
@@ -4980,6 +4981,34 @@ async function _saveInv(id) {
   } catch(e) { showToast(e.message); }
 }
 
+function onInvTypeChange() {
+  const type = document.getElementById('inv-type').value;
+  const unitSel = document.getElementById('inv-unit');
+  const remainingInp = document.getElementById('inv-remaining');
+  const perDoseInp = document.getElementById('inv-perdose');
+  const hint = document.getElementById('inv-remaining-hint');
+  if (type === 'capsule') {
+    unitSel.value = 'caps';
+    perDoseInp.placeholder = 'Capsules per dose (usually 1)';
+    remainingInp.placeholder = 'Capsules left in bottle';
+    hint.textContent = 'Capsules: Remaining = how many capsules are left in the bottle, not mg.';
+  } else if (type === 'nasal') {
+    unitSel.value = 'sprays';
+    perDoseInp.placeholder = 'Sprays per dose (usually 1)';
+    remainingInp.placeholder = 'Sprays left in bottle';
+    hint.textContent = 'Nasal sprays: Remaining = sprays left in the bottle, not mcg.';
+  } else if (type === 'vial') {
+    unitSel.value = 'mg';
+    perDoseInp.placeholder = 'Per-dose amount (mg)';
+    remainingInp.placeholder = 'mg remaining in the open vial';
+    hint.textContent = 'Vials: Remaining tracked in mg/mcg — enables reconstitution math and accurate doses-left.';
+  } else {
+    perDoseInp.placeholder = 'Per-dose amount';
+    remainingInp.placeholder = 'Remaining (blank = unknown)';
+    hint.textContent = 'Vials: track remaining in mg/mcg for reconstitution math. Capsules/sprays: track remaining as a piece count.';
+  }
+}
+
 async function addInventoryItem() {
   const name = document.getElementById('inv-name').value.trim();
   if (!name) { showToast('Name is required'); return; }
@@ -5038,6 +5067,7 @@ async function loadDoseHistory() {
   if (!target) return;
   try {
     const doses = await aiFetch('/doses?limit=30');
+    _doseHistoryCache = doses;
     if (!doses.length) {
       target.innerHTML = '<div style="font-size:12px;color:var(--text3);">No doses logged yet.</div>';
       return;
@@ -5048,26 +5078,82 @@ async function loadDoseHistory() {
         <th style="${th}">Item</th>
         <th style="${th}">Amount</th>
         <th style="${th}">Site</th>
-        <th style="width:36px;"></th>
+        <th style="width:60px;"></th>
       </tr></thead>`;
-    let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;">${tableHead}<tbody>`;
-    html += doses.map(d => {
-      const when = (d.taken_at || '').replace('T', ' ').slice(0, 16);
-      const label = d.item_name || d.protocol_name || '—';
-      const amt = d.amount != null ? `${_fmtQty(d.amount)} ${escapeHtml(d.unit||'')}` : '—';
-      return `<tr style="border-bottom:0.5px solid var(--border);">
-        <td style="padding:4px 6px;color:var(--text3);font-size:11px;white-space:nowrap;">${escapeHtml(when)}</td>
-        <td style="padding:4px 6px;color:var(--text);">${escapeHtml(label)}</td>
-        <td style="padding:4px 6px;color:var(--text2);">${amt}</td>
-        <td style="padding:4px 6px;color:var(--text3);font-size:11px;">${escapeHtml(d.site||'')}</td>
-        <td style="padding:4px 6px;"><button onclick="deleteDoseEvent(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;" title="Delete (restocks item)">✕</button></td>
-      </tr>`;
-    }).join('');
+    let html = `<table style="width:100%;border-collapse:collapse;font-size:12px;">${tableHead}<tbody id="dose-history-tbody">`;
+    html += doses.map(d => _doseRow(d)).join('');
     html += '</tbody></table>';
     target.innerHTML = html;
   } catch(e) {
     target.innerHTML = '<div style="font-size:12px;color:var(--red-text);">Could not load dose history.</div>';
   }
+}
+
+let _doseHistoryCache = [];
+
+function _doseRow(d) {
+  const when = (d.taken_at || '').replace('T', ' ').slice(0, 16);
+  const label = d.item_name || d.protocol_name || d.compound || '—';
+  const amt = d.amount != null ? `${_fmtQty(d.amount)} ${escapeHtml(d.unit||'')}` : '—';
+  return `<tr id="dose-row-${d.id}" style="border-bottom:0.5px solid var(--border);">
+    <td style="padding:4px 6px;color:var(--text3);font-size:11px;white-space:nowrap;">${escapeHtml(when)}</td>
+    <td style="padding:4px 6px;color:var(--text);">${escapeHtml(label)}</td>
+    <td style="padding:4px 6px;color:var(--text2);">${amt}</td>
+    <td style="padding:4px 6px;color:var(--text3);font-size:11px;">${escapeHtml(d.site||'')}</td>
+    <td style="padding:4px 6px;white-space:nowrap;">
+      <button onclick="_editDose(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:13px;padding:0 5px 0 0;" title="Edit / backfill">✎</button>
+      <button onclick="deleteDoseEvent(${d.id})" style="background:none;border:none;cursor:pointer;color:var(--red-text);font-size:12px;padding:0;" title="Delete (restocks item)">✕</button>
+    </td>
+  </tr>`;
+}
+
+function _editDose(id) {
+  const d = _doseHistoryCache.find(x => x.id === id);
+  const row = document.getElementById('dose-row-' + id);
+  if (!d || !row) return;
+  const inp = 'style="width:100%;font-size:11px;padding:2px 4px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;color:var(--text);box-sizing:border-box;"';
+  const itemOpts = '<option value="">— none —</option>' + _stackItems.map(i => `<option value="${i.id}" ${d.item_id===i.id?'selected':''}>${escapeHtml(i.name)}</option>`).join('');
+  const protoOpts = '<option value="">— none —</option>' + _stackProtocols.map(p => `<option value="${p.id}" ${d.protocol_id===p.id?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+  row.innerHTML = `
+    <td colspan="5" style="padding:6px 4px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+        <div><label style="font-size:10px;color:var(--text3);">Compound (free text)</label><input id="de-compound-${id}" value="${escapeHtml(d.compound||'')}" placeholder="e.g. Zinc Picolinate" ${inp}></div>
+        <div><label style="font-size:10px;color:var(--text3);">When</label><input type="datetime-local" id="de-when-${id}" value="${(d.taken_at||'').slice(0,16)}" ${inp}></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px;">
+        <div><label style="font-size:10px;color:var(--text3);">Amount</label><input type="number" step="0.001" id="de-amount-${id}" value="${d.amount ?? ''}" ${inp}></div>
+        <div><label style="font-size:10px;color:var(--text3);">Unit</label><input id="de-unit-${id}" value="${escapeHtml(d.unit||'')}" ${inp}></div>
+        <div><label style="font-size:10px;color:var(--text3);">Site</label><input id="de-site-${id}" value="${escapeHtml(d.site||'')}" ${inp}></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+        <div><label style="font-size:10px;color:var(--text3);">Link to item</label><select id="de-item-${id}" ${inp}>${itemOpts}</select></div>
+        <div><label style="font-size:10px;color:var(--text3);">Link to protocol</label><select id="de-protocol-${id}" ${inp}>${protoOpts}</select></div>
+      </div>
+      <div style="margin-bottom:6px;"><label style="font-size:10px;color:var(--text3);">Notes</label><input id="de-notes-${id}" value="${escapeHtml(d.notes||'')}" ${inp}></div>
+      <button onclick="_saveDose(${id})" class="btn btn-sm btn-primary" style="margin-right:6px;">Save</button>
+      <button onclick="loadDoseHistory()" class="btn btn-sm">Cancel</button>
+    </td>`;
+}
+
+async function _saveDose(id) {
+  const g = f => document.getElementById('de-' + f + '-' + id)?.value;
+  try {
+    await aiFetch('/doses/' + id, {
+      method: 'PUT',
+      body: JSON.stringify({
+        compound:    g('compound').trim() || null,
+        amount:      g('amount') !== '' ? parseFloat(g('amount')) : null,
+        unit:        g('unit').trim() || null,
+        taken_at:    g('when') ? g('when') + ':00' : null,
+        site:        g('site').trim() || null,
+        notes:       g('notes').trim() || null,
+        item_id:     g('item') ? parseInt(g('item')) : null,
+        protocol_id: g('protocol') ? parseInt(g('protocol')) : null,
+      })
+    });
+    await loadDoseHistory();
+    showToast('Dose updated');
+  } catch(e) { showToast(e.message); }
 }
 
 async function deleteDoseEvent(id) {
